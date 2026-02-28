@@ -1,0 +1,592 @@
+/* =====================================================
+   STOCKER – Estilos personalizados
+   Se aplican sobre water.css (classless framework)
+   ===================================================== */
+
+/* ---- Variables ---- */
+:root {
+  --color-primary:    #1a73e8;
+  --color-primary-dk: #1557b0;
+  --color-success:    #188038;
+  --color-danger:     #d93025;
+  --color-warning:    #e37400;
+  --color-text:       #202124;
+  --color-muted:      #5f6368;
+  --color-border:     #dadce0;
+  --color-bg:         #f8f9fa;
+  --color-surface:    #ffffff;
+  --color-compra:     #1e8e3e;
+  --color-venta:      #d93025;
+  --sidebar-width:    220px;
+  --navbar-height:    56px;
+  --radius:           8px;
+  --shadow:           0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+}
+
+/* ---- Reset layout de water.css ---- */
+body {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+}
+
+/* ---- Loading inicial ---- */
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--color-muted);
+  font-size: 1rem;
+}
+
+/* =====================================================
+   LOGIN
+   ===================================================== */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #dbeafe 0%, #eff6ff 55%, #e0e7ff 100%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(26,115,232,.18), 0 2px 8px rgba(0,0,0,.07);
+}
+
+/* ── Cabecera azul ── */
+.login-card-header {
+  background: linear-gradient(135deg, #1557b0 0%, #1a73e8 60%, #4285f4 100%);
+  padding: 2.25rem 2.5rem 2rem;
+  text-align: center;
+  color: #fff;
+}
+
+.login-logo {
+  display: block;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto .7rem;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,.35));
+  border-radius: 9px;
+}
+
+.login-card h1 {
+  margin: 0 0 .3rem;
+  font-size: 1.85rem;
+  color: #fff;
+  letter-spacing: -.03em;
+  font-weight: 700;
+}
+
+.login-card .subtitle {
+  color: rgba(255,255,255,.78);
+  margin: 0;
+  font-size: .875rem;
+}
+
+/* ── Cuerpo blanco ── */
+.login-card-body {
+  background: var(--color-surface);
+  padding: 1.75rem 2.5rem 2rem;
+}
+
+/* ── Tabs segmentados ── */
+.login-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.5rem;
+  border-bottom: none;
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.login-tabs button {
+  flex: 1;
+  background: transparent !important;
+  border: none;
+  padding: .5rem;
+  cursor: pointer;
+  color: var(--color-muted) !important;
+  font-size: .875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  margin-bottom: 0;
+  border-bottom: none;
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+
+.login-tabs button.active {
+  background: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,.13);
+}
+
+.login-card label {
+  display: block;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin-bottom: .3rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.login-card input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+}
+
+/* !important necesario: water.css sobreescribe botones en dark mode */
+.btn-primary {
+  width: 100%;
+  background: var(--color-primary) !important;
+  color: #fff !important;
+  border: none;
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: .25rem;
+  box-shadow: 0 3px 10px rgba(26,115,232,.38);
+  transition: background .2s, box-shadow .2s, transform .1s;
+}
+
+.btn-primary:hover  {
+  background: var(--color-primary-dk) !important;
+  box-shadow: 0 5px 16px rgba(26,115,232,.48);
+}
+.btn-primary:active { transform: scale(.98); }
+
+.login-error {
+  color: var(--color-danger);
+  font-size: .83rem;
+  margin-top: .75rem;
+  text-align: center;
+  min-height: 1.2rem;
+}
+
+/* =====================================================
+   LAYOUT PRINCIPAL
+   ===================================================== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- Navbar ---- */
+.navbar {
+  height: var(--navbar-height);
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,.2);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.navbar-brand {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.navbar-logo {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.navbar-user {
+  font-size: .8rem;
+  opacity: .85;
+}
+
+.navbar-logout {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  padding: .35rem .8rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: .8rem;
+  transition: background .2s;
+}
+
+.navbar-logout:hover { background: rgba(255,255,255,.25); }
+
+/* ---- Body del shell ---- */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  padding: .75rem 0 .25rem;
+}
+
+.sidebar-section-title {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--color-muted);
+  padding: .35rem 1rem;
+}
+
+.sidebar-link {
+  display: block;
+  padding: .5rem 1rem .5rem 1.5rem;
+  color: var(--color-text);
+  text-decoration: none;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  font-size: .88rem;
+  transition: background .15s, border-color .15s;
+}
+
+.sidebar-link:hover     { background: var(--color-bg); }
+.sidebar-link.active    { background: #e8f0fe; color: var(--color-primary); border-left-color: var(--color-primary); font-weight: 600; }
+
+/* ---- Área de contenido ---- */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.25rem;
+}
+
+/* =====================================================
+   SECCIONES / PÁGINAS
+   ===================================================== */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--color-text);
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.card h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+/* ---- Formularios ---- */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .75rem;
+  align-items: end;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.form-group label {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Water.css en dark mode aplica background: #161f27 a inputs — lo neutralizamos */
+input,
+select,
+textarea {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: .45rem .6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: .9rem;
+  transition: border-color .15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(26,115,232,.15);
+}
+
+.form-group textarea { resize: vertical; min-height: 70px; }
+
+.form-actions { margin-top: 1rem; display: flex; gap: .5rem; }
+
+/* Botones generales */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem 1rem;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-size: .875rem;
+  font-weight: 600;
+  transition: opacity .2s, transform .1s;
+}
+
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-sm   { padding: .3rem .7rem; font-size: .8rem; }
+/* !important necesario: Water.css tiene tbody tr:nth-child(2n) button { background: #1a242f }
+   con especificidad (0,1,3) que supera a nuestras clases (0,1,0) */
+.btn-blue  { background: var(--color-primary) !important; color: #fff !important; }
+.btn-blue:hover { opacity: .88; }
+.btn-red   { background: var(--color-danger)  !important; color: #fff !important; }
+.btn-red:hover  { opacity: .88; }
+.btn-ghost { background: var(--color-surface) !important; border: 1px solid var(--color-border); color: var(--color-text) !important; }
+.btn-ghost:hover { background: var(--color-bg) !important; }
+
+/* ---- Tablas ---- */
+.table-wrapper {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .8rem;
+  table-layout: fixed;
+}
+
+thead th {
+  text-align: left;
+  padding: .4rem .4rem;
+  background: var(--color-bg);
+  border-bottom: 2px solid var(--color-border);
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Water.css define strong { color: var(--text-bright) } que puede resultar
+   blanco en dark mode. Forzamos inherit para que respete el color de la celda. */
+tbody strong {
+  color: var(--color-text);
+}
+
+tbody td {
+  padding: .4rem .4rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+/* Water.css: tbody tr:nth-child(2n) tiene spec (0,1,2) y en dark mode pone #161f27.
+   Usamos !important para ganar en cualquier modo del SO. */
+tbody tr            { background-color: var(--color-surface) !important; }
+tbody tr:hover      { background-color: var(--color-bg)      !important; }
+
+.table-empty {
+  text-align: center;
+  color: var(--color-muted);
+  padding: 2rem !important;
+  font-size: .9rem;
+}
+
+/* ---- Badges ---- */
+.badge {
+  display: inline-block;
+  padding: .2rem .55rem;
+  border-radius: 99px;
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.badge-compra  { background: #e6f4ea; color: var(--color-compra); }
+.badge-venta   { background: #fce8e6; color: var(--color-venta); }
+.badge-ars     { background: #e8f0fe; color: var(--color-primary); }
+.badge-usd     { background: #fef7e0; color: var(--color-warning); }
+
+/* ---- Toast ---- */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  z-index: 9999;
+}
+
+.toast {
+  padding: .75rem 1.25rem;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: .88rem;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  animation: slideIn .2s ease-out;
+  max-width: 320px;
+}
+
+.toast-success { background: var(--color-success); }
+.toast-error   { background: var(--color-danger); }
+.toast-info    { background: var(--color-primary); }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ---- Estado vacío ---- */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-muted);
+}
+
+.empty-state p { margin: 0; font-size: .95rem; }
+
+/* ---- Spinner ---- */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0,0,0,.1);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Celda de acciones (Editar + Eliminar) ---- */
+.actions-cell {
+  white-space: nowrap;
+  vertical-align: middle;
+  overflow: visible !important;  /* no recortar los botones */
+  width: 1px;                    /* shrink al mínimo posible */
+}
+
+.actions-cell .btn + .btn {
+  margin-left: .3rem;
+}
+
+/* ---- Ticker chip ---- */
+.ticker-chip {
+  display: inline-block;
+  background: #e8eaf6;
+  color: #3949ab;
+  font-family: monospace;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .1rem .3rem;
+  border-radius: 4px;
+}
+
+/* ---- Total en operaciones ---- */
+.amount {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- Settings ---- */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .5rem 0;
+}
+
+.setting-info { flex: 1; }
+
+.setting-label {
+  font-weight: 600;
+  font-size: .9rem;
+  color: var(--color-text);
+  margin-bottom: .3rem;
+}
+
+.setting-desc {
+  font-size: .85rem;
+  margin-bottom: .3rem;
+}
+
+.setting-meta {
+  font-size: .75rem;
+  color: var(--color-muted);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main-content { padding: 1rem; }
+  .form-row { grid-template-columns: 1fr; }
+}
