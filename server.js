@@ -192,7 +192,7 @@ app.post('/api/alycs', requireAuth, async (req, res) => {
   res.status(201).json({ data: payload })
 })
 
-// ── POST /api/operations ───────────────────────────────────
+// ── POST /api/operations ─────────────────────────���─────────
 app.post('/api/operations', requireAuth, async (req, res) => {
   const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
   const userId = req.userId
@@ -585,6 +585,19 @@ app.patch('/api/settings/:key', requireAuth, async (req, res) => {
   res.json({ data: payload[0] })
 })
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`Stocker corriendo en http://localhost:${PORT}`)
+})
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const altPort = Number(PORT) + 1
+    logger.warn(`Puerto ${PORT} en uso, intentando con ${altPort}`)
+    app.listen(altPort, () => {
+      logger.info(`Stocker corriendo en http://localhost:${altPort}`)
+    })
+  } else {
+    logger.error({ err }, 'Error al iniciar el servidor')
+    process.exit(1)
+  }
 })
