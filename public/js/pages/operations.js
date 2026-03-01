@@ -77,7 +77,7 @@ export const OperationsPage = {
       .from('operations')
       .select('*, instruments(ticker, name), alycs(name)', { count: 'exact' })
       .order('operated_at', { ascending: false })
-      .order('created_at',  { ascending: false })
+      .order('ticker', { referencedTable: 'instruments', ascending: true })
 
     let data, error, count, searching = !!_searchQuery
 

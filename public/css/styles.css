@@ -401,7 +401,7 @@ textarea {
 
 /* ---- Tablas ---- */
 .table-wrapper {
-  overflow-x: hidden;
+  overflow-x: auto;
   width: 100%;
 }
 
@@ -629,9 +629,75 @@ tbody tr:hover      { background-color: var(--color-bg)      !important; }
   color: var(--color-muted);
 }
 
+/* ---- Hamburger button ---- */
+.navbar-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: .3rem .5rem;
+  border-radius: 4px;
+  transition: background .15s;
+}
+.navbar-hamburger:hover { background: rgba(255,255,255,.15); }
+
+/* ---- Overlay para drawer ---- */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: var(--navbar-height);
+  right: 0; bottom: 0; left: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 99;
+}
+.sidebar-overlay.open { display: block; }
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .main-content { padding: 1rem; }
+  .navbar-hamburger { display: block; }
+  .navbar-user { display: none; }
+
+  /* Sidebar como drawer */
+  .sidebar {
+    display: block !important;
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    height: calc(100vh - var(--navbar-height));
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,.25);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .main-content { padding: .75rem; }
+
+  /* Formularios: una columna */
   .form-row { grid-template-columns: 1fr; }
+  .form-row > * { grid-column: span 1 !important; }
+  .form-actions { flex-direction: column; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+
+  /* Page header: wrap */
+  .page-header { flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+
+  /* Tablas: scroll horizontal */
+  table { table-layout: auto; min-width: 520px; }
+
+  /* Table card header: stack */
+  .table-card-header { flex-direction: column; align-items: stretch; gap: .5rem; }
+  .search-input { width: 100%; box-sizing: border-box; }
+
+  /* Toast: ancho completo */
+  .toast-container { bottom: 0; right: 0; left: 0; padding: .75rem; align-items: stretch; }
+  .toast { max-width: 100%; }
+
+  /* Login: menos padding */
+  .login-card { margin: 1rem; max-width: none; }
+  .login-card-header { padding: 1.5rem 1.5rem 1.25rem; }
+  .login-card-body   { padding: 1.25rem 1.5rem 1.5rem; }
 }

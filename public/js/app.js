@@ -30,10 +30,12 @@ function renderShell(userEmail) {
   app.innerHTML = `
     <div class="app-shell">
       <nav class="navbar">
+        <button class="navbar-hamburger" id="btn-menu" aria-label="Menú">&#9776;</button>
         <span class="navbar-brand"><img class="navbar-logo" src="/img/logo.svg" alt=""> Stocker</span>
         <span class="navbar-user">${userEmail}</span>
         <button class="navbar-logout" id="btn-logout">Salir</button>
       </nav>
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
       <div class="app-body">
         <aside class="sidebar">
           <div class="sidebar-section">
@@ -56,9 +58,24 @@ function renderShell(userEmail) {
       </div>
     </div>`
 
+  // Drawer (mobile)
+  const sidebar = app.querySelector('.sidebar')
+  const overlay = document.getElementById('sidebar-overlay')
+  const openDrawer  = () => { sidebar.classList.add('open');    overlay.classList.add('open') }
+  const closeDrawer = () => { sidebar.classList.remove('open'); overlay.classList.remove('open') }
+
+  document.getElementById('btn-menu').addEventListener('click', () =>
+    sidebar.classList.contains('open') ? closeDrawer() : openDrawer()
+  )
+  overlay.addEventListener('click', closeDrawer)
+  window.addEventListener('resize', () => { if (window.innerWidth > 768) closeDrawer() })
+
   // Navegación por sidebar
   app.querySelectorAll('.sidebar-link').forEach(link => {
-    link.addEventListener('click', () => navigate(link.dataset.route))
+    link.addEventListener('click', () => {
+      navigate(link.dataset.route)
+      closeDrawer()
+    })
   })
 
   // Logout
