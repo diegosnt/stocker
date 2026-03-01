@@ -1,29 +1,8 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
+import { apiRequest } from '../api-client.js'
 
-async function postInstrument(ticker, name, instrument_type_id) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch('/api/instruments', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify({ ticker, name, instrument_type_id })
-  })
-  const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error al guardar'), { code: json.error?.[0]?.code })
-  return json.data
-}
-
-async function patchInstrument(id, ticker, name, instrument_type_id) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(`/api/instruments/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify({ ticker, name, instrument_type_id })
-  })
-  const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error al actualizar'), { code: json.error?.[0]?.code })
-  return json.data
-}
+let _instrData = []
 
 export const InstrumentsPage = {
   async render() {
@@ -60,7 +39,10 @@ export const InstrumentsPage = {
       </div>
 
       <div class="card">
-        <h3>Instrumentos registrados</h3>
+        <div class="table-card-header">
+          <h3>Instrumentos registrados</h3>
+          <input type="search" id="inst-search" class="search-input" placeholder="Buscar por ticker, nombre o tipo...">
+        </div>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -79,8 +61,13 @@ export const InstrumentsPage = {
         </div>
       </div>`
 
-    await Promise.all([this._loadTypes(), this._loadList()])
+    try {
+      await Promise.all([this._loadTypes(), this._loadList()])
+    } catch {
+      showToast('Error al cargar los datos. Intentá recargar la página.', 'error')
+    }
     this._bindForm()
+    this._bindSearch()
   },
 
   async _loadTypes(selectedId = null) {
@@ -111,6 +98,14 @@ export const InstrumentsPage = {
       tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Error al cargar.</td></tr>`
       return
     }
+
+    _instrData = data
+    this._renderRows(data)
+  },
+
+  _renderRows(data) {
+    const tbody = document.getElementById('inst-tbody')
+    if (!tbody) return
 
     if (!data.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No hay instrumentos. Agregá uno arriba.</td></tr>`
@@ -146,6 +141,21 @@ export const InstrumentsPage = {
     })
   },
 
+  _bindSearch() {
+    const input = document.getElementById('inst-search')
+    if (!input) return
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase()
+      const filtered = q
+        ? _instrData.filter(i =>
+            i.ticker.toLowerCase().includes(q) ||
+            i.name.toLowerCase().includes(q) ||
+            (i.instrument_types?.name || '').toLowerCase().includes(q))
+        : _instrData
+      this._renderRows(filtered)
+    })
+  },
+
   _bindForm() {
     const form = document.getElementById('form-instrumento')
     if (!form) return
@@ -169,11 +179,11 @@ export const InstrumentsPage = {
 
       try {
         if (editId) {
-          await patchInstrument(editId, ticker, name, typeId)
+          await apiRequest('PATCH', `/api/instruments/${editId}`, { ticker, name, instrument_type_id: typeId })
           showToast(`Instrumento "${ticker}" actualizado.`, 'success')
-          this._cancelEdit()
+          this._cancelEdit(true)
         } else {
-          await postInstrument(ticker, name, typeId)
+          await apiRequest('POST', '/api/instruments', { ticker, name, instrument_type_id: typeId })
           showToast(`Instrumento "${ticker}" agregado.`, 'success')
           form.reset()
         }
@@ -188,17 +198,28 @@ export const InstrumentsPage = {
 
   async _startEdit(record) {
     await this._loadTypes(record.instrument_type_id)
+    const form = document.getElementById('form-instrumento')
     document.getElementById('inst-form-title').textContent        = 'Editar Instrumento'
     document.getElementById('inst-ticker').value                  = record.ticker
     document.getElementById('inst-name').value                    = record.name
     document.getElementById('btn-inst-submit').textContent        = 'Guardar cambios'
     document.getElementById('btn-inst-cancel-edit').style.display = ''
-    document.getElementById('form-instrumento').dataset.editId    = record.id
+    form.dataset.editId         = record.id
+    form.dataset.originalTicker = record.ticker
+    form.dataset.originalName   = record.name
+    form.dataset.originalTypeId = record.instrument_type_id
     document.getElementById('inst-ticker').focus()
-    document.getElementById('form-instrumento').scrollIntoView({ behavior: 'smooth' })
+    form.scrollIntoView({ behavior: 'smooth' })
   },
 
-  _cancelEdit() {
+  _cancelEdit(confirmed = false) {
+    if (!confirmed) {
+      const form    = document.getElementById('form-instrumento')
+      const isDirty = document.getElementById('inst-ticker').value.trim() !== (form.dataset.originalTicker || '') ||
+                      document.getElementById('inst-name').value.trim()   !== (form.dataset.originalName   || '') ||
+                      document.getElementById('inst-type').value          !== (form.dataset.originalTypeId || '')
+      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
+    }
     document.getElementById('inst-form-title').textContent          = 'Nuevo Instrumento'
     document.getElementById('form-instrumento').reset()
     document.getElementById('btn-inst-submit').textContent          = 'Agregar'
@@ -210,15 +231,13 @@ export const InstrumentsPage = {
   async _delete(id, ticker) {
     if (!confirm(`¿Eliminar "${ticker}"?\nNo se puede eliminar si tiene operaciones registradas.`)) return
 
-    const { error } = await supabase.from('instruments').delete().eq('id', id)
-
-    if (error) {
-      showToast(error.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
-      return
+    try {
+      await apiRequest('DELETE', `/api/instruments/${id}`)
+      showToast(`Instrumento "${ticker}" eliminado.`, 'success')
+      await this._loadList()
+    } catch (err) {
+      showToast(err.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
     }
-
-    showToast(`Instrumento "${ticker}" eliminado.`, 'success')
-    await this._loadList()
   }
 }
 

@@ -1,29 +1,8 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
+import { apiRequest } from '../api-client.js'
 
-async function postAlyc(name, cuit, website) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch('/api/alycs', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify({ name, cuit, website })
-  })
-  const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error al guardar'), { code: json.error?.[0]?.code })
-  return json.data
-}
-
-async function patchAlyc(id, name, cuit, website) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(`/api/alycs/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify({ name, cuit, website })
-  })
-  const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error al actualizar'), { code: json.error?.[0]?.code })
-  return json.data
-}
+let _alycsData = []
 
 export const AlycsPage = {
   async render() {
@@ -58,7 +37,10 @@ export const AlycsPage = {
       </div>
 
       <div class="card">
-        <h3>ALyCs registradas</h3>
+        <div class="table-card-header">
+          <h3>ALyCs registradas</h3>
+          <input type="search" id="alyc-search" class="search-input" placeholder="Buscar por nombre, CUIT o sitio web...">
+        </div>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -79,6 +61,7 @@ export const AlycsPage = {
 
     await this._loadList()
     this._bindForm()
+    this._bindSearch()
   },
 
   async _loadList() {
@@ -91,6 +74,14 @@ export const AlycsPage = {
       tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Error al cargar.</td></tr>`
       return
     }
+
+    _alycsData = data
+    this._renderRows(data)
+  },
+
+  _renderRows(data) {
+    const tbody = document.getElementById('alyc-tbody')
+    if (!tbody) return
 
     if (!data.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No hay ALyCs registradas. Agregá una arriba.</td></tr>`
@@ -128,6 +119,21 @@ export const AlycsPage = {
     })
   },
 
+  _bindSearch() {
+    const input = document.getElementById('alyc-search')
+    if (!input) return
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase()
+      const filtered = q
+        ? _alycsData.filter(a =>
+            a.name.toLowerCase().includes(q) ||
+            (a.cuit || '').toLowerCase().includes(q) ||
+            (a.website || '').toLowerCase().includes(q))
+        : _alycsData
+      this._renderRows(filtered)
+    })
+  },
+
   _bindForm() {
     const form = document.getElementById('form-alyc')
     if (!form) return
@@ -148,11 +154,11 @@ export const AlycsPage = {
 
       try {
         if (editId) {
-          await patchAlyc(editId, name, cuit || null, website || null)
+          await apiRequest('PATCH', `/api/alycs/${editId}`, { name, cuit: cuit || null, website: website || null })
           showToast(`ALyC "${name}" actualizada.`, 'success')
-          this._cancelEdit()
+          this._cancelEdit(true)
         } else {
-          await postAlyc(name, cuit || null, website || null)
+          await apiRequest('POST', '/api/alycs', { name, cuit: cuit || null, website: website || null })
           showToast(`ALyC "${name}" agregada.`, 'success')
           form.reset()
         }
@@ -166,18 +172,29 @@ export const AlycsPage = {
   },
 
   _startEdit(record) {
-    document.getElementById('alyc-form-title').textContent          = 'Editar ALyC'
-    document.getElementById('alyc-name').value                      = record.name
-    document.getElementById('alyc-cuit').value                      = record.cuit || ''
-    document.getElementById('alyc-website').value                   = record.website || ''
-    document.getElementById('btn-alyc-submit').textContent          = 'Guardar cambios'
-    document.getElementById('btn-alyc-cancel-edit').style.display   = ''
-    document.getElementById('form-alyc').dataset.editId             = record.id
+    const form = document.getElementById('form-alyc')
+    document.getElementById('alyc-form-title').textContent        = 'Editar ALyC'
+    document.getElementById('alyc-name').value                    = record.name
+    document.getElementById('alyc-cuit').value                    = record.cuit || ''
+    document.getElementById('alyc-website').value                 = record.website || ''
+    document.getElementById('btn-alyc-submit').textContent        = 'Guardar cambios'
+    document.getElementById('btn-alyc-cancel-edit').style.display = ''
+    form.dataset.editId          = record.id
+    form.dataset.originalName    = record.name
+    form.dataset.originalCuit    = record.cuit || ''
+    form.dataset.originalWebsite = record.website || ''
     document.getElementById('alyc-name').focus()
-    document.getElementById('form-alyc').scrollIntoView({ behavior: 'smooth' })
+    form.scrollIntoView({ behavior: 'smooth' })
   },
 
-  _cancelEdit() {
+  _cancelEdit(confirmed = false) {
+    if (!confirmed) {
+      const form    = document.getElementById('form-alyc')
+      const isDirty = document.getElementById('alyc-name').value.trim()    !== (form.dataset.originalName    || '') ||
+                      document.getElementById('alyc-cuit').value.trim()    !== (form.dataset.originalCuit    || '') ||
+                      document.getElementById('alyc-website').value.trim() !== (form.dataset.originalWebsite || '')
+      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
+    }
     document.getElementById('alyc-form-title').textContent          = 'Nueva ALyC'
     document.getElementById('form-alyc').reset()
     document.getElementById('btn-alyc-submit').textContent          = 'Agregar'
@@ -188,15 +205,13 @@ export const AlycsPage = {
   async _delete(id, name) {
     if (!confirm(`¿Eliminar "${name}"?\nNo se puede eliminar si tiene operaciones registradas.`)) return
 
-    const { error } = await supabase.from('alycs').delete().eq('id', id)
-
-    if (error) {
-      showToast(error.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
-      return
+    try {
+      await apiRequest('DELETE', `/api/alycs/${id}`)
+      showToast(`ALyC "${name}" eliminada.`, 'success')
+      await this._loadList()
+    } catch (err) {
+      showToast(err.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
     }
-
-    showToast(`ALyC "${name}" eliminada.`, 'success')
-    await this._loadList()
   }
 }
 

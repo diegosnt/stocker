@@ -556,6 +556,51 @@ tbody tr:hover      { background-color: var(--color-bg)      !important; }
   white-space: nowrap;
 }
 
+/* ---- Cabecera de tabla con buscador ---- */
+.table-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1rem .25rem;
+}
+
+.table-card-header h3 {
+  margin: 0;
+}
+
+.search-input {
+  padding: .35rem .65rem;
+  font-size: .85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  width: 220px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+/* ---- Paginación ---- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: .65rem 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.pag-info {
+  font-size: .82rem;
+  color: var(--color-muted);
+  min-width: 12rem;
+  text-align: center;
+}
+
 /* ---- Settings ---- */
 .setting-row {
   display: flex;

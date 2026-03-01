@@ -1,29 +1,8 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
+import { apiRequest } from '../api-client.js'
 
-async function postInstrumentType(name, description) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch('/api/instrument-types', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify({ name, description })
-  })
-  const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error al guardar'), { code: json.error?.[0]?.code })
-  return json.data
-}
-
-async function patchInstrumentType(id, name, description) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(`/api/instrument-types/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify({ name, description })
-  })
-  const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error al actualizar'), { code: json.error?.[0]?.code })
-  return json.data
-}
+let _tiposData = []
 
 export const InstrumentTypesPage = {
   async render() {
@@ -54,7 +33,10 @@ export const InstrumentTypesPage = {
       </div>
 
       <div class="card">
-        <h3>Tipos registrados</h3>
+        <div class="table-card-header">
+          <h3>Tipos registrados</h3>
+          <input type="search" id="tipos-search" class="search-input" placeholder="Buscar por nombre o descripción...">
+        </div>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -74,6 +56,7 @@ export const InstrumentTypesPage = {
 
     await this._loadList()
     this._bindForm()
+    this._bindSearch()
   },
 
   async _loadList() {
@@ -89,6 +72,14 @@ export const InstrumentTypesPage = {
       tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Error al cargar datos.</td></tr>`
       return
     }
+
+    _tiposData = data
+    this._renderRows(data)
+  },
+
+  _renderRows(data) {
+    const tbody = document.getElementById('tipos-tbody')
+    if (!tbody) return
 
     if (!data.length) {
       tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No hay tipos registrados. Agregá uno arriba.</td></tr>`
@@ -121,6 +112,20 @@ export const InstrumentTypesPage = {
     })
   },
 
+  _bindSearch() {
+    const input = document.getElementById('tipos-search')
+    if (!input) return
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase()
+      const filtered = q
+        ? _tiposData.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            (t.description || '').toLowerCase().includes(q))
+        : _tiposData
+      this._renderRows(filtered)
+    })
+  },
+
   _bindForm() {
     const form = document.getElementById('form-tipo')
     if (!form) return
@@ -140,11 +145,11 @@ export const InstrumentTypesPage = {
 
       try {
         if (editId) {
-          await patchInstrumentType(editId, name, desc || null)
+          await apiRequest('PATCH', `/api/instrument-types/${editId}`, { name, description: desc || null })
           showToast(`Tipo "${name}" actualizado.`, 'success')
-          this._cancelEdit()
+          this._cancelEdit(true)
         } else {
-          await postInstrumentType(name, desc || null)
+          await apiRequest('POST', '/api/instrument-types', { name, description: desc || null })
           showToast(`Tipo "${name}" agregado.`, 'success')
           form.reset()
         }
@@ -158,17 +163,26 @@ export const InstrumentTypesPage = {
   },
 
   _startEdit(record) {
-    document.getElementById('tipo-form-title').textContent      = 'Editar Tipo'
-    document.getElementById('tipo-name').value                  = record.name
-    document.getElementById('tipo-desc').value                  = record.description || ''
-    document.getElementById('btn-tipo-submit').textContent      = 'Guardar cambios'
+    const form = document.getElementById('form-tipo')
+    document.getElementById('tipo-form-title').textContent        = 'Editar Tipo'
+    document.getElementById('tipo-name').value                    = record.name
+    document.getElementById('tipo-desc').value                    = record.description || ''
+    document.getElementById('btn-tipo-submit').textContent        = 'Guardar cambios'
     document.getElementById('btn-tipo-cancel-edit').style.display = ''
-    document.getElementById('form-tipo').dataset.editId         = record.id
+    form.dataset.editId       = record.id
+    form.dataset.originalName = record.name
+    form.dataset.originalDesc = record.description || ''
     document.getElementById('tipo-name').focus()
-    document.getElementById('form-tipo').scrollIntoView({ behavior: 'smooth' })
+    form.scrollIntoView({ behavior: 'smooth' })
   },
 
-  _cancelEdit() {
+  _cancelEdit(confirmed = false) {
+    if (!confirmed) {
+      const form    = document.getElementById('form-tipo')
+      const isDirty = document.getElementById('tipo-name').value.trim() !== (form.dataset.originalName || '') ||
+                      document.getElementById('tipo-desc').value.trim() !== (form.dataset.originalDesc || '')
+      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
+    }
     document.getElementById('tipo-form-title').textContent        = 'Nuevo Tipo'
     document.getElementById('form-tipo').reset()
     document.getElementById('btn-tipo-submit').textContent        = 'Agregar'
@@ -179,15 +193,13 @@ export const InstrumentTypesPage = {
   async _delete(id, name) {
     if (!confirm(`¿Eliminar el tipo "${name}"?\nSi tiene instrumentos asociados no se podrá eliminar.`)) return
 
-    const { error } = await supabase.from('instrument_types').delete().eq('id', id)
-
-    if (error) {
-      showToast(error.code === '23503' ? 'No se puede eliminar: tiene instrumentos asociados.' : 'Error al eliminar.', 'error')
-      return
+    try {
+      await apiRequest('DELETE', `/api/instrument-types/${id}`)
+      showToast(`Tipo "${name}" eliminado.`, 'success')
+      await this._loadList()
+    } catch (err) {
+      showToast(err.code === '23503' ? 'No se puede eliminar: tiene instrumentos asociados.' : 'Error al eliminar.', 'error')
     }
-
-    showToast(`Tipo "${name}" eliminado.`, 'success')
-    await this._loadList()
   }
 }
 

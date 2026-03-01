@@ -6,7 +6,10 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 
 - **Autenticación** — login y registro de usuarios vía Supabase Auth
 - **Historial de operaciones** — registro de compras y ventas con instrumento, ALyC, cantidad, precio, moneda y fecha
+- **Paginación** — el historial de operaciones se carga en páginas de 20 registros con controles Anterior / Siguiente
+- **Búsqueda en tiempo real** — filtro en todas las pantallas (operaciones, instrumentos, tipos e ALyCs) sin recargar datos
 - **Maestros** — ABM completo de Tipos de Instrumento, Instrumentos y ALyCs / Brokers
+- **Detección de cambios sin guardar** — los formularios advierten antes de descartar modificaciones pendientes
 - **Configuración** — habilitación/deshabilitación del registro de nuevos usuarios
 - **Logs estructurados** — todas las operaciones de escritura quedan registradas en el servidor con Pino
 
@@ -94,6 +97,7 @@ stocker/
 │   ├── js/
 │   │   ├── app.js              # Punto de entrada, layout y router
 │   │   ├── auth.js             # Funciones de autenticación
+│   │   ├── api-client.js       # Cliente HTTP unificado para la API REST
 │   │   ├── router.js           # Router basado en hash (#ruta)
 │   │   ├── supabase-client.js  # Cliente Supabase
 │   │   └── pages/
@@ -130,5 +134,6 @@ stocker/
 ## Seguridad
 
 - Todas las tablas tienen **Row Level Security (RLS)** activado en Supabase: cada usuario solo puede ver y modificar sus propios datos.
-- El servidor actúa como intermediario para las operaciones de escritura, registrando cada acción con Pino y reenviando el token JWT del usuario a Supabase para que RLS siga activo.
+- El servidor verifica el token JWT en cada mutación a través de un middleware `requireAuth` antes de reenviar la solicitud a Supabase.
+- Todos los endpoints de escritura validan el cuerpo de la petición (tipos, formatos, campos requeridos) antes de procesarla.
 - Las variables de entorno con claves nunca se suben al repositorio (`.gitignore`).

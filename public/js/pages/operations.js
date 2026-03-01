@@ -1,33 +1,14 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { navigate }  from '../router.js'
+import { apiRequest } from '../api-client.js'
 
 // Estado de edición — persiste entre navegación de lista → formulario
 let _editingOperation = null
-
-async function postOperation(payload) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch('/api/operations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify(payload)
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error('Error al guardar la operación')
-  return json.data
-}
-
-async function patchOperation(id, payload) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(`/api/operations/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` },
-    body: JSON.stringify(payload)
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error('Error al actualizar la operación')
-  return json.data
-}
+let _currentPage  = 0
+let _searchQuery  = ''
+let _searchTimer  = null
+const PAGE_SIZE = 20
 
 export const OperationsPage = {
   async render(mode = 'list') {
@@ -40,6 +21,8 @@ export const OperationsPage = {
 
   // ── Listado ──────────────────────────────────────────────
   async _renderList() {
+    _currentPage = 0
+    _searchQuery  = ''
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
@@ -48,6 +31,11 @@ export const OperationsPage = {
       </div>
 
       <div class="card" style="padding:0">
+        <div class="table-card-header">
+          <span></span>
+          <input type="search" id="ops-search" class="search-input"
+            placeholder="Buscar por ticker, instrumento, ALyC, notas...">
+        </div>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -68,32 +56,62 @@ export const OperationsPage = {
             </tbody>
           </table>
         </div>
+        <div id="ops-pagination"></div>
       </div>`
 
     document.getElementById('btn-nueva-op').addEventListener('click', () => {
       _editingOperation = null
       navigate('new-operation')
     })
-    await this._loadList()
+    this._bindSearch()
+    await this._loadList(0)
   },
 
-  async _loadList() {
+  async _loadList(page = 0) {
     const tbody = document.getElementById('ops-tbody')
     if (!tbody) return
 
-    const { data, error } = await supabase
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
+
+    const baseQuery = supabase
       .from('operations')
-      .select('*, instruments(ticker, name), alycs(name)')
+      .select('*, instruments(ticker, name), alycs(name)', { count: 'exact' })
       .order('operated_at', { ascending: false })
       .order('created_at',  { ascending: false })
 
+    let data, error, count, searching = !!_searchQuery
+
+    if (searching) {
+      // Modo búsqueda: traer todo y filtrar en cliente
+      ;({ data, error, count } = await baseQuery)
+      if (!error && data) {
+        const q = _searchQuery.toLowerCase()
+        data  = data.filter(op =>
+          (op.instruments?.ticker ?? '').toLowerCase().includes(q) ||
+          (op.instruments?.name   ?? '').toLowerCase().includes(q) ||
+          (op.alycs?.name         ?? '').toLowerCase().includes(q) ||
+          (op.notes               ?? '').toLowerCase().includes(q) ||
+          op.type.toLowerCase().includes(q)     ||
+          op.currency.toLowerCase().includes(q)
+        )
+        count = data.length
+      }
+    } else {
+      // Modo paginado normal
+      const from = page * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+      ;({ data, error, count } = await baseQuery.range(from, to))
+    }
+
     if (error) {
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
+      this._renderPagination(0, 0)
       return
     }
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">No hay operaciones registradas.</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${searching ? 'No se encontraron resultados.' : 'No hay operaciones registradas.'}</td></tr>`
+      this._renderPagination(0, 0)
       return
     }
 
@@ -155,17 +173,68 @@ export const OperationsPage = {
     tbody.querySelectorAll('.btn-delete-op').forEach(btn => {
       btn.addEventListener('click', () => this._deleteOp(btn.dataset.id))
     })
+
+    this._renderPagination(page, count)
+  },
+
+  _renderPagination(page, total) {
+    const container = document.getElementById('ops-pagination')
+    if (!container) return
+
+    const totalPages = Math.ceil(total / PAGE_SIZE)
+
+    if (totalPages <= 1) {
+      container.innerHTML = ''
+      return
+    }
+
+    const from = page * PAGE_SIZE + 1
+    const to   = Math.min((page + 1) * PAGE_SIZE, total)
+
+    container.innerHTML = `
+      <div class="pagination">
+        <button class="btn btn-sm btn-ghost" id="btn-pag-prev" ${page === 0 ? 'disabled' : ''}>← Anterior</button>
+        <span class="pag-info">Mostrando ${from}–${to} de ${total}</span>
+        <button class="btn btn-sm btn-ghost" id="btn-pag-next" ${page >= totalPages - 1 ? 'disabled' : ''}>Siguiente →</button>
+      </div>`
+
+    if (page > 0) {
+      document.getElementById('btn-pag-prev').addEventListener('click', () => {
+        _currentPage = page - 1
+        this._loadList(_currentPage)
+      })
+    }
+    if (page < totalPages - 1) {
+      document.getElementById('btn-pag-next').addEventListener('click', () => {
+        _currentPage = page + 1
+        this._loadList(_currentPage)
+      })
+    }
   },
 
   async _deleteOp(id) {
     if (!confirm('¿Eliminar esta operación? Esta acción no se puede deshacer.')) return
 
-    const { error } = await supabase.from('operations').delete().eq('id', id)
+    try {
+      await apiRequest('DELETE', `/api/operations/${id}`)
+      showToast('Operación eliminada.', 'success')
+      await this._loadList(_currentPage)
+    } catch {
+      showToast('Error al eliminar.', 'error')
+    }
+  },
 
-    if (error) { showToast('Error al eliminar.', 'error'); return }
-
-    showToast('Operación eliminada.', 'success')
-    await this._loadList()
+  _bindSearch() {
+    const input = document.getElementById('ops-search')
+    if (!input) return
+    input.addEventListener('input', () => {
+      clearTimeout(_searchTimer)
+      _searchTimer = setTimeout(() => {
+        _searchQuery = input.value.trim()
+        _currentPage = 0
+        this._loadList(0)
+      }, 300)
+    })
   },
 
   // ── Formulario (alta y edición) ───────────────────────────
@@ -248,14 +317,38 @@ export const OperationsPage = {
       ? editing.operated_at
       : new Date().toISOString().split('T')[0]
 
-    const goBack = () => { _editingOperation = null; navigate('operations') }
+    const goBack = () => {
+      const type       = document.getElementById('op-type').value
+      const instrId    = document.getElementById('op-instrument').value
+      const alycId     = document.getElementById('op-alyc').value
+      const qty        = document.getElementById('op-qty').value
+      const price      = document.getElementById('op-price').value
+      const currency   = document.getElementById('op-currency').value
+      const date       = document.getElementById('op-date').value
+      const notes      = document.getElementById('op-notes').value.trim()
+
+      const isDirty = editing
+        ? type !== editing.type         || instrId !== editing.instrument_id ||
+          alycId !== editing.alyc_id    || qty !== String(editing.quantity)  ||
+          price !== String(editing.price) || currency !== editing.currency   ||
+          date !== editing.operated_at  || notes !== (editing.notes || '')
+        : type !== '' || instrId !== '' || alycId !== '' || qty !== '' || price !== '' || notes !== ''
+
+      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
+      _editingOperation = null
+      navigate('operations')
+    }
     document.getElementById('btn-volver').addEventListener('click', goBack)
     document.getElementById('btn-op-cancel').addEventListener('click', goBack)
 
-    await Promise.all([
-      this._loadInstrumentsSelect(editing?.instrument_id),
-      this._loadAlycsSelect(editing?.alyc_id)
-    ])
+    try {
+      await Promise.all([
+        this._loadInstrumentsSelect(editing?.instrument_id),
+        this._loadAlycsSelect(editing?.alyc_id)
+      ])
+    } catch {
+      showToast('Error al cargar los datos del formulario. Intentá recargar la página.', 'error')
+    }
 
     // Pre-cargar campos si estamos editando
     if (editing) {
@@ -367,10 +460,10 @@ export const OperationsPage = {
 
       try {
         if (editing) {
-          await patchOperation(editing.id, payload)
+          await apiRequest('PATCH', `/api/operations/${editing.id}`, payload)
           showToast('Operación actualizada correctamente.', 'success')
         } else {
-          await postOperation(payload)
+          await apiRequest('POST', '/api/operations', payload)
           showToast('Operación registrada correctamente.', 'success')
         }
         _editingOperation = null
