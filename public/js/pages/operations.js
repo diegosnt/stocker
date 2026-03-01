@@ -8,7 +8,7 @@ let _editingOperation = null
 let _currentPage  = 0
 let _searchQuery  = ''
 let _searchTimer  = null
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 export const OperationsPage = {
   async render(mode = 'list') {

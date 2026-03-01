@@ -6,6 +6,7 @@ import { InstrumentsPage }     from './pages/instruments.js'
 import { AlycsPage }           from './pages/alycs.js'
 import { OperationsPage }      from './pages/operations.js'
 import { SettingsPage }        from './pages/settings.js'
+import { HoldingsAnalysisPage } from './pages/holdings-analysis.js'
 
 const app = document.getElementById('app')
 
@@ -42,6 +43,7 @@ function renderShell(userEmail) {
             <div class="sidebar-section-title">Operaciones</div>
             <a class="sidebar-link" data-route="operations">Historial</a>
             <a class="sidebar-link" data-route="new-operation">Nueva Operación</a>
+            <a class="sidebar-link" data-route="holdings-analysis">Análisis de Tenencia</a>
           </div>
           <div class="sidebar-section">
             <div class="sidebar-section-title">Maestros</div>
@@ -88,12 +90,13 @@ function renderShell(userEmail) {
   })
 
   // Registrar rutas
-  register('operations',       () => OperationsPage.render('list'))
-  register('new-operation',    () => OperationsPage.render('form'))
-  register('instrument-types', () => InstrumentTypesPage.render())
-  register('instruments',      () => InstrumentsPage.render())
-  register('alycs',            () => AlycsPage.render())
-  register('settings',         () => SettingsPage.render())
+  register('operations',        () => OperationsPage.render('list'))
+  register('new-operation',     () => OperationsPage.render('form'))
+  register('holdings-analysis', () => HoldingsAnalysisPage.render())
+  register('instrument-types',  () => InstrumentTypesPage.render())
+  register('instruments',       () => InstrumentsPage.render())
+  register('alycs',             () => AlycsPage.render())
+  register('settings',          () => SettingsPage.render())
 
   start()
 }
