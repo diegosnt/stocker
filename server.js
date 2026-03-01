@@ -6,7 +6,7 @@ const logger  = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
 const app  = express()
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3001
 
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
@@ -585,19 +585,21 @@ app.patch('/api/settings/:key', requireAuth, async (req, res) => {
   res.json({ data: payload[0] })
 })
 
-const server = app.listen(PORT, () => {
-  logger.info(`Stocker corriendo en http://localhost:${PORT}`)
-})
+function startServer(port) {
+  const server = app.listen(port, () => {
+    logger.info(`Stocker corriendo en http://localhost:${port}`)
+  })
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    const altPort = Number(PORT) + 1
-    logger.warn(`Puerto ${PORT} en uso, intentando con ${altPort}`)
-    app.listen(altPort, () => {
-      logger.info(`Stocker corriendo en http://localhost:${altPort}`)
-    })
-  } else {
-    logger.error({ err }, 'Error al iniciar el servidor')
-    process.exit(1)
-  }
-})
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      const nextPort = port + 1
+      logger.warn(`Puerto ${port} en uso, intentando con ${nextPort}`)
+      startServer(nextPort)
+    } else {
+      logger.error({ err }, 'Error al iniciar el servidor')
+      process.exit(1)
+    }
+  })
+}
+
+startServer(Number(PORT))
