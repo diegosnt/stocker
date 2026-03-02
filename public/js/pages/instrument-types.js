@@ -26,7 +26,7 @@ export const InstrumentTypesPage = {
             </div>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn btn-blue" id="btn-tipo-submit">Agregar</button>
+            <button type="submit" class="btn btn-primary" id="btn-tipo-submit">+ Agregar</button>
             <button type="button" class="btn btn-ghost" id="btn-tipo-cancel-edit" style="display:none">Cancelar edición</button>
           </div>
         </form>
@@ -96,7 +96,7 @@ export const InstrumentTypesPage = {
             data-id="${t.id}" data-name="${esc(t.name)}" data-desc="${esc(t.description || '')}">
             Editar
           </button>
-          <button class="btn btn-sm btn-red btn-delete" data-id="${t.id}" data-name="${esc(t.name)}">
+          <button class="btn btn-sm btn-danger btn-delete" data-id="${t.id}" data-name="${esc(t.name)}">
             Eliminar
           </button>
         </td>
@@ -185,7 +185,7 @@ export const InstrumentTypesPage = {
     }
     document.getElementById('tipo-form-title').textContent        = 'Nuevo Tipo'
     document.getElementById('form-tipo').reset()
-    document.getElementById('btn-tipo-submit').textContent        = 'Agregar'
+    document.getElementById('btn-tipo-submit').textContent        = '+ Agregar'
     document.getElementById('btn-tipo-cancel-edit').style.display = 'none'
     delete document.getElementById('form-tipo').dataset.editId
   },

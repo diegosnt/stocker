@@ -27,14 +27,15 @@ export const OperationsPage = {
     content.innerHTML = `
       <div class="page-header">
         <h2>Historial de Operaciones</h2>
-        <button class="btn btn-blue" id="btn-nueva-op">+ Nueva Operación</button>
+        <button class="btn btn-primary" id="btn-nueva-op">+ Nueva Operación</button>
       </div>
 
       <div class="card" style="padding:0">
-        <div class="table-card-header">
-          <span></span>
+        <div class="table-card-header" style="padding: 1.5rem; display: flex; justify-content: space-between; align-items: center">
+          <h3 style="margin:0">Registros</h3>
           <input type="search" id="ops-search" class="search-input"
-            placeholder="Buscar por ticker, instrumento, ALyC, notas...">
+            style="width: 300px"
+            placeholder="Buscar por ticker, ALyC...">
         </div>
         <div class="table-wrapper">
           <table>
@@ -148,7 +149,7 @@ export const OperationsPage = {
               data-notes="${esc(op.notes || '')}">
               Editar
             </button>
-            <button class="btn btn-sm btn-red btn-delete-op" data-id="${op.id}">Eliminar</button>
+            <button class="btn btn-sm btn-danger btn-delete-op" data-id="${op.id}">Eliminar</button>
           </td>
         </tr>`
     }).join('')
@@ -294,8 +295,8 @@ export const OperationsPage = {
             </div>
           </div>
 
-          <div id="op-total-row" style="display:none;margin:-.25rem 0 .75rem;padding:.5rem .75rem;background:var(--color-bg);border-radius:4px;font-size:.88rem">
-            Total estimado: <strong id="op-total-value">—</strong>
+          <div id="op-total-row" style="display:none;margin: 1.5rem 0;padding: 1rem;background:var(--bg-main);border-radius:var(--radius);font-size:1rem; border: 1px dashed var(--border)">
+            Total estimado: <strong id="op-total-value" style="color: var(--color-primary)">—</strong>
           </div>
 
           <div class="form-group">
@@ -304,7 +305,7 @@ export const OperationsPage = {
           </div>
 
           <div class="form-actions">
-            <button type="submit" class="btn btn-blue" id="btn-op-submit">
+            <button type="submit" class="btn btn-primary" id="btn-op-submit">
               ${editing ? 'Guardar cambios' : 'Registrar operación'}
             </button>
             <button type="button" class="btn btn-ghost" id="btn-op-cancel">Cancelar</button>

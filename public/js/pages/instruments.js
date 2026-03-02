@@ -32,7 +32,7 @@ export const InstrumentsPage = {
             </div>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn btn-blue" id="btn-inst-submit">Agregar</button>
+            <button type="submit" class="btn btn-primary" id="btn-inst-submit">+ Agregar</button>
             <button type="button" class="btn btn-ghost" id="btn-inst-cancel-edit" style="display:none">Cancelar edición</button>
           </div>
         </form>
@@ -124,7 +124,7 @@ export const InstrumentsPage = {
             data-type-id="${i.instrument_type_id}">
             Editar
           </button>
-          <button class="btn btn-sm btn-red btn-delete" data-id="${i.id}" data-name="${esc(i.ticker)}">
+          <button class="btn btn-sm btn-danger btn-delete" data-id="${i.id}" data-name="${esc(i.ticker)}">
             Eliminar
           </button>
         </td>
@@ -222,7 +222,7 @@ export const InstrumentsPage = {
     }
     document.getElementById('inst-form-title').textContent          = 'Nuevo Instrumento'
     document.getElementById('form-instrumento').reset()
-    document.getElementById('btn-inst-submit').textContent          = 'Agregar'
+    document.getElementById('btn-inst-submit').textContent          = '+ Agregar'
     document.getElementById('btn-inst-cancel-edit').style.display   = 'none'
     delete document.getElementById('form-instrumento').dataset.editId
     this._loadTypes()

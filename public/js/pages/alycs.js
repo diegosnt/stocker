@@ -30,7 +30,7 @@ export const AlycsPage = {
             </div>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn btn-blue" id="btn-alyc-submit">Agregar</button>
+            <button type="submit" class="btn btn-primary" id="btn-alyc-submit">+ Agregar</button>
             <button type="button" class="btn btn-ghost" id="btn-alyc-cancel-edit" style="display:none">Cancelar edición</button>
           </div>
         </form>
@@ -102,7 +102,7 @@ export const AlycsPage = {
             data-cuit="${esc(a.cuit || '')}" data-website="${esc(a.website || '')}">
             Editar
           </button>
-          <button class="btn btn-sm btn-red btn-delete" data-id="${a.id}" data-name="${esc(a.name)}">
+          <button class="btn btn-sm btn-danger btn-delete" data-id="${a.id}" data-name="${esc(a.name)}">
             Eliminar
           </button>
         </td>
@@ -197,7 +197,7 @@ export const AlycsPage = {
     }
     document.getElementById('alyc-form-title').textContent          = 'Nueva ALyC'
     document.getElementById('form-alyc').reset()
-    document.getElementById('btn-alyc-submit').textContent          = 'Agregar'
+    document.getElementById('btn-alyc-submit').textContent          = '+ Agregar'
     document.getElementById('btn-alyc-cancel-edit').style.display   = 'none'
     delete document.getElementById('form-alyc').dataset.editId
   },

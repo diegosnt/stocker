@@ -71,7 +71,7 @@ export const SettingsPage = {
 
     const btn = document.getElementById('btn-toggle-reg')
     btn.textContent = enabled ? 'Deshabilitar registro' : 'Habilitar registro'
-    btn.className   = `btn ${enabled ? 'btn-red' : 'btn-blue'}`
+    btn.className   = `btn ${enabled ? 'btn-danger' : 'btn-primary'}`
     btn.onclick     = () => this._toggle(!enabled)
   },
 

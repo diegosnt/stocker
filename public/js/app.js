@@ -10,6 +10,17 @@ import { HoldingsAnalysisPage } from './pages/holdings-analysis.js'
 
 const app = document.getElementById('app')
 
+// ── Dark Mode ──────────────────────────────────────────────
+function initDarkMode() {
+  const isDark = localStorage.getItem('dark-mode') === 'true'
+  if (isDark) document.body.classList.add('dark-mode')
+}
+
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark-mode')
+  localStorage.setItem('dark-mode', isDark)
+}
+
 // ── Toast ──────────────────────────────────────────────────
 let toastContainer = null
 
@@ -23,7 +34,11 @@ export function showToast(msg, type = 'info') {
   toast.className = `toast toast-${type}`
   toast.textContent = msg
   toastContainer.appendChild(toast)
-  setTimeout(() => toast.remove(), 3500)
+  setTimeout(() => {
+    toast.style.opacity = '0'
+    toast.style.transform = 'translateX(20px)'
+    setTimeout(() => toast.remove(), 300)
+  }, 3500)
 }
 
 // ── Layout principal ───────────────────────────────────────
@@ -31,10 +46,20 @@ function renderShell(userEmail) {
   app.innerHTML = `
     <div class="app-shell">
       <nav class="navbar">
-        <button class="navbar-hamburger" id="btn-menu" aria-label="Menú">&#9776;</button>
-        <span class="navbar-brand"><img class="navbar-logo" src="/img/logo.svg" alt=""> Stocker</span>
-        <span class="navbar-user">${userEmail}</span>
-        <button class="navbar-logout" id="btn-logout">Salir</button>
+        <button class="navbar-hamburger" id="btn-menu" aria-label="Menú" style="display:none">&#9776;</button>
+        <span class="navbar-brand">
+          <img class="navbar-logo" src="/img/logo.svg" alt=""> 
+          <span>Stocker</span>
+        </span>
+        <div class="navbar-actions" style="display:flex; gap:0.75rem; align-items:center">
+          <span class="navbar-user">${userEmail}</span>
+          <button class="dark-mode-toggle" id="btn-dark-mode" title="Cambiar tema">
+            <span class="icon">🌓</span>
+          </button>
+          <button class="navbar-logout" id="btn-logout">
+            <span>Salir</span>
+          </button>
+        </div>
       </nav>
       <div class="sidebar-overlay" id="sidebar-overlay"></div>
       <div class="app-body">
@@ -78,7 +103,19 @@ function renderShell(userEmail) {
       navigate(link.dataset.route)
       closeDrawer()
     })
+    // Marcar activo inicialmente si coincide la ruta
+    if (currentHash() === link.dataset.route) link.classList.add('active')
   })
+
+  // Escuchar cambios de ruta para actualizar sidebar active
+  window.addEventListener('hashchange', () => {
+    app.querySelectorAll('.sidebar-link').forEach(link => {
+      link.classList.toggle('active', currentHash() === link.dataset.route)
+    })
+  })
+
+  // Dark Mode Toggle
+  document.getElementById('btn-dark-mode').addEventListener('click', toggleDarkMode)
 
   // Logout
   document.getElementById('btn-logout').addEventListener('click', async () => {
@@ -102,6 +139,8 @@ function renderShell(userEmail) {
 }
 
 // ── Punto de entrada ───────────────────────────────────────
+initDarkMode()
+
 onAuthChange((session) => {
   if (session) {
     renderShell(session.user.email)

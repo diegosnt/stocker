@@ -26,7 +26,7 @@ export const LoginPage = {
                 <label for="login-password">Contraseña</label>
                 <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password" minlength="6">
               </div>
-              <button type="submit" class="btn-primary" id="login-submit">Ingresar</button>
+              <button type="submit" class="btn btn-primary" id="login-submit" style="width: 100%; margin-top: 1rem">Ingresar</button>
               <p class="login-error" id="login-error"></p>
             </form>
           </div>
