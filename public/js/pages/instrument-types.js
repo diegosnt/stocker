@@ -1,6 +1,7 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
+import { invalidate as cacheInvalidate } from '../cache.js'
 
 let _tiposData = []
 
@@ -153,6 +154,7 @@ export const InstrumentTypesPage = {
           showToast(`Tipo "${name}" agregado.`, 'success')
           form.reset()
         }
+        cacheInvalidate('instrument_types')
         await this._loadList()
       } catch (err) {
         showToast(err.code === '23505' ? `El tipo "${name}" ya existe.` : 'Error al guardar.', 'error')
@@ -195,6 +197,7 @@ export const InstrumentTypesPage = {
 
     try {
       await apiRequest('DELETE', `/api/instrument-types/${id}`)
+      cacheInvalidate('instrument_types')
       showToast(`Tipo "${name}" eliminado.`, 'success')
       await this._loadList()
     } catch (err) {

@@ -1,6 +1,7 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
+import { invalidate as cacheInvalidate } from '../cache.js'
 
 let _instrData = []
 
@@ -187,6 +188,7 @@ export const InstrumentsPage = {
           showToast(`Instrumento "${ticker}" agregado.`, 'success')
           form.reset()
         }
+        cacheInvalidate('instruments')
         await this._loadList()
       } catch (err) {
         showToast(err.code === '23505' ? `El ticker "${ticker}" ya existe.` : 'Error al guardar.', 'error')
@@ -233,6 +235,7 @@ export const InstrumentsPage = {
 
     try {
       await apiRequest('DELETE', `/api/instruments/${id}`)
+      cacheInvalidate('instruments')
       showToast(`Instrumento "${ticker}" eliminado.`, 'success')
       await this._loadList()
     } catch (err) {

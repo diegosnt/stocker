@@ -1,13 +1,17 @@
 require('dotenv').config()
 
-const express = require('express')
-const path    = require('path')
-const logger  = require('./logger')
+const express     = require('express')
+const path        = require('path')
+const compression = require('compression')
+const { jwtVerify, importJWK } = require('jose')
+const logger      = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
 const app  = express()
 const PORT = process.env.PORT || 3000
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET
 
+app.use(compression())
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
 
@@ -18,33 +22,47 @@ app.get('/', (req, res) => {
   }))
 })
 
-// Middleware: verifica el JWT consultando a Supabase y adjunta el user_id verificado.
-// Rechaza cualquier token inválido, expirado o forjado antes de procesar el request.
+// Middleware: verifica el JWT localmente.
+// Si SUPABASE_JWT_SECRET es un JSON (JWK), se importa como tal; 
+// si es una cadena simple, se usa como secreto HS256.
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No autorizado' })
   }
 
-  try {
-    const userRes = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': authHeader
-      }
-    })
+  const token = authHeader.split(' ')[1]
 
-    if (!userRes.ok) {
-      logger.warn({ status: userRes.status }, 'Token inválido o expirado')
-      return res.status(401).json({ error: 'Token inválido o expirado' })
+  if (!SUPABASE_JWT_SECRET) {
+    logger.error('SUPABASE_JWT_SECRET no configurado en .env')
+    return res.status(500).json({ error: 'Error de configuración en el servidor' })
+  }
+
+  try {
+    let key
+    // Detectamos si es el JSON que copiaste del panel
+    if (SUPABASE_JWT_SECRET.trim().startsWith('{')) {
+      const jwk = JSON.parse(SUPABASE_JWT_SECRET)
+      key = await importJWK(jwk, 'ES256')
+    } else {
+      // Es un secreto tradicional HS256
+      key = new TextEncoder().encode(SUPABASE_JWT_SECRET)
     }
 
-    const user = await userRes.json()
-    req.userId = user.id  // user_id verificado por Supabase, no extraído del payload
+    const { payload } = await jwtVerify(token, key)
+    
+    // El user_id en Supabase Auth está en el campo 'sub'
+    req.userId = payload.sub
+    
+    if (!req.userId) {
+      logger.warn('Token válido pero sin campo "sub"')
+      return res.status(401).json({ error: 'Token inválido' })
+    }
+
     next()
   } catch (err) {
-    logger.error({ err }, 'Error al verificar autenticación')
-    return res.status(401).json({ error: 'Error al verificar autenticación' })
+    logger.warn({ err: err.message }, 'Token inválido o expirado')
+    return res.status(401).json({ error: 'Sesión expirada o inválida' })
   }
 }
 

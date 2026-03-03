@@ -1,6 +1,7 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
+import { invalidate as cacheInvalidate } from '../cache.js'
 
 let _alycsData = []
 
@@ -162,6 +163,7 @@ export const AlycsPage = {
           showToast(`ALyC "${name}" agregada.`, 'success')
           form.reset()
         }
+        cacheInvalidate('alycs')
         await this._loadList()
       } catch (err) {
         showToast(err.code === '23505' ? `La ALyC "${name}" ya existe.` : 'Error al guardar.', 'error')
@@ -207,6 +209,7 @@ export const AlycsPage = {
 
     try {
       await apiRequest('DELETE', `/api/alycs/${id}`)
+      cacheInvalidate('alycs')
       showToast(`ALyC "${name}" eliminada.`, 'success')
       await this._loadList()
     } catch (err) {

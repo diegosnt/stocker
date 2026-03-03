@@ -135,19 +135,15 @@ export const HoldingsAnalysisPage = {
     }
 
     let html = ''
-    for (const alyc of data.alycs) {
-      html += `
-        <div class="card">
-          <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem">
-            <span style="color: var(--color-primary)">🏦</span> ${alyc.name}
-          </h3>
-      `
+    for (const [idx, alyc] of data.alycs.entries()) {
+      const collapsed = idx > 0 ? ' collapsed' : ''
+      let bodyHtml = ''
 
       for (const [curr, items] of Object.entries(alyc.currencies)) {
         const totalVal = items.reduce((acc, h) => acc + h.currentValue, 0)
         items.sort((a, b) => b.currentValue - a.currentValue)
 
-        html += `
+        bodyHtml += `
           <div class="currency-group" style="margin-bottom: 2rem">
             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem">
               <span class="badge badge-${curr.toLowerCase()}">${curr}</span>
@@ -156,7 +152,7 @@ export const HoldingsAnalysisPage = {
                 <div style="font-size: 1.25rem; font-weight: 700">${totalVal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
               </div>
             </div>
-            
+
             <div class="chart-container" style="margin-bottom: 1.5rem">
               ${this._renderBarChart(items, totalVal)}
             </div>
@@ -175,9 +171,7 @@ export const HoldingsAnalysisPage = {
                 <tbody>
                   ${items.map(h => `
                     <tr>
-                      <td>
-                        <span class="ticker-chip" title="${h.name}">${h.ticker}</span>
-                      </td>
+                      <td><span class="ticker-chip" title="${h.name}">${h.ticker}</span></td>
                       <td class="amount">${h.quantity.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
                       <td class="amount">${h.lastPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
                       <td class="amount"><strong>${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
@@ -188,7 +182,6 @@ export const HoldingsAnalysisPage = {
               </table>
             </div>
 
-            <!-- Mobile View (SKILL.md) -->
             <div class="mobile-only" style="display: none">
               ${items.map(h => `
                 <div class="mobile-card">
@@ -205,13 +198,30 @@ export const HoldingsAnalysisPage = {
                 </div>
               `).join('')}
             </div>
-          </div>
-        `
+          </div>`
       }
-      html += `</div>`
+
+      html += `
+        <div class="card alyc-card${collapsed}">
+          <div class="alyc-card-header">
+            <h3 style="margin:0; display:flex; align-items:center; gap:0.5rem">
+              <span style="color:var(--color-primary)">🏦</span> ${alyc.name}
+            </h3>
+            <span class="alyc-chevron">▾</span>
+          </div>
+          <div class="alyc-card-body">
+            <div class="alyc-card-inner">${bodyHtml}</div>
+          </div>
+        </div>`
     }
 
     contentContainer.innerHTML = html
+
+    contentContainer.querySelectorAll('.alyc-card-header').forEach(header => {
+      header.addEventListener('click', () => {
+        header.closest('.alyc-card').classList.toggle('collapsed')
+      })
+    })
   },
 
   _renderBarChart(items, total) {

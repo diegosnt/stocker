@@ -2,11 +2,13 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { navigate }  from '../router.js'
 import { apiRequest } from '../api-client.js'
+import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
 
 // Estado de edición — persiste entre navegación de lista → formulario
 let _editingOperation = null
 let _currentPage  = 0
 let _searchQuery  = ''
+let _alycFilter   = ''   // persiste al volver del formulario de edición
 let _searchTimer  = null
 const PAGE_SIZE = 10
 
@@ -23,6 +25,7 @@ export const OperationsPage = {
   async _renderList() {
     _currentPage = 0
     _searchQuery  = ''
+    // _alycFilter NO se resetea — se conserva al volver del formulario de edición
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
@@ -31,11 +34,16 @@ export const OperationsPage = {
       </div>
 
       <div class="card" style="padding:0">
-        <div class="table-card-header" style="padding: 1.5rem; display: flex; justify-content: space-between; align-items: center">
+        <div class="table-card-header" style="padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem">
           <h3 style="margin:0">Registros</h3>
-          <input type="search" id="ops-search" class="search-input"
-            style="width: 300px"
-            placeholder="Buscar por ticker, ALyC...">
+          <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap">
+            <select id="ops-alyc-filter" style="width:200px">
+              <option value="">Todas las ALyCs</option>
+            </select>
+            <input type="search" id="ops-search" class="search-input"
+              style="width: 240px"
+              placeholder="Buscar por ticker, tipo...">
+          </div>
         </div>
         <div class="table-wrapper">
           <table>
@@ -65,7 +73,7 @@ export const OperationsPage = {
       navigate('new-operation')
     })
     this._bindSearch()
-    await this._loadList(0)
+    await Promise.all([this._loadAlycFilter(), this._loadList(0)])
   },
 
   async _loadList(page = 0) {
@@ -74,11 +82,15 @@ export const OperationsPage = {
 
     tbody.innerHTML = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
 
-    const baseQuery = supabase
+    let baseQuery = supabase
       .from('operations')
       .select('*, instruments(ticker, name), alycs(name)', { count: 'exact' })
       .order('operated_at', { ascending: false })
       .order('ticker', { referencedTable: 'instruments', ascending: true })
+
+    if (_alycFilter) {
+      baseQuery = baseQuery.eq('alyc_id', _alycFilter)
+    }
 
     let data, error, count, searching = !!_searchQuery
 
@@ -111,7 +123,8 @@ export const OperationsPage = {
     }
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${searching ? 'No se encontraron resultados.' : 'No hay operaciones registradas.'}</td></tr>`
+      const emptyMsg = searching || _alycFilter ? 'No se encontraron resultados para el filtro aplicado.' : 'No hay operaciones registradas.'
+      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
       this._renderPagination(0, 0)
       return
     }
@@ -225,6 +238,28 @@ export const OperationsPage = {
     }
   },
 
+  async _loadAlycFilter() {
+    const sel = document.getElementById('ops-alyc-filter')
+    if (!sel) return
+
+    let data = cacheGet('alycs')
+    if (!data) {
+      ;({ data } = await supabase.from('alycs').select('id, name').order('name'))
+      if (data) cacheSet('alycs', data)
+    }
+
+    if (data?.length) {
+      sel.innerHTML = '<option value="">Todas las ALyCs</option>' +
+        data.map(a => `<option value="${a.id}" ${a.id === _alycFilter ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+    }
+
+    sel.addEventListener('change', () => {
+      _alycFilter  = sel.value
+      _currentPage = 0
+      this._loadList(0)
+    })
+  },
+
   _bindSearch() {
     const input = document.getElementById('ops-search')
     if (!input) return
@@ -269,7 +304,10 @@ export const OperationsPage = {
           <div class="form-row">
             <div class="form-group" style="grid-column: span 2">
               <label for="op-instrument">Instrumento *</label>
-              <select id="op-instrument" required><option value="">Cargando...</option></select>
+              <div style="display:flex; gap:0.5rem; align-items:center">
+                <select id="op-instrument" required style="flex:1"><option value="">Cargando...</option></select>
+                <button type="button" class="btn btn-sm btn-ghost" id="btn-new-instrument" title="Crear nuevo instrumento" style="white-space:nowrap; flex-shrink:0">+ Nuevo</button>
+              </div>
             </div>
             <div class="form-group" style="grid-column: span 2">
               <label for="op-alyc">ALyC / Broker *</label>
@@ -341,6 +379,7 @@ export const OperationsPage = {
     }
     document.getElementById('btn-volver').addEventListener('click', goBack)
     document.getElementById('btn-op-cancel').addEventListener('click', goBack)
+    document.getElementById('btn-new-instrument').addEventListener('click', () => this._showInstrumentModal())
 
     try {
       await Promise.all([
@@ -368,10 +407,14 @@ export const OperationsPage = {
     const sel = document.getElementById('op-instrument')
     if (!sel) return
 
-    const { data } = await supabase
-      .from('instruments')
-      .select('id, ticker, name, instrument_types(name)')
-      .order('ticker')
+    let data = cacheGet('instruments')
+    if (!data) {
+      ;({ data } = await supabase
+        .from('instruments')
+        .select('id, ticker, name, instrument_types(name)')
+        .order('ticker'))
+      if (data) cacheSet('instruments', data)
+    }
 
     if (!data?.length) {
       sel.innerHTML = '<option value="">— Sin instrumentos (creá uno primero) —</option>'
@@ -388,7 +431,11 @@ export const OperationsPage = {
     const sel = document.getElementById('op-alyc')
     if (!sel) return
 
-    const { data } = await supabase.from('alycs').select('id, name').order('name')
+    let data = cacheGet('alycs')
+    if (!data) {
+      ;({ data } = await supabase.from('alycs').select('id, name').order('name'))
+      if (data) cacheSet('alycs', data)
+    }
 
     if (!data?.length) {
       sel.innerHTML = '<option value="">— Sin ALyCs (creá una primero) —</option>'
@@ -397,6 +444,90 @@ export const OperationsPage = {
 
     sel.innerHTML = '<option value="">— Seleccioná una ALyC —</option>' +
       data.map(a => `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+  },
+
+  async _showInstrumentModal() {
+    let types = cacheGet('instrument_types')
+    if (!types) {
+      ;({ data: types } = await supabase.from('instrument_types').select('id, name').order('name'))
+      if (types) cacheSet('instrument_types', types)
+    }
+
+    if (!types?.length) {
+      showToast('Primero creá al menos un tipo de instrumento.', 'error')
+      return
+    }
+
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 style="margin:0">Nuevo Instrumento</h3>
+          <button type="button" class="btn btn-sm btn-ghost" id="modal-close">✕</button>
+        </div>
+        <form id="modal-inst-form" novalidate>
+          <div class="form-group">
+            <label for="modal-ticker">Ticker *</label>
+            <input type="text" id="modal-ticker" placeholder="Ej: GGAL, AAPL, YPF" required style="text-transform:uppercase">
+          </div>
+          <div class="form-group">
+            <label for="modal-name">Nombre *</label>
+            <input type="text" id="modal-name" placeholder="Ej: Grupo Financiero Galicia" required>
+          </div>
+          <div class="form-group">
+            <label for="modal-type">Tipo *</label>
+            <select id="modal-type" required>
+              <option value="">— Seleccioná un tipo —</option>
+              ${types.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="modal-submit">+ Agregar</button>
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancelar</button>
+          </div>
+        </form>
+      </div>`
+
+    document.body.appendChild(overlay)
+
+    const close = () => overlay.remove()
+    document.getElementById('modal-close').addEventListener('click', close)
+    document.getElementById('modal-cancel').addEventListener('click', close)
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close() })
+
+    const tickerInput = document.getElementById('modal-ticker')
+    tickerInput.addEventListener('input', () => { tickerInput.value = tickerInput.value.toUpperCase() })
+    tickerInput.focus()
+
+    document.getElementById('modal-inst-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const ticker = tickerInput.value.trim().toUpperCase()
+      const name   = document.getElementById('modal-name').value.trim()
+      const typeId = document.getElementById('modal-type').value
+
+      if (!ticker || !name || !typeId) {
+        showToast('Completá todos los campos obligatorios.', 'error')
+        return
+      }
+
+      const btn = document.getElementById('modal-submit')
+      btn.disabled    = true
+      btn.textContent = 'Guardando...'
+
+      try {
+        const result = await apiRequest('POST', '/api/instruments', { ticker, name, instrument_type_id: typeId })
+        const newId  = Array.isArray(result) ? result[0]?.id : result?.id
+        cacheInvalidate('instruments')
+        showToast(`Instrumento "${ticker}" creado.`, 'success')
+        close()
+        await this._loadInstrumentsSelect(newId)
+      } catch (err) {
+        showToast(err.code === '23505' ? `El ticker "${ticker}" ya existe.` : 'Error al guardar.', 'error')
+        btn.disabled    = false
+        btn.textContent = '+ Agregar'
+      }
+    })
   },
 
   _bindTotalCalc() {
