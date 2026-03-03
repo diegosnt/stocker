@@ -82,48 +82,36 @@ export const OperationsPage = {
 
     tbody.innerHTML = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
 
-    let baseQuery = supabase
-      .from('operations')
-      .select('*, instruments(ticker, name), alycs(name)', { count: 'exact' })
+    const from = page * PAGE_SIZE
+    const to   = from + PAGE_SIZE - 1
+
+    // Usamos la vista operations_search para filtrar en el servidor
+    let query = supabase
+      .from('operations_search')
+      .select('*', { count: 'exact' })
       .order('operated_at', { ascending: false })
-      .order('ticker', { referencedTable: 'instruments', ascending: true })
 
     if (_alycFilter) {
-      baseQuery = baseQuery.eq('alyc_id', _alycFilter)
+      query = query.eq('alyc_id', _alycFilter)
     }
 
-    let data, error, count, searching = !!_searchQuery
-
-    if (searching) {
-      // Modo búsqueda: traer todo y filtrar en cliente
-      ;({ data, error, count } = await baseQuery)
-      if (!error && data) {
-        const q = _searchQuery.toLowerCase()
-        data  = data.filter(op =>
-          (op.instruments?.ticker ?? '').toLowerCase().includes(q) ||
-          (op.instruments?.name   ?? '').toLowerCase().includes(q) ||
-          (op.alycs?.name         ?? '').toLowerCase().includes(q) ||
-          (op.notes               ?? '').toLowerCase().includes(q) ||
-          op.type.toLowerCase().includes(q)     ||
-          op.currency.toLowerCase().includes(q)
-        )
-        count = data.length
-      }
-    } else {
-      // Modo paginado normal
-      const from = page * PAGE_SIZE
-      const to   = from + PAGE_SIZE - 1
-      ;({ data, error, count } = await baseQuery.range(from, to))
+    if (_searchQuery) {
+      const q = `%${_searchQuery}%`
+      // Buscamos en ticker, nombre de instrumento, nombre de ALyC, notas, etc.
+      query = query.or(`instrument_ticker.ilike.${q},instrument_name.ilike.${q},alyc_name.ilike.${q},notes.ilike.${q},type.ilike.${q},currency.ilike.${q}`)
     }
+
+    const { data, error, count } = await query.range(from, to)
 
     if (error) {
+      console.error('Error cargando operaciones:', error)
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
       this._renderPagination(0, 0)
       return
     }
 
     if (!data.length) {
-      const emptyMsg = searching || _alycFilter ? 'No se encontraron resultados para el filtro aplicado.' : 'No hay operaciones registradas.'
+      const emptyMsg = _searchQuery || _alycFilter ? 'No se encontraron resultados.' : 'No hay operaciones registradas.'
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
       this._renderPagination(0, 0)
       return
@@ -132,9 +120,9 @@ export const OperationsPage = {
     tbody.innerHTML = data.map(op => {
       const total    = parseFloat(op.quantity) * parseFloat(op.price)
       const fmtNum   = n => n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      const ticker   = op.instruments?.ticker ?? '—'
-      const instName = op.instruments?.name   ?? ''
-      const alycName = op.alycs?.name         ?? '—'
+      const ticker   = op.instrument_ticker ?? '—'
+      const instName = op.instrument_name   ?? ''
+      const alycName = op.alyc_name         ?? '—'
 
       return `
         <tr>

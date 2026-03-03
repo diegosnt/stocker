@@ -37,69 +37,47 @@ export const HoldingsAnalysisPage = {
   },
 
   async _calculateHoldingsByAlyc() {
-    const { data: operations, error: opError } = await supabase
-      .from('operations')
-      .select('*, instruments(ticker, name), alycs(name)')
-      .order('operated_at', { ascending: true })
+    // Llamada a la función RPC que hace todo el cálculo en el servidor
+    const { data: holdings, error } = await supabase.rpc('get_user_holdings')
 
-    if (opError) throw opError
+    if (error) throw error
 
     const alycMap = {}
     let totalARS = 0
     let totalUSD = 0
 
-    for (const op of operations) {
-      const inst = op.instruments
-      const alyc = op.alycs
-      if (!inst || !alyc) continue
-
-      const alycId = op.alyc_id
+    for (const h of holdings) {
+      const alycId = h.alyc_id
       if (!alycMap[alycId]) {
-        alycMap[alycId] = { name: alyc.name, holdings: {} }
+        alycMap[alycId] = { name: h.alyc_name, holdings: {} }
       }
+
+      const val = parseFloat(h.total_quantity) * parseFloat(h.last_price)
+      if (h.currency === 'ARS') totalARS += val
+      else totalUSD += val
 
       const hMap = alycMap[alycId].holdings
-      if (!hMap[inst.ticker]) {
-        hMap[inst.ticker] = {
-          ticker: inst.ticker,
-          name: inst.name,
-          quantity: 0,
-          lastPrice: 0,
-          currency: op.currency
-        }
+      hMap[h.ticker] = {
+        ticker: h.ticker,
+        name: h.instrument_name,
+        quantity: parseFloat(h.total_quantity),
+        lastPrice: parseFloat(h.last_price),
+        currency: h.currency,
+        currentValue: val
       }
-
-      const h = hMap[inst.ticker]
-      const qty = parseFloat(op.quantity)
-      const price = parseFloat(op.price)
-
-      if (op.type === 'compra') h.quantity += qty
-      else h.quantity -= qty
-      
-      h.lastPrice = price
-      h.currency = op.currency
     }
 
     const result = []
     for (const alycId in alycMap) {
       const alyc = alycMap[alycId]
       const items = Object.values(alyc.holdings)
-        .filter(h => h.quantity > 0.000001)
-        .map(h => {
-          const val = h.quantity * h.lastPrice
-          if (h.currency === 'ARS') totalARS += val
-          else totalUSD += val
-          return { ...h, currentValue: val }
-        })
-
-      if (items.length > 0) {
-        const byCurrency = {}
-        items.forEach(h => {
-          if (!byCurrency[h.currency]) byCurrency[h.currency] = []
-          byCurrency[h.currency].push(h)
-        })
-        result.push({ name: alyc.name, currencies: byCurrency })
-      }
+      
+      const byCurrency = {}
+      items.forEach(item => {
+        if (!byCurrency[item.currency]) byCurrency[item.currency] = []
+        byCurrency[item.currency].push(item)
+      })
+      result.push({ name: alyc.name, currencies: byCurrency })
     }
 
     result.sort((a, b) => a.name.localeCompare(b.name))
