@@ -4,31 +4,32 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 
 ## Características
 
-- **Autenticación** — login y registro de usuarios vía Supabase Auth
-- **Historial de operaciones** — registro de compras y ventas con instrumento, ALyC, cantidad, precio, moneda y fecha
-- **Paginación** — el historial de operaciones se carga en páginas de 20 registros con controles Anterior / Siguiente
-- **Búsqueda en tiempo real** — filtro en todas las pantallas (operaciones, instrumentos, tipos e ALyCs) sin recargar datos
-- **Maestros** — ABM completo de Tipos de Instrumento, Instrumentos y ALyCs / Brokers
-- **Detección de cambios sin guardar** — los formularios advierten antes de descartar modificaciones pendientes
-- **Configuración** — habilitación/deshabilitación del registro de nuevos usuarios
-- **Logs estructurados** — todas las operaciones de escritura quedan registradas en el servidor con Pino
+- **Autenticación** — Login y registro de usuarios vía Supabase Auth.
+- **Análisis de Tenencia** — Visualización en tiempo real de la cartera actual por ALyC e instrumento, con KPIs de valorización total (ARS/USD) y gráficos de distribución.
+- **Historial de operaciones** — Registro completo de compras y ventas con soporte para múltiples monedas (ARS/USD).
+- **Búsqueda y Filtrado Avanzado** — Motor de búsqueda optimizado mediante vistas SQL que permite filtrar por ticker, nombre, notas o ALyC en tiempo real.
+- **Gestión de Maestros** — ABM (Alta, Baja, Modificación) de Instrumentos, Tipos de Instrumento y ALyCs / Brokers.
+- **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y validación de esquemas en servidor.
+- **Experiencia de Usuario** — Interfaz responsiva optimizada para mobile, sistema de temas (oscuro/claro) con iconos SVG, notificaciones (toasts), modales interactivos y formularios inteligentes que detectan cambios sin guardar.
+- **Registro Adaptativo** — La interfaz de login oculta automáticamente las opciones de registro si la configuración del sistema las deshabilita.
+- **Logs Estructurados** — Registro detallado de actividad en el servidor utilizando Pino.
 
 ## Stack tecnológico
 
 | Capa | Tecnología |
 |---|---|
-| Servidor | Node.js + Express.js |
-| Frontend | Vanilla JS ES6+ (módulos nativos, sin bundler) |
-| Estilos | CSS3 + Water.css |
-| Base de datos | Supabase (PostgreSQL + Row Level Security) |
-| Autenticación | Supabase Auth |
-| Logging | Pino + pino-pretty |
+| **Servidor** | Node.js + Express.js |
+| **Frontend** | Vanilla JS ES6+ (Módulos nativos, sin bundler) |
+| **Estilos** | CSS3 + Water.css (Light/Dark mode automático) |
+| **Base de Datos** | Supabase (PostgreSQL) |
+| **Seguridad** | Supabase Auth + JWT (jose) + RLS |
+| **Logging** | Pino + pino-pretty |
 
 ## Requisitos previos
 
-- [Node.js](https://nodejs.org/) v18 o superior
-- [pnpm](https://pnpm.io/) (o npm / yarn)
-- Cuenta en [Supabase](https://supabase.com/) (plan gratuito es suficiente)
+- [Node.js](https://nodejs.org/) v18 o superior.
+- [pnpm](https://pnpm.io/) (recomendado) o npm / yarn.
+- Cuenta en [Supabase](https://supabase.com/).
 
 ## Instalación
 
@@ -45,7 +46,7 @@ cd stocker
 pnpm install
 ```
 
-### 3. Descargar Water.css
+### 3. Descargar dependencias de frontend (Water.css)
 
 ```bash
 pnpm run setup
@@ -53,87 +54,66 @@ pnpm run setup
 
 ### 4. Configurar Supabase
 
-En el [SQL Editor de Supabase](https://supabase.com/dashboard), ejecutar el archivo `supabase/schema.sql`. Esto crea las tablas, índices, políticas RLS e inserta la configuración inicial.
+En el **SQL Editor** de Supabase, ejecutar los scripts en el siguiente orden para una instalación limpia:
 
-> Si ya tenés el schema base y solo querés agregar la tabla de configuración, ejecutá `supabase/migration_app_settings.sql`.
+1. `supabase/schema.sql` (Estructura base y RLS)
+2. `supabase/migration_app_settings.sql` (Tabla de configuración global)
+3. `supabase/view_operations_search.sql` (Vista optimizada para búsquedas)
+4. `supabase/rpc_get_user_holdings.sql` (Lógica de cálculo de tenencias en servidor)
+5. `supabase/performance_indexes.sql` (Índices para optimizar consultas)
 
 ### 5. Configurar variables de entorno
 
-```bash
-cp .env.example .env
-```
-
-Editar `.env` con los datos del proyecto de Supabase:
+Crea un archivo `.env` basado en `.env.example`:
 
 ```env
 SUPABASE_URL=https://<tu-proyecto>.supabase.co
 SUPABASE_ANON_KEY=<tu-anon-key>
+SUPABASE_JWT_SECRET=<tu-jwt-secret>
 PORT=3000
 ```
 
-Las claves se encuentran en **Supabase → Project Settings → API**.
+> **Nota:** El `SUPABASE_JWT_SECRET` es necesario para la validación local de tokens y se encuentra en **Settings -> API -> JWT Settings**.
 
 ### 6. Iniciar la aplicación
 
 ```bash
+# Desarrollo (con hot-reload)
+pnpm dev
+
 # Producción
 pnpm start
-
-# Desarrollo (recarga automática)
-pnpm dev
 ```
-
-Abrir [http://localhost:3000](http://localhost:3000) en el navegador.
 
 ## Estructura del proyecto
 
 ```
 stocker/
 ├── public/
-│   ├── css/
-│   │   └── styles.css          # Estilos personalizados
-│   ├── img/
-│   │   └── logo.svg            # Logo de la aplicación
 │   ├── js/
-│   │   ├── app.js              # Punto de entrada, layout y router
-│   │   ├── auth.js             # Funciones de autenticación
-│   │   ├── api-client.js       # Cliente HTTP unificado para la API REST
-│   │   ├── router.js           # Router basado en hash (#ruta)
-│   │   ├── supabase-client.js  # Cliente Supabase
-│   │   └── pages/
-│   │       ├── login.js
-│   │       ├── operations.js
-│   │       ├── instruments.js
-│   │       ├── instrument-types.js
-│   │       ├── alycs.js
-│   │       └── settings.js
-│   └── favicon.ico
-├── scripts/
-│   └── download-deps.js        # Descarga Water.css
+│   │   ├── pages/              # Lógica de cada pantalla (SPA)
+│   │   │   ├── holdings-analysis.js # Análisis de cartera
+│   │   │   ├── operations.js        # Historial y formularios
+│   │   │   └── ...
+│   │   ├── api-client.js       # Cliente HTTP con fetch y auth
+│   │   ├── app.js              # Inicialización y Layout
+│   │   └── router.js           # Manejo de rutas mediante hash
+│   └── css/
 ├── supabase/
-│   ├── schema.sql              # Schema completo (instalación nueva)
-│   └── migration_app_settings.sql  # Migración incremental
+│   ├── schema.sql              # Estructura base: tablas, relaciones y políticas RLS
+│   ├── migration_app_settings.sql # Configuración global (ej: habilitar registros)
+│   ├── view_operations_search.sql # Vista optimizada para el buscador de operaciones
+│   ├── rpc_get_user_holdings.sql  # Lógica de cálculo de cartera (ejecutada en DB)
+│   ├── performance_indexes.sql    # Índices para acelerar consultas frecuentes
+│   └── ...
 ├── views/
-│   └── renderPage.js           # Template HTML del servidor
-├── logger.js                   # Configuración de Pino
-├── server.js                   # Servidor Express y rutas API
-├── .env.example
-└── package.json
+│   └── renderPage.js           # Template base (Server Side Rendering mínimo)
+├── server.js                   # Endpoints API y validaciones
+└── logger.js                   # Configuración de logs (Pino)
 ```
-
-## Variables de entorno
-
-| Variable | Descripción |
-|---|---|
-| `SUPABASE_URL` | URL del proyecto de Supabase |
-| `SUPABASE_ANON_KEY` | Clave anónima pública de Supabase |
-| `PORT` | Puerto del servidor (por defecto: `3000`) |
-| `LOG_LEVEL` | Nivel de log de Pino (por defecto: `info`) |
-| `NODE_ENV` | `production` para logs en JSON puro, cualquier otro para pino-pretty |
 
 ## Seguridad
 
-- Todas las tablas tienen **Row Level Security (RLS)** activado en Supabase: cada usuario solo puede ver y modificar sus propios datos.
-- El servidor verifica el token JWT en cada mutación a través de un middleware `requireAuth` antes de reenviar la solicitud a Supabase.
-- Todos los endpoints de escritura validan el cuerpo de la petición (tipos, formatos, campos requeridos) antes de procesarla.
-- Las variables de entorno con claves nunca se suben al repositorio (`.gitignore`).
+- **Validación Local:** El servidor utiliza la librería `jose` para verificar la firma de los tokens JWT de Supabase antes de procesar cualquier mutación, reduciendo la latencia y mejorando la seguridad.
+- **RLS (Row Level Security):** Todas las tablas de PostgreSQL tienen políticas activas que garantizan que un usuario solo pueda acceder a sus propios registros (`user_id = auth.uid()`).
+- **Validación de Datos:** Se implementa un middleware de validación riguroso para asegurar que los datos recibidos en el servidor cumplan con los formatos esperados (UUID, fechas ISO, montos positivos).

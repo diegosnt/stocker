@@ -1,5 +1,9 @@
 import { signIn, signUp } from '../auth.js'
 import { supabase } from '../supabase-client.js'
+import { toggleDarkMode } from '../app.js'
+
+const SUN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`
+const MOON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`
 
 export const LoginPage = {
   mount(container) {
@@ -7,12 +11,15 @@ export const LoginPage = {
       <div class="login-wrapper">
         <div class="login-card">
           <div class="login-card-header">
+            <button class="login-dark-mode-toggle" id="login-theme-toggle" title="Cambiar tema">
+              ${SUN_SVG}${MOON_SVG}
+            </button>
             <img class="login-logo" src="/img/logo.svg" alt="Stocker">
             <h1>Stocker</h1>
             <p class="subtitle">Registro de operaciones bursátiles</p>
           </div>
           <div class="login-card-body">
-            <div class="login-tabs">
+            <div class="login-tabs" id="login-tabs">
               <button class="active" id="tab-signin">Iniciar sesión</button>
               <button id="tab-signup">Registrarse</button>
             </div>
@@ -37,6 +44,7 @@ export const LoginPage = {
 
     const tabSignin = container.querySelector('#tab-signin')
     const tabSignup = container.querySelector('#tab-signup')
+    const tabsContainer = container.querySelector('#login-tabs')
     const submitBtn = container.querySelector('#login-submit')
     const errorEl   = container.querySelector('#login-error')
     const form      = container.querySelector('#login-form')
@@ -52,6 +60,7 @@ export const LoginPage = {
 
     tabSignin.addEventListener('click', () => setTab('signin'))
     tabSignup.addEventListener('click', () => setTab('signup'))
+    container.querySelector('#login-theme-toggle').addEventListener('click', toggleDarkMode)
 
     // Verificar si el registro está habilitado (lectura pública, no requiere auth)
     supabase
@@ -61,7 +70,7 @@ export const LoginPage = {
       .single()
       .then(({ data }) => {
         if (data?.value === 'false') {
-          tabSignup.style.display = 'none'
+          tabsContainer.style.display = 'none'
           if (activeTab === 'signup') setTab('signin')
         }
       })

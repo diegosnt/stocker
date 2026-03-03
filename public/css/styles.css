@@ -114,10 +114,16 @@ h1, h2, h3, h4, h5 {
   transition: var(--transition);
 }
 
-.navbar-logout:hover, .dark-mode-toggle:hover {
+.navbar-logout:hover, .dark-mode-toggle:hover, .login-dark-mode-toggle:hover {
   background: var(--border);
   transform: translateY(-1px);
 }
+
+/* Iconos de Tema */
+.icon-sun { display: block; }
+.icon-moon { display: none; }
+.dark-mode .icon-sun { display: none; }
+.dark-mode .icon-moon { display: block; }
 
 .app-body {
   display: flex;
@@ -428,6 +434,53 @@ input:focus, select:focus, textarea:focus {
 .login-card-header {
   padding: 3rem 2.5rem 2rem;
   text-align: center;
+  position: relative;
+}
+
+.login-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1.5rem;
+  filter: drop-shadow(0 4px 6px rgba(79, 70, 230, 0.2));
+}
+
+.login-dark-mode-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.login-dark-mode-toggle:hover {
+  background: var(--border);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .login-card-header {
+    padding: 2rem 1.5rem 1.5rem;
+  }
+  .login-logo {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+  }
+  .login-card h1 {
+    font-size: 1.75rem;
+  }
+  .login-wrapper {
+    padding: 1rem;
+  }
 }
 
 .login-card h1 {
