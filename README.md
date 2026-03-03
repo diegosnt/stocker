@@ -10,8 +10,9 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 - **Búsqueda y Filtrado Avanzado** — Motor de búsqueda optimizado mediante vistas SQL que permite filtrar por ticker, nombre, notas o ALyC en tiempo real.
 - **Gestión de Maestros** — ABM (Alta, Baja, Modificación) de Instrumentos, Tipos de Instrumento y ALyCs / Brokers.
 - **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y validación de esquemas en servidor.
-- **Experiencia de Usuario** — Interfaz responsiva optimizada para mobile, sistema de temas (oscuro/claro) con iconos SVG, notificaciones (toasts), modales interactivos y formularios inteligentes que detectan cambios sin guardar.
-- **Registro Adaptativo** — La interfaz de login oculta automáticamente las opciones de registro si la configuración del sistema las deshabilita.
+- **Experiencia de Usuario** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas (oscuro/claro) con iconos SVG minimalistas, notificaciones (toasts) y formularios inteligentes con detección de cambios sin guardar.
+- **Optimización Mobile** — Historial ultra-compacto con columnas dinámicas, código de colores semántico (Verde/Rojo) para montos, filas expandibles para acceso a detalles/acciones y paginación táctil con indicador de progreso.
+- **Registro Adaptativo** — La interfaz de login oculta automáticamente las opciones de registro si la configuración del sistema las deshabilita, simplificando la entrada al usuario.
 - **Logs Estructurados** — Registro detallado de actividad en el servidor utilizando Pino.
 
 ## Stack tecnológico

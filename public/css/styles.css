@@ -99,7 +99,7 @@ h1, h2, h3, h4, h5 {
   font-weight: 500;
 }
 
-.navbar-logout, .dark-mode-toggle {
+.navbar-hamburger, .navbar-logout, .dark-mode-toggle, .login-dark-mode-toggle {
   background: var(--bg-main);
   border: 1px solid var(--border);
   color: var(--text-main);
@@ -110,11 +110,12 @@ h1, h2, h3, h4, h5 {
   font-weight: 600;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   transition: var(--transition);
 }
 
-.navbar-logout:hover, .dark-mode-toggle:hover, .login-dark-mode-toggle:hover {
+.navbar-hamburger:hover, .navbar-logout:hover, .dark-mode-toggle:hover, .login-dark-mode-toggle:hover {
   background: var(--border);
   transform: translateY(-1px);
 }
@@ -125,6 +126,152 @@ h1, h2, h3, h4, h5 {
 .dark-mode .icon-sun { display: none; }
 .dark-mode .icon-moon { display: block; }
 
+/* ---- Operaciones: Fila de detalle (Expandible) ---- */
+.op-detail-row {
+  display: none;
+  background: var(--bg-main);
+}
+
+/* Solo expandir si tiene notas (PC) o si es mobile (media query abajo) */
+.op-row.has-notes.expanded + .op-detail-row {
+  display: table-row;
+}
+
+.op-detail-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.op-row.expanded {
+  background: rgba(79, 70, 230, 0.05);
+}
+
+/* En PC ocultamos los botones redundantes, el nombre del instrumento y el tipo en el detalle */
+.op-detail-actions, .op-detail-instrument, .op-detail-type {
+  display: none;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- Responsividad General ---- */
+@media (max-width: 1200px) {
+  .main-content { padding: 1.5rem; }
+}
+
+@media (max-width: 768px) {
+  .navbar-hamburger { display: block !important; }
+  .navbar-user { display: none; }
+  .main-content { padding: 0.75rem; } /* Menos margen lateral para que la tarjeta sea más ancha */
+  
+  .ops-history-card { padding: 0 !important; }
+  .ops-table-container { padding: 0 0.5rem 0.5rem 0.5rem; }
+  
+  .sidebar {
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    height: calc(100vh - var(--navbar-height));
+    z-index: 100;
+    transform: translateX(-100%);
+    box-shadow: 10px 0 15px -3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .sidebar.open { transform: translateX(0); }
+  
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: var(--navbar-height) 0 0 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+  }
+  .sidebar-overlay.open { display: block; }
+
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  
+  /* Mobile Cards & Desktop Hiding */
+  .desktop-only { display: none !important; }
+  
+  /* Tabla de Operaciones en Mobile */
+  .ops-table .currency-col, .ops-table .type-col { display: none; } /* Ocultar Moneda y Tipo */
+  .ops-table .ticker-name { display: none; } /* Ticker solo */
+  
+  .ops-table th, .ops-table td {
+    padding: 0.6rem 0.15rem;
+    font-size: 0.65rem;
+    letter-spacing: -0.02em;
+  }
+
+  .date-col, .alyc-col {
+    font-size: 0.58rem !important;
+  }
+
+  .pagination .btn-text, .pag-info { display: none; }
+  .pagination .btn-icon { display: inline-block; font-size: 1.1rem; font-weight: bold; }
+  .pag-compact { display: inline-block !important; font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
+  .pagination { gap: 1.5rem; justify-content: center; padding: 1rem 0; border-top: 1px solid var(--border); }
+
+  .total-compra { color: var(--color-success); }
+  .total-venta { color: var(--color-danger); }
+  
+  .alyc-name-cell {
+    max-width: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .ops-table .actions-cell { display: none; } /* Ocultar columna acciones fija */
+  
+  .op-row { cursor: pointer; }
+  .op-row:active { background: rgba(79, 70, 230, 0.1); }
+
+  .op-row.expanded td { border-bottom: none; }
+
+  /* En Mobile siempre permitimos expansión para ver botones */
+  .op-row.expanded + .op-detail-row {
+    display: table-row;
+  }
+  
+  /* En Mobile sí mostramos las acciones y el instrumento en el detalle */
+  .op-detail-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .op-detail-instrument, .op-detail-type {
+    display: block;
+  }
+  
+  .op-detail-actions .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-card-header {
+    padding: 2rem 1.5rem 1.5rem;
+  }
+  .login-logo {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+  }
+  .login-card h1 {
+    font-size: 1.75rem;
+  }
+  .login-wrapper {
+    padding: 1rem;
+  }
+}
+
+/* ---- App Body & Sidebar Base ---- */
 .app-body {
   display: flex;
   flex: 1;
@@ -200,7 +347,7 @@ h1, h2, h3, h4, h5 {
   margin: 0;
 }
 
-/* ---- Cards & KPI (style_example.css) ---- */
+/* ---- Cards & KPI ---- */
 .card {
   background: var(--bg-card);
   padding: 1rem;
@@ -245,7 +392,7 @@ h1, h2, h3, h4, h5 {
   font-weight: 700;
 }
 
-/* ---- Tables (Modernized) ---- */
+/* ---- Tables ---- */
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -326,7 +473,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(79, 70, 230, 0.1);
 }
 
-/* ---- Buttons (Unified) ---- */
+/* ---- Buttons ---- */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -336,14 +483,14 @@ input:focus, select:focus, textarea:focus {
   border-radius: 0.4rem;
   font-weight: 600;
   font-size: 0.8rem;
-  font-family: inherit; /* Asegurar que use Inter */
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
   white-space: nowrap;
   user-select: none;
   min-height: 32px;
-  min-width: 90px; /* Aumentado ligeramente para balancear texto corto */
+  min-width: 90px;
 }
 
 .btn:hover {
@@ -403,12 +550,13 @@ input:focus, select:focus, textarea:focus {
   background: var(--border);
 }
 
-/* Variante para acciones en tablas */
+.btn-icon { display: none; }
+
 .actions-cell .btn {
   min-width: 75px;
 }
 
-/* ---- Login (Slate & Indigo) ---- */
+/* ---- Login ---- */
 .login-wrapper {
   min-height: 100vh;
   display: flex;
@@ -464,23 +612,6 @@ input:focus, select:focus, textarea:focus {
 .login-dark-mode-toggle:hover {
   background: var(--border);
   transform: translateY(-1px);
-}
-
-@media (max-width: 480px) {
-  .login-card-header {
-    padding: 2rem 1.5rem 1.5rem;
-  }
-  .login-logo {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 1rem;
-  }
-  .login-card h1 {
-    font-size: 1.75rem;
-  }
-  .login-wrapper {
-    padding: 1rem;
-  }
 }
 
 .login-card h1 {
@@ -541,6 +672,8 @@ input:focus, select:focus, textarea:focus {
 
 .badge-ars { background: rgba(79, 70, 230, 0.1); color: var(--color-primary); }
 .badge-usd { background: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
+.badge-compra { background: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.badge-venta { background: rgba(239, 68, 68, 0.1); color: var(--color-danger); }
 
 .amount { font-variant-numeric: tabular-nums; text-align: right; }
 
@@ -573,51 +706,6 @@ input:focus, select:focus, textarea:focus {
   to { transform: translateX(0); opacity: 1; }
 }
 
-/* ---- Responsiveness (SKILL.md) ---- */
-@media (max-width: 1200px) {
-  .main-content { padding: 1.5rem; }
-}
-
-@media (max-width: 768px) {
-  .navbar-hamburger { display: block !important; }
-  .navbar-user { display: none; }
-  
-  .sidebar {
-    position: fixed;
-    top: var(--navbar-height);
-    left: 0;
-    height: calc(100vh - var(--navbar-height));
-    z-index: 100;
-    transform: translateX(-100%);
-    box-shadow: 10px 0 15px -3px rgba(0, 0, 0, 0.1);
-  }
-  
-  .sidebar.open { transform: translateX(0); }
-  
-  .sidebar-overlay {
-    display: none;
-    position: fixed;
-    inset: var(--navbar-height) 0 0 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 99;
-  }
-  .sidebar-overlay.open { display: block; }
-
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  
-  /* Mobile Cards (SKILL.md) */
-  .desktop-only { display: none !important; }
-  
-  .mobile-card {
-    background: var(--bg-card);
-    padding: 1rem;
-    border-radius: 1rem;
-    border: 1px solid var(--border);
-    margin-bottom: 1rem;
-    box-shadow: var(--shadow);
-  }
-}
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -635,7 +723,6 @@ input:focus, select:focus, textarea:focus {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ---- Pagination (Centered) ---- */
 .pagination {
   display: flex;
   align-items: center;
@@ -653,7 +740,9 @@ input:focus, select:focus, textarea:focus {
   text-align: center;
 }
 
-/* ---- ALyC collapsible cards ---- */
+.pag-compact { display: none; }
+
+/* ---- ALyC cards ---- */
 .alyc-card-header {
   display: flex;
   align-items: center;
@@ -713,8 +802,6 @@ input:focus, select:focus, textarea:focus {
   backdrop-filter: blur(2px);
   animation: fadeIn 0.15s ease;
 }
-
-@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 
 .modal-card {
   background: var(--bg-card);

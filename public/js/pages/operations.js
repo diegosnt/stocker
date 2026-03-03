@@ -33,7 +33,7 @@ export const OperationsPage = {
         <button class="btn btn-primary" id="btn-nueva-op">+ Nueva Operación</button>
       </div>
 
-      <div class="card" style="padding:0">
+      <div class="card ops-history-card">
         <div class="table-card-header" style="padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem">
           <h3 style="margin:0">Registros</h3>
           <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap">
@@ -45,28 +45,31 @@ export const OperationsPage = {
               placeholder="Buscar por ticker, tipo...">
           </div>
         </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Instrumento</th>
-                <th>ALyC</th>
-                <th style="text-align:right">Cantidad</th>
-                <th style="text-align:right">Precio unit.</th>
-                <th style="text-align:right">Total</th>
-                <th>Moneda</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="ops-tbody">
-              <tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>
-            </tbody>
-          </table>
+        <div class="ops-table-container">
+          <div class="table-wrapper">
+            <table class="ops-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th class="type-col">T</th>
+                  <th>Inst.</th>
+                  <th>ALyC</th>
+                  <th style="text-align:right">Can.</th>
+                  <th style="text-align:right">Precio</th>
+                  <th style="text-align:right">Total</th>
+                  <th class="currency-col">Moneda</th>
+                  <th class="actions-cell"></th>
+                </tr>
+              </thead>
+              <tbody id="ops-tbody">
+                <tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="ops-pagination"></div>
         </div>
-        <div id="ops-pagination"></div>
-      </div>`
+      </div>
+    </div>`
 
     document.getElementById('btn-nueva-op').addEventListener('click', () => {
       _editingOperation = null
@@ -117,63 +120,75 @@ export const OperationsPage = {
       return
     }
 
-    tbody.innerHTML = data.map(op => {
+    let rowsHtml = ''
+    data.forEach(op => {
       const total    = parseFloat(op.quantity) * parseFloat(op.price)
-      const fmtNum   = n => n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      const fmtPrice = n => n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      const fmtQty   = n => Math.round(parseFloat(n) || 0).toLocaleString('es-AR')
       const ticker   = op.instrument_ticker ?? '—'
       const instName = op.instrument_name   ?? ''
       const alycName = op.alyc_name         ?? '—'
+      const hasNotes = !!op.notes?.trim()
 
-      return `
-        <tr>
-          <td>${fmtDateShort(op.operated_at)}</td>
-          <td><span class="badge badge-${op.type}">${op.type}</span></td>
+      rowsHtml += `
+        <tr class="op-row ${hasNotes ? 'has-notes' : ''}" data-id="${op.id}">
+          <td class="date-col">${fmtDateShort(op.operated_at)}</td>
+          <td class="type-col"><span class="badge badge-${op.type}">${op.type.charAt(0).toUpperCase()}</span></td>
           <td>
-            <span class="ticker-chip">${esc(ticker)}</span>
-            <span style="color:var(--color-muted);font-size:.8rem;margin-left:.35rem">${esc(instName)}</span>
+            <span class="ticker-chip" title="${esc(instName)}">${esc(ticker)}</span>
+            <span class="ticker-name" style="color:var(--color-muted);font-size:.8rem;margin-left:.35rem">${esc(instName)}</span>
           </td>
-          <td>${esc(alycName)}</td>
-          <td class="amount">${fmtNum(parseFloat(op.quantity))}</td>
-          <td class="amount">${fmtNum(parseFloat(op.price))}</td>
-          <td class="amount"><strong>${fmtNum(total)}</strong></td>
-          <td><span class="badge badge-${op.currency.toLowerCase()}">${op.currency}</span></td>
+          <td class="alyc-col"><div class="alyc-name-cell">${esc(alycName)}</div></td>
+          <td class="amount total-${op.type}"><strong>${fmtQty(op.quantity)}</strong></td>
+          <td class="amount">${fmtPrice(parseFloat(op.price))}</td>
+          <td class="amount"><strong class="total-amount total-${op.type}">${fmtPrice(total)}</strong></td>
+          <td class="currency-col"><span class="badge badge-${op.currency.toLowerCase()}">${op.currency}</span></td>
           <td class="actions-cell">
-            <button class="btn btn-sm btn-ghost btn-edit-op"
-              data-id="${op.id}"
-              data-type="${op.type}"
-              data-instrument="${op.instrument_id}"
-              data-alyc="${op.alyc_id}"
-              data-qty="${op.quantity}"
-              data-price="${op.price}"
-              data-currency="${op.currency}"
-              data-date="${op.operated_at}"
-              data-notes="${esc(op.notes || '')}">
-              Editar
-            </button>
+            <button class="btn btn-sm btn-ghost btn-edit-op" data-op-idx="${data.indexOf(op)}">Editar</button>
             <button class="btn btn-sm btn-danger btn-delete-op" data-id="${op.id}">Eliminar</button>
           </td>
+        </tr>
+        <tr class="op-detail-row" id="detail-${op.id}">
+          <td colspan="9">
+            <div class="op-detail-content">
+              <div class="op-detail-type"><strong>Tipo:</strong> <span class="badge badge-${op.type}">${op.type.toUpperCase()}</span></div>
+              <div class="op-detail-instrument"><strong>Instrumento:</strong> ${esc(instName)} (${op.currency})</div>
+              ${op.notes ? `<div><strong>Notas:</strong> <span style="color:var(--text-muted)">${esc(op.notes)}</span></div>` : ''}
+              <div class="op-detail-actions">
+                <button class="btn btn-primary btn-edit-op" data-op-idx="${data.indexOf(op)}">Editar</button>
+                <button class="btn btn-danger btn-delete-op" data-id="${op.id}">Eliminar</button>
+              </div>
+            </div>
+          </td>
         </tr>`
-    }).join('')
+    })
 
-    tbody.querySelectorAll('.btn-edit-op').forEach(btn => {
-      btn.addEventListener('click', () => {
-        _editingOperation = {
-          id:            btn.dataset.id,
-          type:          btn.dataset.type,
-          instrument_id: btn.dataset.instrument,
-          alyc_id:       btn.dataset.alyc,
-          quantity:      btn.dataset.qty,
-          price:         btn.dataset.price,
-          currency:      btn.dataset.currency,
-          operated_at:   btn.dataset.date,
-          notes:         btn.dataset.notes
-        }
-        navigate('new-operation')
+    tbody.innerHTML = rowsHtml
+
+    // Eventos de expansión
+    tbody.querySelectorAll('.op-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.actions-cell')) return
+        row.classList.toggle('expanded')
       })
     })
 
+    const handleEdit = (btn) => {
+      const op = data[btn.dataset.opIdx]
+      _editingOperation = { ...op }
+      navigate('new-operation')
+    }
+
+    const handleDelete = async (btn) => {
+      await this._deleteOp(btn.dataset.id)
+    }
+
+    tbody.querySelectorAll('.btn-edit-op').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); handleEdit(btn) })
+    })
+
     tbody.querySelectorAll('.btn-delete-op').forEach(btn => {
-      btn.addEventListener('click', () => this._deleteOp(btn.dataset.id))
+      btn.addEventListener('click', (e) => { e.stopPropagation(); handleDelete(btn) })
     })
 
     this._renderPagination(page, count)
@@ -195,9 +210,14 @@ export const OperationsPage = {
 
     container.innerHTML = `
       <div class="pagination">
-        <button class="btn btn-sm btn-ghost" id="btn-pag-prev" ${page === 0 ? 'disabled' : ''}>← Anterior</button>
+        <button class="btn btn-sm btn-ghost" id="btn-pag-prev" ${page === 0 ? 'disabled' : ''}>
+          <span class="btn-text">← Anterior</span><span class="btn-icon">←</span>
+        </button>
         <span class="pag-info">Mostrando ${from}–${to} de ${total}</span>
-        <button class="btn btn-sm btn-ghost" id="btn-pag-next" ${page >= totalPages - 1 ? 'disabled' : ''}>Siguiente →</button>
+        <span class="pag-compact">${page + 1} / ${totalPages}</span>
+        <button class="btn btn-sm btn-ghost" id="btn-pag-next" ${page >= totalPages - 1 ? 'disabled' : ''}>
+          <span class="btn-text">Siguiente →</span><span class="btn-icon">→</span>
+        </button>
       </div>`
 
     if (page > 0) {
