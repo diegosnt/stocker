@@ -3,7 +3,6 @@ require('dotenv').config()
 const express     = require('express')
 const path        = require('path')
 const compression = require('compression')
-const { jwtVerify, importJWK } = require('jose')
 const logger      = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
@@ -23,8 +22,6 @@ app.get('/', (req, res) => {
 })
 
 // Middleware: verifica el JWT localmente.
-// Si SUPABASE_JWT_SECRET es un JSON (JWK), se importa como tal; 
-// si es una cadena simple, se usa como secreto HS256.
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
@@ -39,19 +36,19 @@ async function requireAuth(req, res, next) {
   }
 
   try {
+    // Importación dinámica para compatibilidad con ESM en CommonJS
+    const { jwtVerify, importJWK } = await import('jose')
+    
     let key
-    // Detectamos si es el JSON que copiaste del panel
     if (SUPABASE_JWT_SECRET.trim().startsWith('{')) {
       const jwk = JSON.parse(SUPABASE_JWT_SECRET)
       key = await importJWK(jwk, 'ES256')
     } else {
-      // Es un secreto tradicional HS256
       key = new TextEncoder().encode(SUPABASE_JWT_SECRET)
     }
 
     const { payload } = await jwtVerify(token, key)
     
-    // El user_id en Supabase Auth está en el campo 'sub'
     req.userId = payload.sub
     
     if (!req.userId) {
