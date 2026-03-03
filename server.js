@@ -52,14 +52,14 @@ async function requireAuth(req, res, next) {
     req.userId = payload.sub
     
     if (!req.userId) {
-      logger.warn('Token válido pero sin campo "sub"')
+      logger.warn({ payload }, 'Token válido pero sin campo "sub"')
       return res.status(401).json({ error: 'Token inválido' })
     }
 
     next()
   } catch (err) {
-    logger.warn({ err: err.message }, 'Token inválido o expirado')
-    return res.status(401).json({ error: 'Sesión expirada o inválida' })
+    logger.warn({ err: err.message, stack: err.stack }, 'Error en validación de token')
+    return res.status(401).json({ error: `Sesión inválida: ${err.message}` })
   }
 }
 
