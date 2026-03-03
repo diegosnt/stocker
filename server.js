@@ -36,18 +36,30 @@ async function requireAuth(req, res, next) {
   }
 
   try {
-    // Importación dinámica para compatibilidad con ESM en CommonJS
     const { jwtVerify, importJWK } = await import('jose')
     
-    let key
-    if (SUPABASE_JWT_SECRET.trim().startsWith('{')) {
-      const jwk = JSON.parse(SUPABASE_JWT_SECRET)
-      key = await importJWK(jwk, 'ES256')
-    } else {
-      key = new TextEncoder().encode(SUPABASE_JWT_SECRET)
+    let secretStr = SUPABASE_JWT_SECRET.trim()
+    
+    // Limpiar comillas accidentales (comunes al pegar en paneles de control)
+    if ((secretStr.startsWith("'") && secretStr.endsWith("'")) || 
+        (secretStr.startsWith('"') && secretStr.endsWith('"'))) {
+      secretStr = secretStr.slice(1, -1).trim()
     }
 
-    const { payload } = await jwtVerify(token, key)
+    let key
+    if (secretStr.startsWith('{')) {
+      // Caso 1: Es un JWK (JSON) - Para algoritmos ES256
+      const jwk = JSON.parse(secretStr)
+      key = await importJWK(jwk, 'ES256')
+    } else {
+      // Caso 2: Es un secreto tradicional (String) - Solo para HS256
+      key = new TextEncoder().encode(secretStr)
+    }
+
+    // Validamos con 'authenticated' como audience, que es el estándar de Supabase
+    const { payload } = await jwtVerify(token, key, {
+      audience: 'authenticated'
+    })
     
     req.userId = payload.sub
     
