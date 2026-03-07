@@ -152,6 +152,103 @@ h1, h2, h3, h4, h5 {
   display: none;
 }
 
+/* ---- Tarjetas mobile de operaciones ---- */
+.ops-cards-grid {
+  display: none; /* oculto en desktop; se activa en el media query mobile */
+}
+
+.op-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-left: 4px solid var(--border);
+}
+
+.op-card-compra { border-left-color: var(--color-success); }
+.op-card-venta  { border-left-color: var(--color-danger); }
+
+.op-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.op-card-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.op-card-badges {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.op-card-instrument {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.op-card-inst-name {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.op-card-alyc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.op-card-amounts {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  background: var(--bg-main);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.6rem 0.75rem;
+}
+
+.op-card-amount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.op-card-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.op-card-notes {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0.4rem 0.6rem;
+  border-left: 2px solid var(--border);
+}
+
+.op-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.op-card-actions .btn {
+  flex: 1;
+}
+
+.total-compra { color: var(--color-success); }
+.total-venta  { color: var(--color-danger); }
+
 .app-body {
   display: flex;
   flex: 1;
@@ -170,7 +267,11 @@ h1, h2, h3, h4, h5 {
   
   .ops-history-card { padding: 0 !important; }
   .ops-table-container { padding: 0 0.5rem 0.5rem 0.5rem; }
-  
+
+  /* Mobile: ocultar tabla, mostrar tarjetas */
+  .ops-desktop-table { display: none; }
+  .ops-cards-grid    { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }
+
   .sidebar {
     position: fixed;
     top: var(--navbar-height);
@@ -197,61 +298,10 @@ h1, h2, h3, h4, h5 {
   /* Mobile Cards & Desktop Hiding */
   .desktop-only { display: none !important; }
   
-  /* Tabla de Operaciones en Mobile */
-  .ops-table .currency-col, .ops-table .type-col { display: none; } /* Ocultar Moneda y Tipo */
-  .ops-table .ticker-name { display: none; } /* Ticker solo */
-  
-  .ops-table th, .ops-table td {
-    padding: 0.6rem 0.15rem;
-    font-size: 0.65rem;
-    letter-spacing: -0.02em;
-  }
-
-  .date-col, .alyc-col {
-    font-size: 0.58rem !important;
-  }
-
   .pagination .btn-text, .pag-info { display: none; }
   .pagination .btn-icon { display: inline-block; font-size: 1.1rem; font-weight: bold; }
   .pag-compact { display: inline-block !important; font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
   .pagination { gap: 1.5rem; justify-content: center; padding: 1rem 0; border-top: 1px solid var(--border); }
-
-  .total-compra { color: var(--color-success); }
-  .total-venta { color: var(--color-danger); }
-  
-  .alyc-name-cell {
-    max-width: 50px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  
-  .ops-table .actions-cell { display: none; } /* Ocultar columna acciones fija */
-  
-  .op-row { cursor: pointer; }
-  .op-row:active { background: rgba(79, 70, 230, 0.1); }
-
-  .op-row.expanded td { border-bottom: none; }
-
-  /* En Mobile siempre permitimos expansión para ver botones */
-  .op-row.expanded + .op-detail-row {
-    display: table-row;
-  }
-  
-  /* En Mobile sí mostramos las acciones y el instrumento en el detalle */
-  .op-detail-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-  
-  .op-detail-instrument, .op-detail-type {
-    display: block;
-  }
-  
-  .op-detail-actions .btn {
-    flex: 1;
-  }
 }
 
 @media (max-width: 480px) {
@@ -517,6 +567,20 @@ input:focus, select:focus, textarea:focus {
   min-width: 70px;
 }
 
+.btn-icon-only {
+  min-width: 32px;
+  padding: 0.35rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .btn-primary {
   background: var(--color-primary);
   color: #ffffff !important;
@@ -552,7 +616,7 @@ input:focus, select:focus, textarea:focus {
 
 .btn-icon { display: none; }
 
-.actions-cell .btn {
+.actions-cell .btn:not(.btn-icon-only) {
   min-width: 75px;
 }
 

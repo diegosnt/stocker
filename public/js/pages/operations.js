@@ -4,6 +4,9 @@ import { navigate }  from '../router.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
 
+const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
+const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
+
 // Estado de edición — persiste entre navegación de lista → formulario
 let _editingOperation = null
 let _currentPage  = 0
@@ -29,7 +32,7 @@ export const OperationsPage = {
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
-        <h2>Historial de Operaciones</h2>
+        <h2>Historial</h2>
         <button class="btn btn-primary" id="btn-nueva-op">+ Nueva Operación</button>
       </div>
 
@@ -46,13 +49,13 @@ export const OperationsPage = {
           </div>
         </div>
         <div class="ops-table-container">
-          <div class="table-wrapper">
+          <div class="table-wrapper ops-desktop-table">
             <table class="ops-table">
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th class="type-col">T</th>
-                  <th>Inst.</th>
+                 
+                  <th>Ticker</th>
                   <th>ALyC</th>
                   <th style="text-align:right">Can.</th>
                   <th style="text-align:right">Precio</th>
@@ -65,6 +68,9 @@ export const OperationsPage = {
                 <tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>
               </tbody>
             </table>
+          </div>
+          <div id="ops-cards" class="ops-cards-grid">
+            <div class="table-empty"><span class="spinner"></span></div>
           </div>
           <div id="ops-pagination"></div>
         </div>
@@ -80,10 +86,12 @@ export const OperationsPage = {
   },
 
   async _loadList(page = 0) {
-    const tbody = document.getElementById('ops-tbody')
+    const tbody    = document.getElementById('ops-tbody')
+    const opsCards = document.getElementById('ops-cards')
     if (!tbody) return
 
-    tbody.innerHTML = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
+    tbody.innerHTML    = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
+    if (opsCards) opsCards.innerHTML = `<div class="table-empty"><span class="spinner"></span></div>`
 
     const from = page * PAGE_SIZE
     const to   = from + PAGE_SIZE - 1
@@ -116,11 +124,13 @@ export const OperationsPage = {
     if (!data.length) {
       const emptyMsg = _searchQuery || _alycFilter ? 'No se encontraron resultados.' : 'No hay operaciones registradas.'
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
+      if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
       this._renderPagination(0, 0)
       return
     }
 
-    let rowsHtml = ''
+    let rowsHtml  = ''
+    let cardsHtml = ''
     data.forEach(op => {
       const total    = parseFloat(op.quantity) * parseFloat(op.price)
       const fmtPrice = n => n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -129,11 +139,12 @@ export const OperationsPage = {
       const instName = op.instrument_name   ?? ''
       const alycName = op.alyc_name         ?? '—'
       const hasNotes = !!op.notes?.trim()
+      const idx      = data.indexOf(op)
 
       rowsHtml += `
         <tr class="op-row ${hasNotes ? 'has-notes' : ''}" data-id="${op.id}">
           <td class="date-col">${fmtDateShort(op.operated_at)}</td>
-          <td class="type-col"><span class="badge badge-${op.type}">${op.type.charAt(0).toUpperCase()}</span></td>
+         
           <td>
             <span class="ticker-chip" title="${esc(instName)}">${esc(ticker)}</span>
             <span class="ticker-name" style="color:var(--color-muted);font-size:.8rem;margin-left:.35rem">${esc(instName)}</span>
@@ -144,8 +155,8 @@ export const OperationsPage = {
           <td class="amount"><strong class="total-amount total-${op.type}">${fmtPrice(total)}</strong></td>
           <td class="currency-col"><span class="badge badge-${op.currency.toLowerCase()}">${op.currency}</span></td>
           <td class="actions-cell">
-            <button class="btn btn-sm btn-ghost btn-edit-op" data-op-idx="${data.indexOf(op)}">Editar</button>
-            <button class="btn btn-sm btn-danger btn-delete-op" data-id="${op.id}">Eliminar</button>
+            <button class="btn btn-sm btn-ghost btn-icon-only btn-edit-op" data-op-idx="${idx}" title="Editar" aria-label="Editar">${ICON_EDIT}</button>
+            <button class="btn btn-sm btn-danger btn-icon-only btn-delete-op" data-id="${op.id}" title="Eliminar" aria-label="Eliminar">${ICON_DELETE}</button>
           </td>
         </tr>
         <tr class="op-detail-row" id="detail-${op.id}">
@@ -155,17 +166,52 @@ export const OperationsPage = {
               <div class="op-detail-instrument"><strong>Instrumento:</strong> ${esc(instName)} (${op.currency})</div>
               ${op.notes ? `<div><strong>Notas:</strong> <span style="color:var(--text-muted)">${esc(op.notes)}</span></div>` : ''}
               <div class="op-detail-actions">
-                <button class="btn btn-primary btn-edit-op" data-op-idx="${data.indexOf(op)}">Editar</button>
-                <button class="btn btn-danger btn-delete-op" data-id="${op.id}">Eliminar</button>
+                <button class="btn btn-primary btn-edit-op" data-op-idx="${idx}">${ICON_EDIT} Editar</button>
+                <button class="btn btn-danger btn-delete-op" data-id="${op.id}">${ICON_DELETE} Eliminar</button>
               </div>
             </div>
           </td>
         </tr>`
+
+      cardsHtml += `
+        <div class="op-card op-card-${op.type}" data-id="${op.id}">
+          <div class="op-card-top">
+            <span class="op-card-date">${fmtDateShort(op.operated_at)}</span>
+            <div class="op-card-badges">
+          <div class="op-card-alyc">${esc(alycName)}</div>
+            </div>
+          </div>
+          <div class="op-card-instrument">
+            <span class="ticker-chip">${esc(ticker)}</span>
+            <span class="op-card-inst-name">${esc(instName)}</span>
+          </div>
+
+          <div class="op-card-amounts">
+            <div class="op-card-amount-item">
+              <span class="op-card-label">CANT</span>
+               <strong class="total-${op.type}">${fmtQty(op.quantity)}</strong>
+            </div>
+            <div class="op-card-amount-item">
+              <span class="op-card-label">Precio</span>
+              <strong>${fmtPrice(parseFloat(op.price))}</strong>
+            </div>
+            <div class="op-card-amount-item">
+              <span class="op-card-label">Total</span>
+              <strong>${fmtPrice(total)}</strong>
+            </div>
+          </div>
+          ${hasNotes ? `<div class="op-card-notes">${esc(op.notes)}</div>` : ''}
+          <div class="op-card-actions">
+            <button class="btn btn-sm btn-ghost btn-edit-op" data-op-idx="${idx}" title="Editar" aria-label="Editar">${ICON_EDIT} Editar</button>
+            <button class="btn btn-sm btn-danger btn-delete-op" data-id="${op.id}" title="Eliminar" aria-label="Eliminar">${ICON_DELETE} Eliminar</button>
+          </div>
+        </div>`
     })
 
     tbody.innerHTML = rowsHtml
+    if (opsCards) opsCards.innerHTML = cardsHtml
 
-    // Eventos de expansión
+    // Eventos de expansión (desktop)
     tbody.querySelectorAll('.op-row').forEach(row => {
       row.addEventListener('click', (e) => {
         if (e.target.closest('.actions-cell')) return
@@ -186,10 +232,18 @@ export const OperationsPage = {
     tbody.querySelectorAll('.btn-edit-op').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); handleEdit(btn) })
     })
-
     tbody.querySelectorAll('.btn-delete-op').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); handleDelete(btn) })
     })
+
+    if (opsCards) {
+      opsCards.querySelectorAll('.btn-edit-op').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); handleEdit(btn) })
+      })
+      opsCards.querySelectorAll('.btn-delete-op').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); handleDelete(btn) })
+      })
+    }
 
     this._renderPagination(page, count)
   },
