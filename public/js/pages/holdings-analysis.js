@@ -92,7 +92,7 @@ export const HoldingsAnalysisPage = {
 
       const chartId = `pnl-chart-${alycIdx}-${curr}`
       this._pnlChartItems[chartId] = items.map(h => ({
-        ticker: h.ticker, quantity: h.quantity, lastPrice: h.lastPrice
+        ticker: h.ticker, quantity: h.quantity, avgBuyPrice: h.avgBuyPrice
       }))
 
       bodyHtml += `
@@ -103,6 +103,10 @@ export const HoldingsAnalysisPage = {
             <div class="chart-panel">
               <div class="chart-panel-title">Distribución de Tenencia</div>
               ${this._renderPieChart(items, totalVal)}
+            </div>
+            <div class="chart-panel">
+              <div class="chart-panel-title">Por Tipo de Instrumento</div>
+              ${this._renderTypeChart(items)}
             </div>
             <div class="chart-panel">
               <div class="chart-panel-title">Rendimiento Individual (P&amp;L $)</div>
@@ -120,8 +124,8 @@ export const HoldingsAnalysisPage = {
                 <tr>
                   <th class="sortable" data-col="ticker">Ticker</th>
                   <th class="sortable" data-col="quantity" style="text-align:right">Cantidad</th>
-                  <th class="sortable" data-col="lastPrice" style="text-align:right">Últ. Precio</th>
-                  <th class="sortable" data-col="value" style="text-align:right">Valor Est.</th>
+                  <th class="sortable" data-col="avgBuyPrice" style="text-align:right">Precio Prom. Compra</th>
+                  <th class="sortable" data-col="value" style="text-align:right">Valor Invertido</th>
                   <th class="sortable" data-col="marketPrice" style="text-align:right">Precio Actual</th>
                   <th class="sortable" data-col="marketValue" style="text-align:right">Valor Actual</th>
                   <th class="sortable" data-col="pnl" style="text-align:right">P&amp;L $</th>
@@ -131,15 +135,15 @@ export const HoldingsAnalysisPage = {
               </thead>
               <tbody>
                 ${items.map(h => `
-                  <tr data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-last-price="${h.lastPrice}" data-value="${h.currentValue}">
+                  <tr data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}" data-value="${h.currentValue}">
                     <td><span class="ticker-chip" title="${h.name}">${h.ticker}</span></td>
                     <td class="amount">${h.quantity.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
-                    <td class="amount">${h.lastPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                    <td class="amount">${h.avgBuyPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
                     <td class="amount"><strong>${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
                     <td class="amount market-price-cell" data-ticker="${h.ticker}"><span class="cell-skeleton"></span></td>
                     <td class="amount market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}"><span class="cell-skeleton"></span></td>
-                    <td class="amount pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-last-price="${h.lastPrice}"><span class="cell-skeleton"></span></td>
-                    <td class="amount pnl-pct-cell" data-ticker="${h.ticker}" data-last-price="${h.lastPrice}"><span class="cell-skeleton"></span></td>
+                    <td class="amount pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
+                    <td class="amount pnl-pct-cell" data-ticker="${h.ticker}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
                     <td class="amount" style="color: var(--text-muted); font-weight: 600">${((h.currentValue / totalVal) * 100).toFixed(1)}%</td>
                   </tr>
                 `).join('')}
@@ -157,16 +161,16 @@ export const HoldingsAnalysisPage = {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.875rem">
                   <div style="color: var(--text-muted)">Cantidad:</div>
                   <div style="text-align: right; font-weight: 500">${h.quantity.toLocaleString('es-AR')}</div>
-                  <div style="color: var(--text-muted)">Valor Est.:</div>
+                  <div style="color: var(--text-muted)">Valor Invertido:</div>
                   <div style="text-align: right; font-weight: 700; color: var(--color-primary)">${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
                   <div style="color: var(--text-muted)">Precio Actual:</div>
                   <div class="market-price-cell" data-ticker="${h.ticker}" style="text-align: right; font-weight: 500"><span class="cell-skeleton"></span></div>
                   <div style="color: var(--text-muted)">Valor Actual:</div>
                   <div class="market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" style="text-align: right; font-weight: 700; color: var(--color-primary)"><span class="cell-skeleton"></span></div>
                   <div style="color: var(--text-muted)">P&amp;L $:</div>
-                  <div class="pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-last-price="${h.lastPrice}" style="text-align: right"><span class="cell-skeleton"></span></div>
+                  <div class="pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}" style="text-align: right"><span class="cell-skeleton"></span></div>
                   <div style="color: var(--text-muted)">P&amp;L %:</div>
-                  <div class="pnl-pct-cell" data-ticker="${h.ticker}" data-last-price="${h.lastPrice}" style="text-align: right"><span class="cell-skeleton"></span></div>
+                  <div class="pnl-pct-cell" data-ticker="${h.ticker}" data-avg-buy-price="${h.avgBuyPrice}" style="text-align: right"><span class="cell-skeleton"></span></div>
                 </div>
               </div>
             `).join('')}
@@ -195,26 +199,25 @@ export const HoldingsAnalysisPage = {
 
     document.querySelectorAll(`.pnl-amount-cell[data-ticker="${ticker}"]`).forEach(el => {
       if (price === null) { el.innerHTML = dash; return }
-      const quantity  = parseFloat(el.dataset.quantity)
-      const lastPrice = parseFloat(el.dataset.lastPrice)
-      const pnl       = (price - lastPrice) * quantity
-      const color     = pnlColor(pnl)
-      el.innerHTML    = `<strong style="color:${color}">${sign(pnl)}${fmt(pnl)}</strong>`
+      const quantity    = parseFloat(el.dataset.quantity)
+      const avgBuyPrice = parseFloat(el.dataset.avgBuyPrice)
+      const pnl         = (price - avgBuyPrice) * quantity
+      const color       = pnlColor(pnl)
+      el.innerHTML      = `<strong style="color:${color}">${sign(pnl)}${fmt(pnl)}</strong>`
     })
 
     document.querySelectorAll(`.pnl-pct-cell[data-ticker="${ticker}"]`).forEach(el => {
       if (price === null) { el.innerHTML = dash; return }
-      const lastPrice = parseFloat(el.dataset.lastPrice)
-      if (lastPrice === 0) { el.innerHTML = dash; return }
-      const pct   = ((price / lastPrice) - 1) * 100
+      const avgBuyPrice = parseFloat(el.dataset.avgBuyPrice)
+      if (avgBuyPrice === 0) { el.innerHTML = dash; return }
+      const pct   = ((price / avgBuyPrice) - 1) * 100
       const color = pnlColor(pct)
       el.innerHTML = `<span style="color:${color};font-weight:600">${sign(pct)}${pct.toFixed(2)}%</span>`
     })
 
     this._refreshPnlCharts(ticker)
     this._updatePnlKpis()
-    if (this._holdingsSortCol === 'marketPrice' || this._holdingsSortCol === 'marketValue' ||
-        this._holdingsSortCol === 'pnl' || this._holdingsSortCol === 'pnlPct') {
+    if (['marketPrice', 'marketValue', 'pnl', 'pnlPct'].includes(this._holdingsSortCol)) {
       this._sortAllHoldingsTables()
     }
   },
@@ -239,10 +242,10 @@ export const HoldingsAnalysisPage = {
 
       if (h.currency === 'ARS') {
         resolvedARS++
-        if (price !== null) pnlARS += (price - h.lastPrice) * h.totalQuantity
+        if (price !== null) pnlARS += (price - h.avgBuyPrice) * h.totalQuantity
       } else {
         resolvedUSD++
-        if (price !== null) pnlUSD += (price - h.lastPrice) * h.totalQuantity
+        if (price !== null) pnlUSD += (price - h.avgBuyPrice) * h.totalQuantity
       }
     }
 
@@ -295,7 +298,7 @@ export const HoldingsAnalysisPage = {
       .map(h => {
         const price = this._resolvedPrices?.[h.ticker] ?? null
         return price !== null
-          ? { ticker: h.ticker, pnl: (price - h.lastPrice) * h.quantity }
+          ? { ticker: h.ticker, pnl: (price - h.avgBuyPrice) * h.quantity }
           : null
       })
       .filter(Boolean)
@@ -339,10 +342,10 @@ export const HoldingsAnalysisPage = {
     let totalUSD = 0
 
     for (const h of holdings) {
-      const alycId    = h.alyc_id
-      const quantity  = parseFloat(h.total_quantity)
-      const lastPrice = parseFloat(h.last_price)
-      const val       = quantity * lastPrice
+      const alycId      = h.alyc_id
+      const quantity    = parseFloat(h.total_quantity)
+      const avgBuyPrice = parseFloat(h.avg_buy_price)
+      const val         = quantity * avgBuyPrice
 
       if (!alycMap[alycId]) alycMap[alycId] = { name: h.alyc_name, holdings: {} }
 
@@ -350,13 +353,13 @@ export const HoldingsAnalysisPage = {
       else totalUSD += val
 
       alycMap[alycId].holdings[h.ticker] = {
-        ticker: h.ticker, name: h.instrument_name,
-        quantity, lastPrice, currency: h.currency, currentValue: val
+        ticker: h.ticker, name: h.instrument_name, instrumentType: h.instrument_type_name,
+        quantity, avgBuyPrice, currency: h.currency, currentValue: val
       }
 
       // Agregar al resumen global por ticker (puede haber el mismo ticker en varias ALyCs)
       if (!tickerSummary[h.ticker]) {
-        tickerSummary[h.ticker] = { currency: h.currency, totalQuantity: 0, lastPrice }
+        tickerSummary[h.ticker] = { currency: h.currency, totalQuantity: 0, avgBuyPrice }
       }
       tickerSummary[h.ticker].totalQuantity += quantity
     }
@@ -535,9 +538,9 @@ export const HoldingsAnalysisPage = {
         return asc ? cmp : -cmp
       }
       let va, vb
-      if (col === 'quantity')  { va = parseFloat(a.dataset.quantity);  vb = parseFloat(b.dataset.quantity) }
-      if (col === 'lastPrice') { va = parseFloat(a.dataset.lastPrice); vb = parseFloat(b.dataset.lastPrice) }
-      if (col === 'value')     { va = parseFloat(a.dataset.value);     vb = parseFloat(b.dataset.value) }
+      if (col === 'quantity')     { va = parseFloat(a.dataset.quantity);    vb = parseFloat(b.dataset.quantity) }
+      if (col === 'avgBuyPrice')  { va = parseFloat(a.dataset.avgBuyPrice); vb = parseFloat(b.dataset.avgBuyPrice) }
+      if (col === 'value')        { va = parseFloat(a.dataset.value);       vb = parseFloat(b.dataset.value) }
       if (col === 'marketPrice' || col === 'marketValue') {
         const px = t => this._resolvedPrices?.[t.dataset.ticker] ?? nullEdge
         va = col === 'marketPrice' ? px(a) : px(a) * parseFloat(a.dataset.quantity)
@@ -546,15 +549,15 @@ export const HoldingsAnalysisPage = {
       if (col === 'pnl') {
         const pnl = t => {
           const p = this._resolvedPrices?.[t.dataset.ticker]
-          return p != null ? (p - parseFloat(t.dataset.lastPrice)) * parseFloat(t.dataset.quantity) : nullEdge
+          return p != null ? (p - parseFloat(t.dataset.avgBuyPrice)) * parseFloat(t.dataset.quantity) : nullEdge
         }
         va = pnl(a); vb = pnl(b)
       }
       if (col === 'pnlPct') {
         const pct = t => {
-          const p  = this._resolvedPrices?.[t.dataset.ticker]
-          const lp = parseFloat(t.dataset.lastPrice)
-          return p != null && lp ? (p / lp - 1) * 100 : nullEdge
+          const p   = this._resolvedPrices?.[t.dataset.ticker]
+          const abp = parseFloat(t.dataset.avgBuyPrice)
+          return p != null && abp ? (p / abp - 1) * 100 : nullEdge
         }
         va = pct(a); vb = pct(b)
       }
@@ -562,6 +565,76 @@ export const HoldingsAnalysisPage = {
     })
 
     rows.forEach(row => tbody.appendChild(row))
+  },
+
+  _renderTypeChart(items) {
+    // Agrupa el valor invertido por tipo de instrumento
+    const byType = {}
+    for (const h of items) {
+      const type = h.instrumentType || 'Sin tipo'
+      byType[type] = (byType[type] || 0) + h.currentValue
+    }
+    const typeItems = Object.entries(byType)
+      .map(([ticker, currentValue]) => ({ ticker, currentValue }))
+      .sort((a, b) => b.currentValue - a.currentValue)
+    const total = typeItems.reduce((acc, t) => acc + t.currentValue, 0)
+    return this._renderSolidPieChart(typeItems, total)
+  },
+
+  _renderSolidPieChart(items, total) {
+    const colors = [
+      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+      '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+    ]
+    const cx = 150, cy = 150, R = 120
+    const MIN_LABEL = 0.06
+
+    const label = (x, y, line1, line2) => `
+      <text x="${x.toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle"
+            font-size="13" font-weight="800" fill="white"
+            stroke="rgba(0,0,0,0.5)" stroke-width="3" paint-order="stroke">${line1}</text>
+      <text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" text-anchor="middle"
+            font-size="12" fill="rgba(255,255,255,0.95)"
+            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${line2}</text>`
+
+    if (items.length === 1) {
+      return `<svg viewBox="0 0 300 300" class="pie-svg">
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
+        ${label(cx, cy, items[0].ticker, '100%')}
+      </svg>`
+    }
+
+    let angle = -Math.PI / 2
+    const sectors = []
+    const labels  = []
+
+    items.forEach((h, i) => {
+      const pct   = h.currentValue / total
+      const sweep = pct * 2 * Math.PI
+      const end   = angle + sweep
+      const large = sweep > Math.PI ? 1 : 0
+      const color = colors[i % colors.length]
+      const mid   = angle + sweep / 2
+
+      const x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle)
+      const x2 = cx + R * Math.cos(end),   y2 = cy + R * Math.sin(end)
+
+      const d = `M${cx} ${cy} L${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2}Z`
+      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2" class="pie-sector">
+        <title>${h.ticker}: ${(pct * 100).toFixed(1)}%</title></path>`)
+
+      if (pct >= MIN_LABEL) {
+        const lx = cx + (R * 0.65) * Math.cos(mid)
+        const ly = cy + (R * 0.65) * Math.sin(mid)
+        labels.push(label(lx, ly, h.ticker, `${(pct * 100).toFixed(0)}%`))
+      }
+
+      angle = end
+    })
+
+    return `<svg viewBox="0 0 300 300" class="pie-svg">
+      ${sectors.join('')}${labels.join('')}
+    </svg>`
   },
 
   _renderPieChart(items, total) {
