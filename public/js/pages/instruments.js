@@ -4,9 +4,13 @@ import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
 import { esc, confirmModal, setFieldError } from '../utils.js'
 
+const PAGE_SIZE   = 10
+
 let _instrData    = []
 let _instrSortCol = 'ticker'
 let _instrSortAsc = true
+let _instrPage    = 0
+let _instrVisible = []   // datos filtrados + ordenados actualmente visibles
 
 export const InstrumentsPage = {
   async render() {
@@ -19,7 +23,7 @@ export const InstrumentsPage = {
       <div class="card">
         <h3 id="inst-form-title">Nuevo Instrumento</h3>
         <form id="form-instrumento" novalidate>
-          <div class="form-row">
+          <div class="form-row form-row-3">
             <div class="form-group">
               <label for="inst-ticker">Ticker *</label>
               <input type="text" id="inst-ticker" placeholder="Ej: GGAL, AAPL, YPF" required style="text-transform:uppercase">
@@ -63,6 +67,7 @@ export const InstrumentsPage = {
             </tbody>
           </table>
         </div>
+        <div id="inst-pagination"></div>
       </div>`
 
     try {
@@ -104,8 +109,10 @@ export const InstrumentsPage = {
       return
     }
 
-    _instrData = data
-    this._renderRows(this._sorted(data))
+    _instrData    = data
+    _instrPage    = 0
+    _instrVisible = this._sorted(data)
+    this._renderRows()
   },
 
   _sorted(data) {
@@ -131,10 +138,12 @@ export const InstrumentsPage = {
         else { _instrSortCol = col; _instrSortAsc = col !== 'created_at' }
         this._updateSortHeaders()
         const q = document.getElementById('inst-search')?.value.trim().toLowerCase() || ''
-        const visible = q
+        const filtered = q
           ? _instrData.filter(i => i.ticker.toLowerCase().includes(q) || i.name.toLowerCase().includes(q) || (i.instrument_types?.name || '').toLowerCase().includes(q))
           : _instrData
-        this._renderRows(this._sorted(visible))
+        _instrPage    = 0
+        _instrVisible = this._sorted(filtered)
+        this._renderRows()
       })
     })
     this._updateSortHeaders()
@@ -148,16 +157,20 @@ export const InstrumentsPage = {
     })
   },
 
-  _renderRows(data) {
+  _renderRows() {
     const tbody = document.getElementById('inst-tbody')
     if (!tbody) return
 
-    if (!data.length) {
+    if (!_instrVisible.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No hay instrumentos. Agregá uno arriba.</td></tr>`
+      this._renderPagination()
       return
     }
 
-    tbody.innerHTML = data.map(i => `
+    const start = _instrPage * PAGE_SIZE
+    const page  = _instrVisible.slice(start, start + PAGE_SIZE)
+
+    tbody.innerHTML = page.map(i => `
       <tr>
         <td><span class="ticker-chip">${esc(i.ticker)}</span></td>
         <td>${esc(i.name)}</td>
@@ -184,6 +197,46 @@ export const InstrumentsPage = {
     tbody.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', () => this._delete(btn.dataset.id, btn.dataset.name))
     })
+
+    this._renderPagination()
+  },
+
+  _renderPagination() {
+    const container = document.getElementById('inst-pagination')
+    if (!container) return
+
+    const total      = _instrVisible.length
+    const totalPages = Math.ceil(total / PAGE_SIZE)
+
+    if (totalPages <= 1) { container.innerHTML = ''; return }
+
+    const from  = _instrPage * PAGE_SIZE + 1
+    const to    = Math.min((_instrPage + 1) * PAGE_SIZE, total)
+    const pages = _buildPageRange(_instrPage, totalPages)
+
+    const pageButtons = pages.map(p =>
+      p === '...'
+        ? `<span class="pag-ellipsis">…</span>`
+        : `<button class="btn btn-sm ${p === _instrPage ? 'btn-primary pag-active' : 'btn-ghost'} pag-num" data-page="${p}">${p + 1}</button>`
+    ).join('')
+
+    container.innerHTML = `
+      <div class="pagination">
+        <button class="btn btn-sm btn-ghost" id="btn-inst-prev" ${_instrPage === 0 ? 'disabled' : ''}>←</button>
+        <div class="pag-pages">${pageButtons}</div>
+        <button class="btn btn-sm btn-ghost" id="btn-inst-next" ${_instrPage >= totalPages - 1 ? 'disabled' : ''}>→</button>
+        <span class="pag-info">Mostrando ${from}–${to} de ${total}</span>
+      </div>`
+
+    container.querySelectorAll('.pag-num').forEach(btn => {
+      btn.addEventListener('click', () => { _instrPage = parseInt(btn.dataset.page, 10); this._renderRows() })
+    })
+    if (_instrPage > 0) {
+      document.getElementById('btn-inst-prev').addEventListener('click', () => { _instrPage--; this._renderRows() })
+    }
+    if (_instrPage < totalPages - 1) {
+      document.getElementById('btn-inst-next').addEventListener('click', () => { _instrPage++; this._renderRows() })
+    }
   },
 
   _bindSearch() {
@@ -197,7 +250,9 @@ export const InstrumentsPage = {
             i.name.toLowerCase().includes(q) ||
             (i.instrument_types?.name || '').toLowerCase().includes(q))
         : _instrData
-      this._renderRows(this._sorted(filtered))
+      _instrPage    = 0
+      _instrVisible = this._sorted(filtered)
+      this._renderRows()
     })
   },
 
@@ -299,4 +354,19 @@ export const InstrumentsPage = {
 
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function _buildPageRange(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
+  const pages = new Set([0, total - 1, current])
+  for (let i = Math.max(0, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i)
+  const sorted = [...pages].sort((a, b) => a - b)
+  const result = []
+  let prev = -1
+  for (const p of sorted) {
+    if (p - prev > 1) result.push('...')
+    result.push(p)
+    prev = p
+  }
+  return result
 }
