@@ -2,6 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
+import { esc, confirmModal } from '../utils.js'
 
 let _tiposData = []
 
@@ -193,7 +194,11 @@ export const InstrumentTypesPage = {
   },
 
   async _delete(id, name) {
-    if (!confirm(`¿Eliminar el tipo "${name}"?\nSi tiene instrumentos asociados no se podrá eliminar.`)) return
+    const ok = await confirmModal({
+      title: `Eliminar tipo "${name}"`,
+      message: 'Esta acción no se puede deshacer. Si tiene instrumentos asociados no se podrá eliminar.'
+    })
+    if (!ok) return
 
     try {
       await apiRequest('DELETE', `/api/instrument-types/${id}`)
@@ -206,9 +211,6 @@ export const InstrumentTypesPage = {
   }
 }
 
-function esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
 
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })

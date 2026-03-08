@@ -1,5 +1,6 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
+import { apiRequest } from '../api-client.js'
 
 export const SettingsPage = {
   async render() {
@@ -81,30 +82,23 @@ export const SettingsPage = {
 
     const { data: { session } } = await supabase.auth.getSession()
 
-    const res = await fetch('/api/settings/registration_enabled', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${session?.access_token ?? ''}`
-      },
-      body: JSON.stringify({
+    let result
+    try {
+      result = await apiRequest('PATCH', '/api/settings/registration_enabled', {
         value:      newEnabled ? 'true' : 'false',
         updated_by: session?.user?.email ?? null
       })
-    })
-
-    if (!res.ok) {
+    } catch {
       showToast('Error al actualizar la configuración.', 'error')
       btn.disabled = false
       return
     }
 
-    const json = await res.json()
     showToast(
       `Registro ${newEnabled ? 'habilitado' : 'deshabilitado'} correctamente.`,
       'success'
     )
-    this._renderState(json.data)
+    this._renderState(result)
     btn.disabled = false
   }
 }

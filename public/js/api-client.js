@@ -22,6 +22,11 @@ export async function apiRequest(method, path, body = undefined) {
     body: body !== undefined ? JSON.stringify(body) : undefined
   })
 
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('session-expired'))
+    throw Object.assign(new Error('Sesión expirada'), { code: 'session_expired' })
+  }
+
   if (res.status === 204) return null
 
   const json = await res.json()

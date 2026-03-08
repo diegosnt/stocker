@@ -2,8 +2,11 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
+import { esc, confirmModal } from '../utils.js'
 
-let _alycsData = []
+let _alycsData    = []
+let _alycSortCol  = 'name'
+let _alycSortAsc  = true
 
 export const AlycsPage = {
   async render() {
@@ -46,10 +49,10 @@ export const AlycsPage = {
           <table>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>CUIT</th>
+                <th class="sortable" data-col="name">Nombre</th>
+                <th class="sortable" data-col="cuit">CUIT</th>
                 <th>Sitio web</th>
-                <th>Fecha alta</th>
+                <th class="sortable" data-col="created_at">Fecha alta</th>
                 <th></th>
               </tr>
             </thead>
@@ -63,6 +66,7 @@ export const AlycsPage = {
     await this._loadList()
     this._bindForm()
     this._bindSearch()
+    this._bindSortHeaders()
   },
 
   async _loadList() {
@@ -77,7 +81,7 @@ export const AlycsPage = {
     }
 
     _alycsData = data
-    this._renderRows(data)
+    this._renderRows(this._sorted(data))
   },
 
   _renderRows(data) {
@@ -131,7 +135,45 @@ export const AlycsPage = {
             (a.cuit || '').toLowerCase().includes(q) ||
             (a.website || '').toLowerCase().includes(q))
         : _alycsData
-      this._renderRows(filtered)
+      this._renderRows(this._sorted(filtered))
+    })
+  },
+
+  _sorted(data) {
+    return [...data].sort((a, b) => {
+      let va, vb
+      if (_alycSortCol === 'name')       { va = a.name || '';       vb = b.name || '' }
+      else if (_alycSortCol === 'cuit')  { va = a.cuit || '';       vb = b.cuit || '' }
+      else if (_alycSortCol === 'created_at') { va = a.created_at; vb = b.created_at }
+      else return 0
+      const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb
+      return _alycSortAsc ? cmp : -cmp
+    })
+  },
+
+  _bindSortHeaders() {
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      if (!th.closest('table')?.querySelector('#alyc-tbody')) return
+      th.addEventListener('click', () => {
+        const col = th.dataset.col
+        if (_alycSortCol === col) { _alycSortAsc = !_alycSortAsc }
+        else { _alycSortCol = col; _alycSortAsc = col !== 'created_at' }
+        this._updateSortHeaders()
+        const q = document.getElementById('alyc-search')?.value.trim().toLowerCase() || ''
+        const visible = q
+          ? _alycsData.filter(a => a.name.toLowerCase().includes(q) || (a.cuit || '').toLowerCase().includes(q) || (a.website || '').toLowerCase().includes(q))
+          : _alycsData
+        this._renderRows(this._sorted(visible))
+      })
+    })
+    this._updateSortHeaders()
+  },
+
+  _updateSortHeaders() {
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      if (!th.closest('table')?.querySelector('#alyc-tbody')) return
+      th.classList.remove('sort-asc', 'sort-desc')
+      if (th.dataset.col === _alycSortCol) th.classList.add(_alycSortAsc ? 'sort-asc' : 'sort-desc')
     })
   },
 
@@ -205,7 +247,11 @@ export const AlycsPage = {
   },
 
   async _delete(id, name) {
-    if (!confirm(`¿Eliminar "${name}"?\nNo se puede eliminar si tiene operaciones registradas.`)) return
+    const ok = await confirmModal({
+      title: `Eliminar "${name}"`,
+      message: 'Esta acción no se puede deshacer. No se puede eliminar si tiene operaciones registradas.'
+    })
+    if (!ok) return
 
     try {
       await apiRequest('DELETE', `/api/alycs/${id}`)
@@ -218,9 +264,6 @@ export const AlycsPage = {
   }
 }
 
-function esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
 
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })

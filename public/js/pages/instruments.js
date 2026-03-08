@@ -2,8 +2,11 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
+import { esc, confirmModal } from '../utils.js'
 
-let _instrData = []
+let _instrData    = []
+let _instrSortCol = 'ticker'
+let _instrSortAsc = true
 
 export const InstrumentsPage = {
   async render() {
@@ -48,10 +51,10 @@ export const InstrumentsPage = {
           <table>
             <thead>
               <tr>
-                <th>Ticker</th>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Fecha alta</th>
+                <th class="sortable" data-col="ticker">Ticker</th>
+                <th class="sortable" data-col="name">Nombre</th>
+                <th class="sortable" data-col="type">Tipo</th>
+                <th class="sortable" data-col="created_at">Fecha alta</th>
                 <th></th>
               </tr>
             </thead>
@@ -69,6 +72,7 @@ export const InstrumentsPage = {
     }
     this._bindForm()
     this._bindSearch()
+    this._bindSortHeaders()
   },
 
   async _loadTypes(selectedId = null) {
@@ -101,7 +105,47 @@ export const InstrumentsPage = {
     }
 
     _instrData = data
-    this._renderRows(data)
+    this._renderRows(this._sorted(data))
+  },
+
+  _sorted(data) {
+    return [...data].sort((a, b) => {
+      let va, vb
+      if (_instrSortCol === 'ticker')      { va = a.ticker;                           vb = b.ticker }
+      else if (_instrSortCol === 'name')   { va = a.name;                             vb = b.name }
+      else if (_instrSortCol === 'type')   { va = a.instrument_types?.name ?? '';     vb = b.instrument_types?.name ?? '' }
+      else if (_instrSortCol === 'created_at') { va = a.created_at;                  vb = b.created_at }
+      else return 0
+      const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb
+      return _instrSortAsc ? cmp : -cmp
+    })
+  },
+
+  _bindSortHeaders() {
+    document.querySelectorAll('#inst-tbody').forEach(() => {})  // ensure DOM ready
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      if (!th.closest('table')?.querySelector('#inst-tbody')) return
+      th.addEventListener('click', () => {
+        const col = th.dataset.col
+        if (_instrSortCol === col) { _instrSortAsc = !_instrSortAsc }
+        else { _instrSortCol = col; _instrSortAsc = col !== 'created_at' }
+        this._updateSortHeaders()
+        const q = document.getElementById('inst-search')?.value.trim().toLowerCase() || ''
+        const visible = q
+          ? _instrData.filter(i => i.ticker.toLowerCase().includes(q) || i.name.toLowerCase().includes(q) || (i.instrument_types?.name || '').toLowerCase().includes(q))
+          : _instrData
+        this._renderRows(this._sorted(visible))
+      })
+    })
+    this._updateSortHeaders()
+  },
+
+  _updateSortHeaders() {
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      if (!th.closest('table')?.querySelector('#inst-tbody')) return
+      th.classList.remove('sort-asc', 'sort-desc')
+      if (th.dataset.col === _instrSortCol) th.classList.add(_instrSortAsc ? 'sort-asc' : 'sort-desc')
+    })
   },
 
   _renderRows(data) {
@@ -153,7 +197,7 @@ export const InstrumentsPage = {
             i.name.toLowerCase().includes(q) ||
             (i.instrument_types?.name || '').toLowerCase().includes(q))
         : _instrData
-      this._renderRows(filtered)
+      this._renderRows(this._sorted(filtered))
     })
   },
 
@@ -231,7 +275,11 @@ export const InstrumentsPage = {
   },
 
   async _delete(id, ticker) {
-    if (!confirm(`¿Eliminar "${ticker}"?\nNo se puede eliminar si tiene operaciones registradas.`)) return
+    const ok = await confirmModal({
+      title: `Eliminar "${ticker}"`,
+      message: 'Esta acción no se puede deshacer. No se puede eliminar si tiene operaciones registradas.'
+    })
+    if (!ok) return
 
     try {
       await apiRequest('DELETE', `/api/instruments/${id}`)
@@ -244,9 +292,6 @@ export const InstrumentsPage = {
   }
 }
 
-function esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
 
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })

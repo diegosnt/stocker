@@ -1,15 +1,28 @@
 require('dotenv').config()
 
-const express     = require('express')
-const path        = require('path')
-const compression = require('compression')
-const logger      = require('./logger')
+const express        = require('express')
+const path           = require('path')
+const compression    = require('compression')
+const helmet         = require('helmet')
+const logger         = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
 const app  = express()
 const PORT = process.env.PORT || 3000
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET
 
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'", "https://esm.sh"],
+      styleSrc:   ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "https://esm.sh", "https://*.supabase.co"],
+      imgSrc:     ["'self'", "data:"],
+      fontSrc:    ["'self'"],
+    }
+  }
+}))
 app.use(compression())
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
@@ -85,6 +98,27 @@ const isDate     = v => DATE_RE.test(v) && !isNaN(Date.parse(v))
 const isPositive = v => { const n = Number(v); return Number.isFinite(n) && n > 0 }
 const isUrl      = v => { try { new URL(v); return true } catch { return false } }
 
+// Wrapper de fetch a Supabase REST. Lanza un error con { status, payload } si la respuesta no es ok.
+async function supabaseFetch(path, method, authHeader, body) {
+  const headers = {
+    'apikey':        process.env.SUPABASE_ANON_KEY,
+    'Authorization': authHeader ?? ''
+  }
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    headers['Prefer']       = 'return=representation'
+  }
+  const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  })
+  if (res.status === 204) return null
+  const json = await res.json()
+  if (!res.ok) throw Object.assign(new Error('Supabase error'), { status: res.status, payload: json })
+  return json
+}
+
 // Recibe { campo: [[testFn, mensaje], ...] } y devuelve un objeto de errores o null.
 function validate(body, rules) {
   const errs = {}
@@ -113,29 +147,15 @@ app.post('/api/instrument-types', requireAuth, async (req, res) => {
 
   logger.info({ name, description, user_id: userId }, 'Alta tipo de instrumento — datos recibidos')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/instrument_types`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({ name, description: description || null, user_id: userId })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al insertar tipo de instrumento')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch('instrument_types', 'POST', req.headers.authorization,
+      { name, description: description || null, user_id: userId })
+    logger.info({ id: data[0]?.id, name }, 'Tipo de instrumento creado OK')
+    res.status(201).json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al insertar tipo de instrumento')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id: payload[0]?.id, name }, 'Tipo de instrumento creado OK')
-  res.status(201).json({ data: payload })
 })
 
 // ── POST /api/instruments ──────────────────────────────────
@@ -154,29 +174,15 @@ app.post('/api/instruments', requireAuth, async (req, res) => {
 
   logger.info({ ticker, name, instrument_type_id, user_id: userId }, 'Alta instrumento — datos recibidos')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/instruments`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({ ticker, name, instrument_type_id, user_id: userId })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al insertar instrumento')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch('instruments', 'POST', req.headers.authorization,
+      { ticker, name, instrument_type_id, user_id: userId })
+    logger.info({ id: data[0]?.id, ticker }, 'Instrumento creado OK')
+    res.status(201).json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al insertar instrumento')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id: payload[0]?.id, ticker }, 'Instrumento creado OK')
-  res.status(201).json({ data: payload })
 })
 
 // ── POST /api/alycs ────────────────────────────────────────
@@ -194,29 +200,15 @@ app.post('/api/alycs', requireAuth, async (req, res) => {
 
   logger.info({ name, cuit, website, user_id: userId }, 'Alta ALyC — datos recibidos')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/alycs`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({ name, cuit: cuit || null, website: website || null, user_id: userId })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al insertar ALyC')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch('alycs', 'POST', req.headers.authorization,
+      { name, cuit: cuit || null, website: website || null, user_id: userId })
+    logger.info({ id: data[0]?.id, name }, 'ALyC creada OK')
+    res.status(201).json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al insertar ALyC')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id: payload[0]?.id, name }, 'ALyC creada OK')
-  res.status(201).json({ data: payload })
 })
 
 // ── POST /api/operations ───────────────────────────────────
@@ -241,32 +233,17 @@ app.post('/api/operations', requireAuth, async (req, res) => {
     'Alta operación — datos recibidos'
   )
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/operations`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({
-        type, instrument_id, alyc_id, quantity, price, currency,
-        operated_at, notes: notes || null, user_id: userId
-      })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al insertar operación')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch('operations', 'POST', req.headers.authorization, {
+      type, instrument_id, alyc_id, quantity, price, currency,
+      operated_at, notes: notes || null, user_id: userId
+    })
+    logger.info({ id: data[0]?.id, type, instrument_id }, 'Operación creada OK')
+    res.status(201).json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al insertar operación')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id: payload[0]?.id, type, instrument_id }, 'Operación creada OK')
-  res.status(201).json({ data: payload })
 })
 
 // ── PATCH /api/instrument-types/:id ───────────────────────
@@ -285,29 +262,15 @@ app.patch('/api/instrument-types/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, name, description, user_id: userId }, 'Edición tipo de instrumento — datos recibidos')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/instrument_types?id=eq.${id}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({ name, description: description || null })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al actualizar tipo de instrumento')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch(`instrument_types?id=eq.${id}`, 'PATCH', req.headers.authorization,
+      { name, description: description || null })
+    logger.info({ id, name }, 'Tipo de instrumento actualizado OK')
+    res.json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al actualizar tipo de instrumento')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id, name }, 'Tipo de instrumento actualizado OK')
-  res.json({ data: payload })
 })
 
 // ── PATCH /api/instruments/:id ─────────────────────────────
@@ -328,29 +291,15 @@ app.patch('/api/instruments/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, ticker, name, instrument_type_id, user_id: userId }, 'Edición instrumento — datos recibidos')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/instruments?id=eq.${id}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({ ticker, name, instrument_type_id })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al actualizar instrumento')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch(`instruments?id=eq.${id}`, 'PATCH', req.headers.authorization,
+      { ticker, name, instrument_type_id })
+    logger.info({ id, ticker }, 'Instrumento actualizado OK')
+    res.json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al actualizar instrumento')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id, ticker }, 'Instrumento actualizado OK')
-  res.json({ data: payload })
 })
 
 // ── PATCH /api/alycs/:id ───────────────────────────────────
@@ -370,29 +319,15 @@ app.patch('/api/alycs/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, name, cuit, website, user_id: userId }, 'Edición ALyC — datos recibidos')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/alycs?id=eq.${id}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({ name, cuit: cuit || null, website: website || null })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al actualizar ALyC')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch(`alycs?id=eq.${id}`, 'PATCH', req.headers.authorization,
+      { name, cuit: cuit || null, website: website || null })
+    logger.info({ id, name }, 'ALyC actualizada OK')
+    res.json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al actualizar ALyC')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id, name }, 'ALyC actualizada OK')
-  res.json({ data: payload })
 })
 
 // ── PATCH /api/operations/:id ──────────────────────────────
@@ -419,32 +354,17 @@ app.patch('/api/operations/:id', requireAuth, async (req, res) => {
     'Edición operación — datos recibidos'
   )
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/operations?id=eq.${id}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({
-        type, instrument_id, alyc_id, quantity, price, currency,
-        operated_at, notes: notes || null
-      })
-    }
-  )
-
-  const payload = await supabaseRes.json()
-
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al actualizar operación')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    const data = await supabaseFetch(`operations?id=eq.${id}`, 'PATCH', req.headers.authorization, {
+      type, instrument_id, alyc_id, quantity, price, currency,
+      operated_at, notes: notes || null
+    })
+    logger.info({ id, type, instrument_id }, 'Operación actualizada OK')
+    res.json({ data })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al actualizar operación')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id, type, instrument_id }, 'Operación actualizada OK')
-  res.json({ data: payload })
 })
 
 // ── DELETE /api/instrument-types/:id ──────────────────────
@@ -456,25 +376,14 @@ app.delete('/api/instrument-types/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, user_id: userId }, 'Eliminación tipo de instrumento — solicitada')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/instrument_types?id=eq.${id}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? ''
-      }
-    }
-  )
-
-  if (!supabaseRes.ok) {
-    const payload = await supabaseRes.json()
-    logger.warn({ id, status: supabaseRes.status, error: payload }, 'Error al eliminar tipo de instrumento')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    await supabaseFetch(`instrument_types?id=eq.${id}`, 'DELETE', req.headers.authorization)
+    logger.info({ id }, 'Tipo de instrumento eliminado OK')
+    res.status(204).send()
+  } catch (err) {
+    logger.warn({ id, status: err.status, error: err.payload }, 'Error al eliminar tipo de instrumento')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id }, 'Tipo de instrumento eliminado OK')
-  res.status(204).send()
 })
 
 // ── DELETE /api/instruments/:id ────────────────────────────
@@ -486,25 +395,14 @@ app.delete('/api/instruments/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, user_id: userId }, 'Eliminación instrumento — solicitada')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/instruments?id=eq.${id}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? ''
-      }
-    }
-  )
-
-  if (!supabaseRes.ok) {
-    const payload = await supabaseRes.json()
-    logger.warn({ id, status: supabaseRes.status, error: payload }, 'Error al eliminar instrumento')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    await supabaseFetch(`instruments?id=eq.${id}`, 'DELETE', req.headers.authorization)
+    logger.info({ id }, 'Instrumento eliminado OK')
+    res.status(204).send()
+  } catch (err) {
+    logger.warn({ id, status: err.status, error: err.payload }, 'Error al eliminar instrumento')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id }, 'Instrumento eliminado OK')
-  res.status(204).send()
 })
 
 // ── DELETE /api/alycs/:id ──────────────────────────────────
@@ -516,25 +414,14 @@ app.delete('/api/alycs/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, user_id: userId }, 'Eliminación ALyC — solicitada')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/alycs?id=eq.${id}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? ''
-      }
-    }
-  )
-
-  if (!supabaseRes.ok) {
-    const payload = await supabaseRes.json()
-    logger.warn({ id, status: supabaseRes.status, error: payload }, 'Error al eliminar ALyC')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    await supabaseFetch(`alycs?id=eq.${id}`, 'DELETE', req.headers.authorization)
+    logger.info({ id }, 'ALyC eliminada OK')
+    res.status(204).send()
+  } catch (err) {
+    logger.warn({ id, status: err.status, error: err.payload }, 'Error al eliminar ALyC')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id }, 'ALyC eliminada OK')
-  res.status(204).send()
 })
 
 // ── DELETE /api/operations/:id ─────────────────────────────
@@ -546,25 +433,14 @@ app.delete('/api/operations/:id', requireAuth, async (req, res) => {
 
   logger.info({ id, user_id: userId }, 'Eliminación operación — solicitada')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/operations?id=eq.${id}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? ''
-      }
-    }
-  )
-
-  if (!supabaseRes.ok) {
-    const payload = await supabaseRes.json()
-    logger.warn({ id, status: supabaseRes.status, error: payload }, 'Error al eliminar operación')
-    return res.status(supabaseRes.status).json({ error: payload })
+  try {
+    await supabaseFetch(`operations?id=eq.${id}`, 'DELETE', req.headers.authorization)
+    logger.info({ id }, 'Operación eliminada OK')
+    res.status(204).send()
+  } catch (err) {
+    logger.warn({ id, status: err.status, error: err.payload }, 'Error al eliminar operación')
+    res.status(err.status ?? 500).json({ error: err.payload })
   }
-
-  logger.info({ id }, 'Operación eliminada OK')
-  res.status(204).send()
 })
 
 // ── PATCH /api/settings/:key ───────────────────────────────
@@ -583,35 +459,88 @@ app.patch('/api/settings/:key', requireAuth, async (req, res) => {
 
   logger.info({ key, value, updated_by, user_id: userId }, 'Configuración — cambio solicitado')
 
-  const supabaseRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/app_settings?key=eq.${encodeURIComponent(key)}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        process.env.SUPABASE_ANON_KEY,
-        'Authorization': req.headers.authorization ?? '',
-        'Prefer':        'return=representation'
-      },
-      body: JSON.stringify({
-        value,
-        updated_at: new Date().toISOString(),
-        updated_by: updated_by || null
-      })
-    }
-  )
+  try {
+    const data = await supabaseFetch(`app_settings?key=eq.${encodeURIComponent(key)}`, 'PATCH', req.headers.authorization, {
+      value,
+      updated_at: new Date().toISOString(),
+      updated_by: updated_by || null
+    })
+    logger.info({ key, value }, 'Configuración actualizada OK')
+    res.json({ data: data[0] })
+  } catch (err) {
+    logger.warn({ status: err.status, error: err.payload }, 'Error al actualizar configuración')
+    res.status(err.status ?? 500).json({ error: err.payload })
+  }
+})
 
-  const payload = await supabaseRes.json()
+// ── GET /api/quote/:ticker ─────────────────────────────────
+const TICKER_RE  = /^[A-Za-z0-9.\-^=]{1,20}$/
 
-  if (!supabaseRes.ok) {
-    logger.warn({ status: supabaseRes.status, error: payload }, 'Error al actualizar configuración')
-    return res.status(supabaseRes.status).json({ error: payload })
+// Rate limit solo sobre llamadas reales a Finance (cache miss), no sobre hits de cache
+const QUOTE_TTL      = 5 * 60 * 1000  // 5 minutos en ms
+const FETCH_LIMIT    = 30              // máx llamadas a Finance por IP por ventana
+const FETCH_WINDOW   = 5 * 60 * 1000  // ventana de 5 minutos
+const quoteCache     = new Map()       // ticker → { price, currency, expiresAt }
+const fetchCounters  = new Map()       // ip → { count, resetAt }
+
+function checkFetchLimit(ip) {
+  const now   = Date.now()
+  const entry = fetchCounters.get(ip)
+  if (!entry || now > entry.resetAt) {
+    fetchCounters.set(ip, { count: 1, resetAt: now + FETCH_WINDOW })
+    return true
+  }
+  if (entry.count >= FETCH_LIMIT) return false
+  entry.count++
+  return true
+}
+
+app.get('/api/quote/:ticker', requireAuth, async (req, res) => {
+  const { ticker } = req.params
+  if (!TICKER_RE.test(ticker)) {
+    return res.status(400).json({ error: 'Ticker inválido' })
   }
 
-  logger.info({ key, value }, 'Configuración actualizada OK')
-  res.json({ data: payload[0] })
+  const cached = quoteCache.get(ticker)
+  if (cached && Date.now() < cached.expiresAt) {
+    return res.json({ price: cached.price, currency: cached.currency, marketState: cached.marketState })
+  }
+
+  const ip = req.ip ?? req.socket.remoteAddress
+  if (!checkFetchLimit(ip)) {
+    return res.status(429).json({ error: 'Demasiadas consultas. Intentá de nuevo en unos minutos.' })
+  }
+
+  try {
+    const yfBase   = process.env.FINANCE_URL ?? process.env.FINANCE_URL
+    const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
+    const url = `${yfBase}/${encodeURIComponent(ticker)}${yfSuffix}?interval=1d&range=1d&includeTimestamps=false`
+    const yfRes = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Stocker/1.0)' }
+    })
+
+    if (!yfRes.ok) {
+      return res.status(yfRes.status).json({ error: 'Error al consultar Finance' })
+    }
+
+    const data = await yfRes.json()
+    const meta = data?.chart?.result?.[0]?.meta
+
+    if (!meta) {
+      return res.status(404).json({ error: 'Ticker no encontrado' })
+    }
+
+    const price    = meta.regularMarketPrice ?? null
+    const currency = meta.currency ?? null
+
+    quoteCache.set(ticker, { price, currency, expiresAt: Date.now() + QUOTE_TTL })
+    res.json({ price, currency })
+  } catch (err) {
+    logger.warn({ ticker, err: err.message }, 'Error al consultar Finance')
+    res.status(500).json({ error: 'Error interno al consultar precio' })
+  }
 })
 
 app.listen(PORT, () => {
-  logger.info(`Stocker corriendo en http://localhost:${PORT}`)
+  console.log(`Stocker corriendo en http://localhost:${PORT}`)
 })

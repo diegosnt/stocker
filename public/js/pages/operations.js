@@ -1,27 +1,30 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
-import { navigate }  from '../router.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
+import { esc, confirmModal } from '../utils.js'
 
 const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
 const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
 
 // Estado de edición — persiste entre navegación de lista → formulario
-let _editingOperation = null
-let _currentPage  = 0
-let _searchQuery  = ''
-let _alycFilter   = ''   // persiste al volver del formulario de edición
-let _searchTimer  = null
+let _editingOperation  = null
+let _currentPage       = 0
+let _searchQuery       = ''
+let _alycFilter        = ''   // persiste al volver del formulario de edición
+let _instrumentFilter  = ''
+let _typeFilter        = ''
+let _currencyFilter    = ''
+let _dateFrom          = ''
+let _dateTo            = ''
+let _sortCol           = 'operated_at'
+let _sortAsc           = false
+let _searchTimer       = null
 const PAGE_SIZE = 10
 
 export const OperationsPage = {
-  async render(mode = 'list') {
-    if (mode === 'form') {
-      await this._renderForm()
-    } else {
-      await this._renderList()
-    }
+  async render() {
+    await this._renderList()
   },
 
   // ── Listado ──────────────────────────────────────────────
@@ -32,20 +35,39 @@ export const OperationsPage = {
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
-        <h2>Historial</h2>
+        <h2>Operaciones</h2>
         <button class="btn btn-primary" id="btn-nueva-op">+ Nueva Operación</button>
       </div>
 
-      <div class="card ops-history-card">
-        <div class="table-card-header" style="padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem">
-          <h3 style="margin:0">Registros</h3>
-          <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap">
-            <select id="ops-alyc-filter" style="width:200px">
+      <div class="card ops-card">
+        <div class="ops-filters-bar">
+          <div class="ops-filters-title">
+            <h3 style="margin:0">Registros</h3>
+            <button class="btn btn-sm btn-ghost" id="btn-clear-filters" style="display:none">✕ Limpiar filtros</button>
+          </div>
+          <div class="ops-filters-row">
+            <select id="ops-alyc-filter">
               <option value="">Todas las ALyCs</option>
             </select>
-            <input type="search" id="ops-search" class="search-input"
-              style="width: 240px"
-              placeholder="Buscar por ticker, tipo...">
+            <select id="ops-instrument-filter">
+              <option value="">Todos los instrumentos</option>
+            </select>
+            <select id="ops-type-filter">
+              <option value="">Todos los tipos</option>
+              <option value="compra" ${_typeFilter === 'compra' ? 'selected' : ''}>Compra</option>
+              <option value="venta" ${_typeFilter === 'venta' ? 'selected' : ''}>Venta</option>
+            </select>
+            <select id="ops-currency-filter">
+              <option value="">Todas las monedas</option>
+              <option value="ARS" ${_currencyFilter === 'ARS' ? 'selected' : ''}>ARS</option>
+              <option value="USD" ${_currencyFilter === 'USD' ? 'selected' : ''}>USD</option>
+            </select>
+            <div class="ops-date-range">
+              <input type="date" id="ops-date-from" title="Fecha desde" value="${_dateFrom}">
+              <span>—</span>
+              <input type="date" id="ops-date-to" title="Fecha hasta" value="${_dateTo}">
+            </div>
+            <input type="search" id="ops-search" class="search-input" placeholder="Buscar por ticker...">
           </div>
         </div>
         <div class="ops-table-container">
@@ -53,14 +75,13 @@ export const OperationsPage = {
             <table class="ops-table">
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                 
-                  <th>Ticker</th>
-                  <th>ALyC</th>
-                  <th style="text-align:right">Can.</th>
-                  <th style="text-align:right">Precio</th>
+                  <th class="sortable" data-col="operated_at">Fecha</th>
+                  <th class="sortable" data-col="instrument_ticker">Ticker</th>
+                  <th class="sortable" data-col="alyc_name">ALyC</th>
+                  <th class="sortable" data-col="quantity" style="text-align:right">Can.</th>
+                  <th class="sortable" data-col="price" style="text-align:right">Precio</th>
                   <th style="text-align:right">Total</th>
-                  <th class="currency-col">Moneda</th>
+                  <th class="sortable currency-col" data-col="currency">Moneda</th>
                   <th class="actions-cell"></th>
                 </tr>
               </thead>
@@ -79,10 +100,12 @@ export const OperationsPage = {
 
     document.getElementById('btn-nueva-op').addEventListener('click', () => {
       _editingOperation = null
-      navigate('new-operation')
+      this._showFormModal()
     })
     this._bindSearch()
-    await Promise.all([this._loadAlycFilter(), this._loadList(0)])
+    this._bindFilters()
+    this._bindSortHeaders()
+    await Promise.all([this._loadAlycFilter(), this._loadInstrumentFilter(), this._loadList(0)])
   },
 
   async _loadList(page = 0) {
@@ -100,16 +123,18 @@ export const OperationsPage = {
     let query = supabase
       .from('operations_search')
       .select('*', { count: 'exact' })
-      .order('operated_at', { ascending: false })
+      .order(_sortCol, { ascending: _sortAsc })
 
-    if (_alycFilter) {
-      query = query.eq('alyc_id', _alycFilter)
-    }
+    if (_alycFilter)       query = query.eq('alyc_id', _alycFilter)
+    if (_instrumentFilter) query = query.eq('instrument_id', _instrumentFilter)
+    if (_typeFilter)       query = query.eq('type', _typeFilter)
+    if (_currencyFilter)   query = query.eq('currency', _currencyFilter)
+    if (_dateFrom)         query = query.gte('operated_at', _dateFrom)
+    if (_dateTo)           query = query.lte('operated_at', _dateTo)
 
     if (_searchQuery) {
       const q = `%${_searchQuery}%`
-      // Buscamos en ticker, nombre de instrumento, nombre de ALyC, notas, etc.
-      query = query.or(`instrument_ticker.ilike.${q},instrument_name.ilike.${q},alyc_name.ilike.${q},notes.ilike.${q},type.ilike.${q},currency.ilike.${q}`)
+      query = query.or(`instrument_ticker.ilike.${q},instrument_name.ilike.${q},alyc_name.ilike.${q},notes.ilike.${q}`)
     }
 
     const { data, error, count } = await query.range(from, to)
@@ -122,7 +147,8 @@ export const OperationsPage = {
     }
 
     if (!data.length) {
-      const emptyMsg = _searchQuery || _alycFilter ? 'No se encontraron resultados.' : 'No hay operaciones registradas.'
+      const hasFilters = _searchQuery || _alycFilter || _instrumentFilter || _typeFilter || _currencyFilter || _dateFrom || _dateTo
+      const emptyMsg = hasFilters ? 'No se encontraron resultados para los filtros aplicados.' : 'No hay operaciones registradas.'
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
       if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
       this._renderPagination(0, 0)
@@ -220,9 +246,8 @@ export const OperationsPage = {
     })
 
     const handleEdit = (btn) => {
-      const op = data[btn.dataset.opIdx]
-      _editingOperation = { ...op }
-      navigate('new-operation')
+      _editingOperation = { ...data[btn.dataset.opIdx] }
+      this._showFormModal()
     }
 
     const handleDelete = async (btn) => {
@@ -246,6 +271,7 @@ export const OperationsPage = {
     }
 
     this._renderPagination(page, count)
+    this._updateSortHeaders()
   },
 
   _renderPagination(page, total) {
@@ -262,18 +288,29 @@ export const OperationsPage = {
     const from = page * PAGE_SIZE + 1
     const to   = Math.min((page + 1) * PAGE_SIZE, total)
 
+    // Genera la secuencia de páginas a mostrar con elipsis cuando hay muchas
+    const pages = _buildPageRange(page, totalPages)
+
+    const pageButtons = pages.map(p =>
+      p === '...'
+        ? `<span class="pag-ellipsis">…</span>`
+        : `<button class="btn btn-sm ${p === page ? 'btn-primary pag-active' : 'btn-ghost'} pag-num" data-page="${p}">${p + 1}</button>`
+    ).join('')
+
     container.innerHTML = `
       <div class="pagination">
-        <button class="btn btn-sm btn-ghost" id="btn-pag-prev" ${page === 0 ? 'disabled' : ''}>
-          <span class="btn-text">← Anterior</span><span class="btn-icon">←</span>
-        </button>
+        <button class="btn btn-sm btn-ghost" id="btn-pag-prev" ${page === 0 ? 'disabled' : ''}>←</button>
+        <div class="pag-pages">${pageButtons}</div>
+        <button class="btn btn-sm btn-ghost" id="btn-pag-next" ${page >= totalPages - 1 ? 'disabled' : ''}>→</button>
         <span class="pag-info">Mostrando ${from}–${to} de ${total}</span>
-        <span class="pag-compact">${page + 1} / ${totalPages}</span>
-        <button class="btn btn-sm btn-ghost" id="btn-pag-next" ${page >= totalPages - 1 ? 'disabled' : ''}>
-          <span class="btn-text">Siguiente →</span><span class="btn-icon">→</span>
-        </button>
       </div>`
 
+    container.querySelectorAll('.pag-num').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _currentPage = parseInt(btn.dataset.page, 10)
+        this._loadList(_currentPage)
+      })
+    })
     if (page > 0) {
       document.getElementById('btn-pag-prev').addEventListener('click', () => {
         _currentPage = page - 1
@@ -289,7 +326,11 @@ export const OperationsPage = {
   },
 
   async _deleteOp(id) {
-    if (!confirm('¿Eliminar esta operación? Esta acción no se puede deshacer.')) return
+    const ok = await confirmModal({
+      title: 'Eliminar operación',
+      message: 'Esta acción no se puede deshacer.'
+    })
+    if (!ok) return
 
     try {
       await apiRequest('DELETE', `/api/operations/${id}`)
@@ -318,35 +359,147 @@ export const OperationsPage = {
     sel.addEventListener('change', () => {
       _alycFilter  = sel.value
       _currentPage = 0
+      this._updateClearBtn()
       this._loadList(0)
     })
+  },
+
+  async _loadInstrumentFilter() {
+    const sel = document.getElementById('ops-instrument-filter')
+    if (!sel) return
+
+    let data = cacheGet('instruments')
+    if (!data) {
+      ;({ data } = await supabase.from('instruments').select('id, ticker, name').order('ticker'))
+      if (data) cacheSet('instruments', data)
+    }
+
+    if (data?.length) {
+      sel.innerHTML = '<option value="">Todos los instrumentos</option>' +
+        data.map(i => `<option value="${i.id}" ${i.id === _instrumentFilter ? 'selected' : ''}>${esc(i.ticker)} – ${esc(i.name)}</option>`).join('')
+    }
+
+    sel.addEventListener('change', () => {
+      _instrumentFilter = sel.value
+      _currentPage = 0
+      this._updateClearBtn()
+      this._loadList(0)
+    })
+  },
+
+  _bindFilters() {
+    const typeSel     = document.getElementById('ops-type-filter')
+    const currencySel = document.getElementById('ops-currency-filter')
+    const dateFrom    = document.getElementById('ops-date-from')
+    const dateTo      = document.getElementById('ops-date-to')
+    const clearBtn    = document.getElementById('btn-clear-filters')
+
+    typeSel?.addEventListener('change', () => {
+      _typeFilter = typeSel.value
+      _currentPage = 0
+      this._updateClearBtn()
+      this._loadList(0)
+    })
+
+    currencySel?.addEventListener('change', () => {
+      _currencyFilter = currencySel.value
+      _currentPage = 0
+      this._updateClearBtn()
+      this._loadList(0)
+    })
+
+    dateFrom?.addEventListener('change', () => {
+      _dateFrom = dateFrom.value
+      _currentPage = 0
+      this._updateClearBtn()
+      this._loadList(0)
+    })
+
+    dateTo?.addEventListener('change', () => {
+      _dateTo = dateTo.value
+      _currentPage = 0
+      this._updateClearBtn()
+      this._loadList(0)
+    })
+
+    clearBtn?.addEventListener('click', () => {
+      _alycFilter = ''; _instrumentFilter = ''; _typeFilter = ''; _currencyFilter = ''; _dateFrom = ''; _dateTo = ''; _searchQuery = ''
+      document.getElementById('ops-alyc-filter').value        = ''
+      document.getElementById('ops-instrument-filter').value  = ''
+      document.getElementById('ops-type-filter').value        = ''
+      document.getElementById('ops-currency-filter').value    = ''
+      document.getElementById('ops-date-from').value          = ''
+      document.getElementById('ops-date-to').value            = ''
+      document.getElementById('ops-search').value             = ''
+      _currentPage = 0
+      this._updateClearBtn()
+      this._loadList(0)
+    })
+
+    this._updateClearBtn()
+  },
+
+  _updateClearBtn() {
+    const btn = document.getElementById('btn-clear-filters')
+    if (!btn) return
+    const active = _alycFilter || _instrumentFilter || _typeFilter || _currencyFilter || _dateFrom || _dateTo || _searchQuery
+    btn.style.display = active ? '' : 'none'
   },
 
   _bindSearch() {
     const input = document.getElementById('ops-search')
     if (!input) return
+    input.value = _searchQuery
     input.addEventListener('input', () => {
       clearTimeout(_searchTimer)
       _searchTimer = setTimeout(() => {
         _searchQuery = input.value.trim()
         _currentPage = 0
+        this._updateClearBtn()
         this._loadList(0)
       }, 300)
     })
   },
 
-  // ── Formulario (alta y edición) ───────────────────────────
-  async _renderForm() {
+  _bindSortHeaders() {
+    document.querySelectorAll('.ops-table th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col
+        if (_sortCol === col) {
+          _sortAsc = !_sortAsc
+        } else {
+          _sortCol = col
+          _sortAsc = (col !== 'operated_at')  // fechas por defecto desc; resto asc
+        }
+        _currentPage = 0
+        this._updateSortHeaders()
+        this._loadList(0)
+      })
+    })
+    this._updateSortHeaders()
+  },
+
+  _updateSortHeaders() {
+    document.querySelectorAll('.ops-table th.sortable').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc')
+      if (th.dataset.col === _sortCol) {
+        th.classList.add(_sortAsc ? 'sort-asc' : 'sort-desc')
+      }
+    })
+  },
+
+  // ── Modal formulario (alta y edición) ────────────────────
+  async _showFormModal() {
     const editing = _editingOperation
-    const content = document.getElementById('page-content')
 
-    content.innerHTML = `
-      <div class="page-header">
-        <h2>${editing ? 'Editar Operación' : 'Nueva Operación'}</h2>
-        <button class="btn btn-ghost" id="btn-volver">← Volver al historial</button>
-      </div>
-
-      <div class="card" style="max-width:680px">
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal-card modal-card-lg">
+        <div class="modal-header">
+          <h3 style="margin:0">${editing ? 'Editar Operación' : 'Nueva Operación'}</h3>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-op-close">✕</button>
+        </div>
         <form id="form-op" novalidate>
           <div class="form-row">
             <div class="form-group">
@@ -364,20 +517,23 @@ export const OperationsPage = {
           </div>
 
           <div class="form-row">
-            <div class="form-group" style="grid-column: span 2">
+            <div class="form-group">
               <label for="op-instrument">Instrumento *</label>
               <div style="display:flex; gap:0.5rem; align-items:center">
                 <select id="op-instrument" required style="flex:1"><option value="">Cargando...</option></select>
-                <button type="button" class="btn btn-sm btn-ghost" id="btn-new-instrument" title="Crear nuevo instrumento" style="white-space:nowrap; flex-shrink:0">+ Nuevo</button>
+                <button type="button" class="btn btn-sm btn-ghost btn-icon-only" id="btn-new-instrument" title="Crear nuevo instrumento" aria-label="Crear nuevo instrumento" style="flex-shrink:0">+</button>
               </div>
             </div>
-            <div class="form-group" style="grid-column: span 2">
+            <div class="form-group">
               <label for="op-alyc">ALyC / Broker *</label>
-              <select id="op-alyc" required><option value="">Cargando...</option></select>
+              <div style="display:flex; gap:0.5rem; align-items:center">
+                <select id="op-alyc" required style="flex:1"><option value="">Cargando...</option></select>
+                <button type="button" class="btn btn-sm btn-ghost btn-icon-only" id="btn-new-alyc" title="Crear nueva ALyC" aria-label="Crear nueva ALyC" style="flex-shrink:0">+</button>
+              </div>
             </div>
           </div>
 
-          <div class="form-row">
+          <div class="form-row form-row-3">
             <div class="form-group">
               <label for="op-qty">Cantidad *</label>
               <input type="number" id="op-qty" min="0.0001" step="any" placeholder="Ej: 100" required>
@@ -395,7 +551,7 @@ export const OperationsPage = {
             </div>
           </div>
 
-          <div id="op-total-row" style="display:none;margin: 1.5rem 0;padding: 1rem;background:var(--bg-main);border-radius:var(--radius);font-size:1rem; border: 1px dashed var(--border)">
+          <div id="op-total-row" style="display:none;margin: 1rem 0;padding: 0.75rem 1rem;background:var(--bg-main);border-radius:var(--radius);font-size:1rem; border: 1px dashed var(--border)">
             Total estimado: <strong id="op-total-value" style="color: var(--color-primary)">—</strong>
           </div>
 
@@ -413,35 +569,38 @@ export const OperationsPage = {
         </form>
       </div>`
 
+    document.body.appendChild(overlay)
+
     // Fecha de hoy por defecto (solo alta)
     document.getElementById('op-date').value = editing
       ? editing.operated_at
       : new Date().toISOString().split('T')[0]
 
-    const goBack = () => {
-      const type       = document.getElementById('op-type').value
-      const instrId    = document.getElementById('op-instrument').value
-      const alycId     = document.getElementById('op-alyc').value
-      const qty        = document.getElementById('op-qty').value
-      const price      = document.getElementById('op-price').value
-      const currency   = document.getElementById('op-currency').value
-      const date       = document.getElementById('op-date').value
-      const notes      = document.getElementById('op-notes').value.trim()
+    const close = () => {
+      const type    = document.getElementById('op-type').value
+      const instrId = document.getElementById('op-instrument').value
+      const alycId  = document.getElementById('op-alyc').value
+      const qty     = document.getElementById('op-qty').value
+      const price   = document.getElementById('op-price').value
+      const date    = document.getElementById('op-date').value
+      const notes   = document.getElementById('op-notes').value.trim()
 
       const isDirty = editing
-        ? type !== editing.type         || instrId !== editing.instrument_id ||
-          alycId !== editing.alyc_id    || qty !== String(editing.quantity)  ||
-          price !== String(editing.price) || currency !== editing.currency   ||
-          date !== editing.operated_at  || notes !== (editing.notes || '')
+        ? type !== editing.type           || instrId !== editing.instrument_id ||
+          alycId !== editing.alyc_id      || qty !== String(editing.quantity)  ||
+          price !== String(editing.price) || date !== editing.operated_at      ||
+          notes !== (editing.notes || '')
         : type !== '' || instrId !== '' || alycId !== '' || qty !== '' || price !== '' || notes !== ''
 
       if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
       _editingOperation = null
-      navigate('operations')
+      overlay.remove()
     }
-    document.getElementById('btn-volver').addEventListener('click', goBack)
-    document.getElementById('btn-op-cancel').addEventListener('click', goBack)
+
+    document.getElementById('btn-op-close').addEventListener('click', close)
+    document.getElementById('btn-op-cancel').addEventListener('click', close)
     document.getElementById('btn-new-instrument').addEventListener('click', () => this._showInstrumentModal())
+    document.getElementById('btn-new-alyc').addEventListener('click', () => this._showAlycModal())
 
     try {
       await Promise.all([
@@ -452,7 +611,6 @@ export const OperationsPage = {
       showToast('Error al cargar los datos del formulario. Intentá recargar la página.', 'error')
     }
 
-    // Pre-cargar campos si estamos editando
     if (editing) {
       document.getElementById('op-type').value     = editing.type
       document.getElementById('op-qty').value      = editing.quantity
@@ -462,7 +620,7 @@ export const OperationsPage = {
     }
 
     this._bindTotalCalc()
-    this._bindFormSubmit()
+    this._bindFormSubmit(overlay)
   },
 
   async _loadInstrumentsSelect(selectedId = null) {
@@ -592,6 +750,75 @@ export const OperationsPage = {
     })
   },
 
+  async _showAlycModal() {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 style="margin:0">Nueva ALyC</h3>
+          <button type="button" class="btn btn-sm btn-ghost" id="modal-alyc-close">✕</button>
+        </div>
+        <form id="modal-alyc-form" novalidate>
+          <div class="form-group">
+            <label for="modal-alyc-name">Nombre *</label>
+            <input type="text" id="modal-alyc-name" placeholder="Ej: IOL invertironline" required>
+          </div>
+          <div class="form-group">
+            <label for="modal-alyc-cuit">CUIT</label>
+            <input type="text" id="modal-alyc-cuit" placeholder="Ej: 30-12345678-9">
+          </div>
+          <div class="form-group">
+            <label for="modal-alyc-website">Sitio web</label>
+            <input type="url" id="modal-alyc-website" placeholder="Ej: https://www.iol.com.ar">
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="modal-alyc-submit">+ Agregar</button>
+            <button type="button" class="btn btn-ghost" id="modal-alyc-cancel">Cancelar</button>
+          </div>
+        </form>
+      </div>`
+
+    document.body.appendChild(overlay)
+
+    const close = () => overlay.remove()
+    document.getElementById('modal-alyc-close').addEventListener('click', close)
+    document.getElementById('modal-alyc-cancel').addEventListener('click', close)
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close() })
+
+    const nameInput = document.getElementById('modal-alyc-name')
+    nameInput.focus()
+
+    document.getElementById('modal-alyc-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const name    = nameInput.value.trim()
+      const cuit    = document.getElementById('modal-alyc-cuit').value.trim()
+      const website = document.getElementById('modal-alyc-website').value.trim()
+
+      if (!name) {
+        showToast('El nombre es obligatorio.', 'error')
+        return
+      }
+
+      const btn = document.getElementById('modal-alyc-submit')
+      btn.disabled    = true
+      btn.textContent = 'Guardando...'
+
+      try {
+        const result = await apiRequest('POST', '/api/alycs', { name, cuit: cuit || null, website: website || null })
+        const newId  = Array.isArray(result) ? result[0]?.id : result?.id
+        cacheInvalidate('alycs')
+        showToast(`ALyC "${name}" creada.`, 'success')
+        close()
+        await this._loadAlycsSelect(newId)
+      } catch (err) {
+        showToast(err.code === '23505' ? `La ALyC "${name}" ya existe.` : 'Error al guardar.', 'error')
+        btn.disabled    = false
+        btn.textContent = '+ Agregar'
+      }
+    })
+  },
+
   _bindTotalCalc() {
     const qtyInput   = document.getElementById('op-qty')
     const priceInput = document.getElementById('op-price')
@@ -615,7 +842,7 @@ export const OperationsPage = {
     update()
   },
 
-  _bindFormSubmit() {
+  _bindFormSubmit(overlay) {
     const form    = document.getElementById('form-op')
     const editing = _editingOperation
     if (!form) return
@@ -661,7 +888,8 @@ export const OperationsPage = {
           showToast('Operación registrada correctamente.', 'success')
         }
         _editingOperation = null
-        navigate('operations')
+        overlay.remove()
+        await this._loadList(_currentPage)
       } catch {
         showToast('Error al guardar la operación.', 'error')
         btn.disabled    = false
@@ -671,11 +899,26 @@ export const OperationsPage = {
   }
 }
 
-function esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
 
 function fmtDateShort(iso) {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+// Genera un rango de páginas con elipsis, ej: [0,1,'...',8,9,10,'...',19,20]
+function _buildPageRange(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
+
+  const pages = new Set([0, total - 1, current])
+  for (let i = Math.max(0, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i)
+
+  const sorted = [...pages].sort((a, b) => a - b)
+  const result = []
+  let prev = -1
+  for (const p of sorted) {
+    if (p - prev > 1) result.push('...')
+    result.push(p)
+    prev = p
+  }
+  return result
 }

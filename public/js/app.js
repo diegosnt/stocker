@@ -72,8 +72,7 @@ function renderShell(userEmail) {
         <aside class="sidebar">
           <div class="sidebar-section">
             <div class="sidebar-section-title">Operaciones</div>
-            <a class="sidebar-link" data-route="operations">Historial</a>
-            <a class="sidebar-link" data-route="new-operation">Nueva Operación</a>
+            <a class="sidebar-link" data-route="operations">Operaciones</a>
             <a class="sidebar-link" data-route="holdings-analysis">Análisis de Tenencia</a>
           </div>
           <div class="sidebar-section">
@@ -133,8 +132,7 @@ function renderShell(userEmail) {
   })
 
   // Registrar rutas
-  register('operations',        () => OperationsPage.render('list'))
-  register('new-operation',     () => OperationsPage.render('form'))
+  register('operations',        () => OperationsPage.render())
   register('holdings-analysis', () => HoldingsAnalysisPage.render())
   register('instrument-types',  () => InstrumentTypesPage.render())
   register('instruments',       () => InstrumentsPage.render())
@@ -143,6 +141,12 @@ function renderShell(userEmail) {
 
   start()
 }
+
+// ── Sesión expirada ────────────────────────────────────────
+window.addEventListener('session-expired', async () => {
+  try { await signOut() } catch {}
+  showToast('Tu sesión expiró. Ingresá de nuevo.', 'error')
+})
 
 // ── Punto de entrada ───────────────────────────────────────
 initDarkMode()

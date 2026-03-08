@@ -23,8 +23,9 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 | **Frontend** | Vanilla JS ES6+ (Módulos nativos, sin bundler) |
 | **Estilos** | CSS3 + Water.css (Light/Dark mode automático) |
 | **Base de Datos** | Supabase (PostgreSQL) |
-| **Seguridad** | Supabase Auth + JWT (jose) + RLS |
+| **Seguridad** | Supabase Auth + JWT (jose) + RLS + Helmet |
 | **Logging** | Pino + pino-pretty |
+| **Precios** | Finance API (proxy server-side con cache TTL 5 min) |
 
 ## Requisitos previos
 
@@ -72,9 +73,15 @@ SUPABASE_URL=https://<tu-proyecto>.supabase.co
 SUPABASE_ANON_KEY=<tu-anon-key>
 SUPABASE_JWT_SECRET=<tu-jwt-secret>
 PORT=3000
+
+# Finance
+FINANCE_URL=https://finance
+FINANCE_EXCHANGE=BA
 ```
 
 > **Nota:** El `SUPABASE_JWT_SECRET` es necesario para la validación local de tokens y se encuentra en **Settings -> API -> JWT Settings**.
+>
+> **`FINANCE_EXCHANGE`** define el sufijo de bolsa para los tickers (ej: `BA` = Bolsa de Buenos Aires). Dejar vacío para tickers sin sufijo (mercados internacionales).
 
 ### 6. Iniciar la aplicación
 
@@ -96,9 +103,10 @@ stocker/
 │   │   │   ├── holdings-analysis.js # Análisis de cartera
 │   │   │   ├── operations.js        # Historial y formularios
 │   │   │   └── ...
-│   │   ├── api-client.js       # Cliente HTTP con fetch y auth
+│   │   ├── api-client.js       # Cliente HTTP con fetch, auth y manejo de sesión expirada
 │   │   ├── app.js              # Inicialización y Layout
-│   │   └── router.js           # Manejo de rutas mediante hash
+│   │   ├── router.js           # Manejo de rutas mediante hash
+│   │   └── utils.js            # Utilidades compartidas (esc, etc.)
 │   └── css/
 ├── supabase/
 │   ├── schema.sql              # Estructura base: tablas, relaciones y políticas RLS
@@ -113,8 +121,30 @@ stocker/
 └── logger.js                   # Configuración de logs (Pino)
 ```
 
+## TODO
+
+Mejoras pendientes ordenadas por prioridad:
+
+| # | Mejora | Área | Prioridad |
+|---|--------|------|-----------|
+| ~~1~~ | ~~Modal de confirmación antes de eliminar registros~~ | ~~UX~~ | ✅ Hecho |
+| ~~2~~ | ~~Filtros en historial de operaciones (fecha, tipo, moneda, instrumento)~~ | ~~Funcionalidad~~ | ✅ Hecho |
+| ~~3~~ | ~~Paginación en historial de operaciones~~ | ~~Performance~~ | ✅ Hecho |
+| 4 | Recordar posición del scroll al volver de un formulario | UX | 🟡 Media |
+| 5 | Botón de refresh manual de precios en Análisis de Tenencia | UX | 🟡 Media |
+| 6 | Indicador visual de mercado abierto/cerrado | UX | 🟡 Media |
+| ~~7~~ | ~~Totales P&L globales en los KPIs de Análisis de Tenencia~~ | ~~Funcionalidad~~ | ✅ Hecho |
+| 8 | Validación de formularios en el frontend antes de enviar al servidor | UX | 🟡 Media |
+| 9 | Mensajes de error más descriptivos (mostrar qué campo falló) | UX | 🟢 Baja |
+| ~~10~~ | ~~Ordenamiento de columnas clickeable en las tablas~~ | ~~UX~~ | ✅ Hecho |
+
+---
+
 ## Seguridad
 
 - **Validación Local:** El servidor utiliza la librería `jose` para verificar la firma de los tokens JWT de Supabase antes de procesar cualquier mutación, reduciendo la latencia y mejorando la seguridad.
 - **RLS (Row Level Security):** Todas las tablas de PostgreSQL tienen políticas activas que garantizan que un usuario solo pueda acceder a sus propios registros (`user_id = auth.uid()`).
 - **Validación de Datos:** Se implementa un middleware de validación riguroso para asegurar que los datos recibidos en el servidor cumplan con los formatos esperados (UUID, fechas ISO, montos positivos).
+- **Cabeceras HTTP:** Helmet.js configura cabeceras de seguridad (CSP, X-Frame-Options, HSTS, Referrer-Policy, etc.) en todas las respuestas.
+- **Rate Limiting:** El endpoint de precios limita las consultas reales a Finance a 30 por IP cada 5 minutos (las respuestas cacheadas no consumen quota).
+- **Sesión Expirada:** El cliente detecta respuestas 401 automáticamente, cierra la sesión y redirige al login con un mensaje de aviso.
