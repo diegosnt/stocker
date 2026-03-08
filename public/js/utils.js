@@ -1,3 +1,23 @@
+export function setFieldError(fieldId, message) {
+  const el = document.getElementById(fieldId)
+  if (!el) return
+  el.classList.add('field-error-input')
+  const group = el.closest('.form-group')
+  if (group) {
+    group.querySelector('.field-error-msg')?.remove()
+    const msg = document.createElement('span')
+    msg.className   = 'field-error-msg'
+    msg.textContent = message
+    group.appendChild(msg)
+  }
+  const clear = () => {
+    el.classList.remove('field-error-input')
+    el.closest('.form-group')?.querySelector('.field-error-msg')?.remove()
+  }
+  el.addEventListener('input',  clear, { once: true })
+  el.addEventListener('change', clear, { once: true })
+}
+
 export function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

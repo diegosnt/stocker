@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal } from '../utils.js'
+import { esc, confirmModal, setFieldError } from '../utils.js'
 
 const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
 const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
@@ -726,10 +726,11 @@ export const OperationsPage = {
       const name   = document.getElementById('modal-name').value.trim()
       const typeId = document.getElementById('modal-type').value
 
-      if (!ticker || !name || !typeId) {
-        showToast('Completá todos los campos obligatorios.', 'error')
-        return
-      }
+      let hasError = false
+      if (!ticker) { setFieldError('modal-ticker', 'Ingresá un ticker');   hasError = true }
+      if (!name)   { setFieldError('modal-name',   'Ingresá un nombre');   hasError = true }
+      if (!typeId) { setFieldError('modal-type',   'Seleccioná un tipo'); hasError = true }
+      if (hasError) return
 
       const btn = document.getElementById('modal-submit')
       btn.disabled    = true
@@ -795,10 +796,7 @@ export const OperationsPage = {
       const cuit    = document.getElementById('modal-alyc-cuit').value.trim()
       const website = document.getElementById('modal-alyc-website').value.trim()
 
-      if (!name) {
-        showToast('El nombre es obligatorio.', 'error')
-        return
-      }
+      if (!name) { setFieldError('modal-alyc-name', 'El nombre es obligatorio'); return }
 
       const btn = document.getElementById('modal-alyc-submit')
       btn.disabled    = true
@@ -859,10 +857,14 @@ export const OperationsPage = {
       const operatedAt   = document.getElementById('op-date').value
       const notes        = document.getElementById('op-notes').value.trim()
 
-      if (!type || !instrumentId || !alycId || !qty || !price || !operatedAt) {
-        showToast('Completá todos los campos obligatorios.', 'error')
-        return
-      }
+      let hasError = false
+      if (!type)                           { setFieldError('op-type',       'Seleccioná un tipo de operación'); hasError = true }
+      if (!operatedAt)                     { setFieldError('op-date',       'Ingresá una fecha');              hasError = true }
+      if (!instrumentId)                   { setFieldError('op-instrument', 'Seleccioná un instrumento');      hasError = true }
+      if (!alycId)                         { setFieldError('op-alyc',       'Seleccioná una ALyC');           hasError = true }
+      if (!qty   || parseFloat(qty)   <= 0){ setFieldError('op-qty',        'Ingresá una cantidad mayor a 0'); hasError = true }
+      if (!price || parseFloat(price) <= 0){ setFieldError('op-price',      'Ingresá un precio mayor a 0');   hasError = true }
+      if (hasError) return
 
       const btn = document.getElementById('btn-op-submit')
       btn.disabled    = true

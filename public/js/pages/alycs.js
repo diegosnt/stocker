@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal } from '../utils.js'
+import { esc, confirmModal, setFieldError } from '../utils.js'
 
 let _alycsData    = []
 let _alycSortCol  = 'name'
@@ -190,7 +190,7 @@ export const AlycsPage = {
       const website = document.getElementById('alyc-website').value.trim()
       const editId  = form.dataset.editId
 
-      if (!name) { showToast('El nombre es obligatorio.', 'error'); return }
+      if (!name) { setFieldError('alyc-name', 'El nombre es obligatorio'); return }
 
       const btn = document.getElementById('btn-alyc-submit')
       btn.disabled = true

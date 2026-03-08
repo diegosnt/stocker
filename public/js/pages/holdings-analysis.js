@@ -3,11 +3,41 @@ import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 
 export const HoldingsAnalysisPage = {
+  _isMarketOpen() {
+    const now = new Date()
+    // ART = UTC-3, sin horario de verano
+    const artMs = now.getTime() + (-3 * 60 * 60 * 1000)
+    const art   = new Date(artMs)
+    const day   = art.getUTCDay() // 0=Dom, 6=Sáb
+    if (day === 0 || day === 6) return false
+    const minutes = art.getUTCHours() * 60 + art.getUTCMinutes()
+    return minutes >= 11 * 60 && minutes < 17 * 60
+  },
+
+  _updateMarketBadge() {
+    const el = document.getElementById('market-status-badge')
+    if (!el) return
+    const open = this._isMarketOpen()
+    el.className   = `market-badge ${open ? 'market-open' : 'market-closed'}`
+    el.textContent = open ? '● Mercado abierto' : '● Mercado cerrado'
+  },
+
   async render() {
+    if (this._marketInterval) {
+      clearInterval(this._marketInterval)
+      this._marketInterval = null
+    }
+
+    const { data: badgeSetting } = await supabase
+      .from('app_settings').select('value').eq('key', 'market_badge_enabled').single()
+    const badgeEnabled = badgeSetting?.value !== 'false'
+
+    const open = this._isMarketOpen()
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
         <h2>Análisis de Tenencia</h2>
+        ${badgeEnabled ? `<span id="market-status-badge" class="market-badge ${open ? 'market-open' : 'market-closed'}">${open ? '● Mercado abierto' : '● Mercado cerrado'}</span>` : ''}
       </div>
       
       <div id="holdings-kpis" class="kpi-grid">
@@ -28,6 +58,7 @@ export const HoldingsAnalysisPage = {
       const data = await this._calculateHoldingsByAlyc()
       this._renderHoldings(data)
       this._updateMarketPrices(data.tickers) // sin await — actualiza celdas al llegar
+      if (badgeEnabled) this._marketInterval = setInterval(() => this._updateMarketBadge(), 60_000)
     } catch (error) {
       console.error(error)
       content.innerHTML = `
@@ -66,16 +97,21 @@ export const HoldingsAnalysisPage = {
 
       bodyHtml += `
         <div class="currency-group" style="margin-bottom: 2rem">
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem">
-            <span class="badge badge-${curr.toLowerCase()}">${curr}</span>
-            <div style="text-align: right">
-              <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase">Subtotal</div>
-              <div style="font-size: 1.25rem; font-weight: 700">${totalVal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
-            </div>
-          </div>
 
-          <div class="chart-container" style="margin-bottom: 1.5rem">
-            ${this._renderBarChart(items, totalVal)}
+
+          <div class="charts-row">
+            <div class="chart-panel">
+              <div class="chart-panel-title">Distribución de Tenencia</div>
+              ${this._renderPieChart(items, totalVal)}
+            </div>
+            <div class="chart-panel">
+              <div class="chart-panel-title">Rendimiento Individual (P&amp;L $)</div>
+              <div id="${chartId}" class="pnl-chart-container">
+                <div style="display:flex; gap:0.5rem; align-items:center; color:var(--text-muted); font-size:0.85rem">
+                  <span class="spinner"></span> Esperando precios...
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="table-wrapper desktop-only">
@@ -136,14 +172,6 @@ export const HoldingsAnalysisPage = {
             `).join('')}
           </div>
 
-          <div style="margin-top: 1.5rem">
-            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 0.75rem">Rendimiento Individual (P&amp;L $)</div>
-            <div id="${chartId}" class="pnl-chart-container">
-              <div style="display:flex; gap: 0.5rem; align-items:center; color:var(--text-muted); font-size:0.85rem">
-                <span class="spinner"></span> Esperando precios...
-              </div>
-            </div>
-          </div>
         </div>`
     }
     return bodyHtml
@@ -408,13 +436,21 @@ export const HoldingsAnalysisPage = {
 
       if (idx > 0) this._pendingAlycs[idx] = alyc
 
+      const alycTotals = Object.entries(alyc.currencies).map(([curr, items]) => {
+        const t = items.reduce((acc, h) => acc + h.currentValue, 0)
+        return `<span class="alyc-header-total"><span class="badge badge-${curr.toLowerCase()}">${curr}</span>${t.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>`
+      }).join('')
+
       html += `
         <div class="card alyc-card${collapsed}" data-alyc-index="${idx}">
           <div class="alyc-card-header">
             <h3 style="margin:0; display:flex; align-items:center; gap:0.5rem">
               <span style="color:var(--color-primary)">🏦</span> ${alyc.name}
             </h3>
-            <span class="alyc-chevron">▾</span>
+            <div class="alyc-header-right">
+              <div class="alyc-header-totals">${alycTotals}</div>
+              <span class="alyc-chevron">▾</span>
+            </div>
           </div>
           <div class="alyc-card-body">
             <div class="alyc-card-inner">${innerHtml}</div>
@@ -528,29 +564,65 @@ export const HoldingsAnalysisPage = {
     rows.forEach(row => tbody.appendChild(row))
   },
 
-  _renderBarChart(items, total) {
+  _renderPieChart(items, total) {
     const colors = [
-      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
+      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
       '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
     ]
+    const cx = 150, cy = 150, R = 120, hole = 68
+    const midR = (R + hole) / 2   // radio medio donde van las etiquetas
+    const MIN_LABEL = 0.06         // sectores < 6% no tienen etiqueta interior
 
-    return `
-      <div style="display: flex; height: 12px; width: 100%; border-radius: 6px; overflow: hidden; background: var(--bg-main)">
-        ${items.map((h, i) => {
-          const pct = (h.currentValue / total) * 100
-          if (pct < 0.5) return '' 
-          return `<div style="width: ${pct}%; background-color: ${colors[i % colors.length]};" title="${h.ticker}: ${pct.toFixed(2)}%"></div>`
-        }).join('')}
-      </div>
-      <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; justify-content: start">
-        ${items.map((h, i) => `
-          <div style="display: flex; align-items: center; font-size: 0.75rem">
-            <div style="width: 8px; height: 8px; background-color: ${colors[i % colors.length]}; border-radius: 2px; margin-right: 6px"></div>
-            <span style="color: var(--text-main); font-weight: 500">${h.ticker}</span>
-            <span style="color: var(--text-muted); margin-left: 4px">${((h.currentValue / total) * 100).toFixed(1)}%</span>
-          </div>
-        `).join('')}
-      </div>
-    `
+    // texto con contorno para legibilidad sobre cualquier color
+    const label = (x, y, line1, line2, color) => `
+      <text x="${x.toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle"
+            font-size="13" font-weight="800" fill="white"
+            stroke="rgba(0,0,0,0.45)" stroke-width="3" paint-order="stroke">${line1}</text>
+      <text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" text-anchor="middle"
+            font-size="12" fill="rgba(255,255,255,0.95)"
+            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${line2}</text>`
+
+    // Caso especial: único instrumento → círculo completo
+    if (items.length === 1) {
+      return `<svg viewBox="0 0 300 300" class="pie-svg">
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
+        <circle cx="${cx}" cy="${cy}" r="${hole}" fill="var(--bg-card)"/>
+        ${label(cx, cy, items[0].ticker, '100%', colors[0])}
+      </svg>`
+    }
+
+    let angle = -Math.PI / 2
+    const sectors = []
+    const labels  = []
+
+    items.forEach((h, i) => {
+      const pct   = h.currentValue / total
+      const sweep = pct * 2 * Math.PI
+      const end   = angle + sweep
+      const large = sweep > Math.PI ? 1 : 0
+      const color = colors[i % colors.length]
+      const mid   = angle + sweep / 2
+
+      const x1 = cx + R    * Math.cos(angle), y1 = cy + R    * Math.sin(angle)
+      const x2 = cx + R    * Math.cos(end),   y2 = cy + R    * Math.sin(end)
+      const x3 = cx + hole * Math.cos(end),   y3 = cy + hole * Math.sin(end)
+      const x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
+
+      const d = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${large} 0 ${x4} ${y4}Z`
+      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2" class="pie-sector">
+        <title>${h.ticker}: ${(pct * 100).toFixed(1)}%</title></path>`)
+
+      if (pct >= MIN_LABEL) {
+        const lx = cx + midR * Math.cos(mid)
+        const ly = cy + midR * Math.sin(mid)
+        labels.push(label(lx, ly, h.ticker, `${(pct * 100).toFixed(0)}%`, color))
+      }
+
+      angle = end
+    })
+
+    return `<svg viewBox="0 0 300 300" class="pie-svg">
+      ${sectors.join('')}${labels.join('')}
+    </svg>`
   }
 }

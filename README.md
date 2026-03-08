@@ -134,7 +134,7 @@ Mejoras pendientes ordenadas por prioridad:
 | 5 | Botón de refresh manual de precios en Análisis de Tenencia | UX | 🟡 Media |
 | 6 | Indicador visual de mercado abierto/cerrado | UX | 🟡 Media |
 | ~~7~~ | ~~Totales P&L globales en los KPIs de Análisis de Tenencia~~ | ~~Funcionalidad~~ | ✅ Hecho |
-| 8 | Validación de formularios en el frontend antes de enviar al servidor | UX | 🟡 Media |
+| ~~8~~ | ~~Validación de formularios en el frontend antes de enviar al servidor~~ | ~~UX~~ | ✅ Hecho |
 | 9 | Mensajes de error más descriptivos (mostrar qué campo falló) | UX | 🟢 Baja |
 | ~~10~~ | ~~Ordenamiento de columnas clickeable en las tablas~~ | ~~UX~~ | ✅ Hecho |
 

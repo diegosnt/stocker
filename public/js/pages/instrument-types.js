@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal } from '../utils.js'
+import { esc, confirmModal, setFieldError } from '../utils.js'
 
 let _tiposData = []
 
@@ -140,7 +140,7 @@ export const InstrumentTypesPage = {
       const desc   = document.getElementById('tipo-desc').value.trim()
       const editId = form.dataset.editId
 
-      if (!name) { showToast('El nombre es obligatorio.', 'error'); return }
+      if (!name) { setFieldError('tipo-name', 'El nombre es obligatorio'); return }
 
       const btn = document.getElementById('btn-tipo-submit')
       btn.disabled = true

@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../app.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal } from '../utils.js'
+import { esc, confirmModal, setFieldError } from '../utils.js'
 
 let _instrData    = []
 let _instrSortCol = 'ticker'
@@ -217,7 +217,11 @@ export const InstrumentsPage = {
       const typeId = document.getElementById('inst-type').value
       const editId = form.dataset.editId
 
-      if (!ticker || !name || !typeId) { showToast('Ticker, nombre y tipo son obligatorios.', 'error'); return }
+      let hasError = false
+      if (!ticker) { setFieldError('inst-ticker', 'Ingresá un ticker');   hasError = true }
+      if (!name)   { setFieldError('inst-name',   'Ingresá un nombre');   hasError = true }
+      if (!typeId) { setFieldError('inst-type',   'Seleccioná un tipo'); hasError = true }
+      if (hasError) return
 
       const btn = document.getElementById('btn-inst-submit')
       btn.disabled = true

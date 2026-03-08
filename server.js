@@ -444,7 +444,7 @@ app.delete('/api/operations/:id', requireAuth, async (req, res) => {
 })
 
 // ── PATCH /api/settings/:key ───────────────────────────────
-const ALLOWED_SETTINGS = new Set(['registration_enabled'])
+const ALLOWED_SETTINGS = new Set(['registration_enabled', 'market_badge_enabled'])
 
 app.patch('/api/settings/:key', requireAuth, async (req, res) => {
   const { key }                  = req.params
