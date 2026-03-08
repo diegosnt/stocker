@@ -524,6 +524,21 @@ h1, h2, h3, h4, h5 {
   min-height: 1rem;
 }
 
+.kpi-card--compact {
+  padding: 0.5rem 0.75rem;
+}
+.kpi-card--compact .kpi-label {
+  font-size: 0.7rem;
+  margin-bottom: 0.1rem;
+}
+.kpi-card--compact .kpi-value {
+  font-size: 0.95rem;
+}
+.kpi-card--compact .kpi-sub {
+  min-height: 0;
+  font-size: 0.65rem;
+}
+
 /* ---- Tables ---- */
 .table-wrapper {
   width: 100%;
@@ -890,6 +905,18 @@ input:focus, select:focus, textarea:focus {
   flex-direction: column;
   gap: 0.5rem;
 }
+.pnl-bar-chart--wide .pnl-bar-row {
+  grid-template-columns: 80px 1fr 130px;
+}
+.pnl-bar-chart--wide .pnl-bar-track {
+  height: 22px;
+}
+.pnl-bar-chart--wide .pnl-bar-label {
+  font-size: 0.7rem;
+}
+.pnl-bar-chart--wide .pnl-bar-value {
+  font-size: 0.75rem;
+}
 .pnl-bar-row {
   display: grid;
   grid-template-columns: 60px 1fr 110px;
@@ -1092,6 +1119,7 @@ input:focus, select:focus, textarea:focus {
 .alyc-chevron {
   font-size: 1.1rem;
   color: var(--text-muted);
+  transition: transform 0.2s ease;
   transition: transform 0.25s ease;
   line-height: 1;
 }
