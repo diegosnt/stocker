@@ -30,6 +30,12 @@ export async function apiRequest(method, path, body = undefined) {
   if (res.status === 204) return null
 
   const json = await res.json()
-  if (!res.ok) throw Object.assign(new Error('Error en la solicitud'), { code: json.error?.[0]?.code })
+  if (!res.ok) {
+    const err = new Error('Error en la solicitud')
+    err.code = json.error?.[0]?.code
+    err.status = res.status
+    err.response = json
+    throw err
+  }
   return json.data ?? json
 }

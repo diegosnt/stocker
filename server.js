@@ -246,6 +246,140 @@ app.post('/api/operations', requireAuth, async (req, res) => {
   }
 })
 
+// ── POST /api/operations/bulk ──────────────────────────────
+app.post('/api/operations/bulk', requireAuth, async (req, res) => {
+  const { operations, skip_duplicate_check = false } = req.body
+  const userId = req.userId
+
+  if (!Array.isArray(operations)) {
+    return res.status(400).json({ error: 'Se esperaba un array de operaciones' })
+  }
+
+  logger.info({ count: operations.length, skip_duplicate_check, user_id: userId }, 'Importación masiva — inicio')
+
+  try {
+    // 1. Obtener Alycs e Instrumentos del usuario para mapear nombres/tickers a IDs
+    const [alycs, instruments] = await Promise.all([
+      supabaseFetch('alycs', 'GET', req.headers.authorization),
+      supabaseFetch('instruments', 'GET', req.headers.authorization)
+    ])
+
+    const alycMap = new Map(alycs.map(a => [a.name.toLowerCase(), a.id]))
+    const instMap = new Map(instruments.map(i => [i.ticker.toLowerCase(), i.id]))
+
+    // 2. Obtener operaciones existentes en el rango de fechas del CSV para verificar duplicados eficientemente
+    const dates = operations.map(op => op.operated_at).filter(isDate)
+    const minDate = dates.reduce((a, b) => a < b ? a : b)
+    const maxDate = dates.reduce((a, b) => a > b ? a : b)
+
+    const existingOps = await supabaseFetch(
+      `operations?user_id=eq.${userId}&operated_at=gte.${minDate}&operated_at=lte.${maxDate}`,
+      'GET', req.headers.authorization
+    )
+
+    const results = { imported: 0, skipped: 0, errors: [], duplicates: [], failed_entities: [] }
+    const toInsert = []
+    const cleanOps = []
+
+    for (const [idx, op] of operations.entries()) {
+      const rowNum = op.row || (idx + 2)
+      
+      // Resolución de IDs: Priorizar IDs directos (reintento) sobre nombres (CSV original)
+      const alycId = op.alyc_id || alycMap.get(op.alyc?.toLowerCase())
+      const instId = op.instrument_id || instMap.get(op.ticker?.toLowerCase())
+
+      // Guardamos la info original para el modal de errores/duplicados
+      const meta = op._raw || { ticker: op.ticker, alyc: op.alyc }
+
+      if (!alycId || !instId) {
+        results.failed_entities.push({ 
+          row: rowNum, operated_at: op.operated_at, _raw: meta, 
+          error: !alycId ? `ALyC no encontrada` : `Instrumento no encontrado` 
+        })
+        results.skipped++
+        continue
+      }
+
+      if (!isDate(op.operated_at) || !isPositive(op.quantity) || !isPositive(op.price)) {
+        results.failed_entities.push({ 
+          row: rowNum, operated_at: op.operated_at, _raw: meta, 
+          error: 'Datos numéricos o de fecha inválidos' 
+        })
+        results.skipped++
+        continue
+      }
+
+      // Objeto limpio para Supabase
+      const opData = {
+        type: op.type,
+        instrument_id: instId,
+        alyc_id: alycId,
+        quantity: parseFloat(op.quantity),
+        price: parseFloat(op.price),
+        currency: op.currency,
+        operated_at: op.operated_at,
+        user_id: userId
+      }
+
+      // Objeto con metadata para el frontend (duplicados/limpios)
+      const opWithMeta = { ...opData, _raw: meta, row: rowNum }
+
+      // 2. Verificar duplicados (solo si no es un reintento forzado)
+      if (!skip_duplicate_check) {
+        const isDuplicate = existingOps.some(ex => {
+          const sameInst = ex.instrument_id === opData.instrument_id
+          const sameAlyc = ex.alyc_id === opData.alyc_id
+          const sameType = ex.type === opData.type
+          const sameCurr = ex.currency === opData.currency
+          // Comparación de fechas normalizada (YYYY-MM-DD)
+          const sameDate = String(ex.operated_at).substring(0, 10) === String(opData.operated_at).substring(0, 10)
+          // Comparación numérica con tolerancia para decimales
+          const sameQty  = Math.abs(parseFloat(ex.quantity) - opData.quantity) < 0.0001
+          const samePrice = Math.abs(parseFloat(ex.price) - opData.price) < 0.0001
+          
+          return sameInst && sameAlyc && sameType && sameCurr && sameDate && sameQty && samePrice
+        })
+
+        if (isDuplicate) {
+          results.duplicates.push(opWithMeta)
+          continue
+        }
+      }
+
+      cleanOps.push(opWithMeta)
+      toInsert.push(opData) // Solo enviamos opData (limpio) a Supabase
+    }
+
+    // Si hay duplicados y el cliente aún no confirmó, devolvemos 409
+    if (results.duplicates.length > 0 && !skip_duplicate_check) {
+      return res.status(409).json({ 
+        error: 'Se encontraron operaciones duplicadas', 
+        duplicates: results.duplicates,
+        clean_ops: cleanOps,
+        failed_entities: results.failed_entities
+      })
+    }
+
+    // Inserción masiva en Supabase
+    if (toInsert.length > 0) {
+      try {
+        await supabaseFetch('operations', 'POST', req.headers.authorization, toInsert)
+        results.imported = toInsert.length
+      } catch (err) {
+        logger.error({ err: err.payload, user_id: userId }, 'Error fatal en inserción masiva Supabase')
+        throw err // Re-lanzar para que el catch general lo maneje
+      }
+    }
+
+    logger.info({ imported: results.imported, failed: results.failed_entities.length, user_id: userId }, 'Importación masiva — finalizada')
+    res.json({ data: results })
+
+  } catch (err) {
+    logger.error({ err: err.message, stack: err.stack }, 'Error en importación masiva')
+    res.status(err.status ?? 500).json({ error: err.payload || 'Error interno en el servidor' })
+  }
+})
+
 // ── PATCH /api/instrument-types/:id ───────────────────────
 app.patch('/api/instrument-types/:id', requireAuth, async (req, res) => {
   const { id } = req.params
