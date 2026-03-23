@@ -896,6 +896,24 @@ input:focus, select:focus, textarea:focus {
 }
 .pie-sector:hover { opacity: 0.82; cursor: default; }
 
+/* ---- Heatmap (Treemap) ---- */
+.heatmap-container {
+  width: 100%;
+  background: var(--bg-main);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  min-height: 100px;
+  overflow: hidden;
+}
+.heatmap-rect rect {
+  transition: opacity 0.2s ease, filter 0.2s ease;
+  cursor: pointer;
+}
+.heatmap-rect:hover rect {
+  opacity: 0.85;
+  filter: brightness(1.1);
+}
+
 /* ---- P&L Bar Chart ---- */
 .pnl-chart-container {
   padding: 0.25rem 0;

@@ -5,8 +5,10 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 ## Características
 
 - **Autenticación** — Login y registro de usuarios vía Supabase Auth.
-- **Análisis de Tenencia** — Visualización en tiempo real de la cartera actual por ALyC e instrumento, con KPIs de valorización total (ARS/USD) y gráficos de distribución.
+- **Dashboard** — Resumen ejecutivo de la cartera con KPIs enfocados (en USD si están disponibles) junto a un heatmap de distribución y detalle de activos con cotizaciones en tiempo real.
+- **Análisis de Tenencia** — Visualización de la cartera segmentada por ALyC con un diseño simplificado y libre de ruidos. Cada ALyC presenta su propio **Resumen de Cartera** con "Total Invertido", "Valor Actual" y "P&L" (monto/porcentaje) dinámico. Se eliminaron los totales globales en ARS y el gráfico de barras de rendimiento individual para agilizar el análisis.
 - **Historial de operaciones** — Registro completo de compras y ventas con soporte para múltiples monedas (ARS/USD).
+- **Importación de Operaciones** — Carga masiva de transacciones mediante archivos CSV con detección inteligente de duplicados y previsualización de errores.
 - **Búsqueda y Filtrado Avanzado** — Motor de búsqueda optimizado mediante vistas SQL que permite filtrar por ticker, nombre, notas o ALyC en tiempo real.
 - **Gestión de Maestros** — ABM (Alta, Baja, Modificación) de Instrumentos, Tipos de Instrumento y ALyCs / Brokers.
 - **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y validación de esquemas en servidor.
@@ -58,11 +60,13 @@ pnpm run setup
 
 En el **SQL Editor** de Supabase, ejecutar los scripts en el siguiente orden para una instalación limpia:
 
-1. `supabase/schema.sql` (Estructura base y RLS)
+1. `supabase/schema.sql` (Estructura base, relaciones y RLS)
 2. `supabase/migration_app_settings.sql` (Tabla de configuración global)
-3. `supabase/view_operations_search.sql` (Vista optimizada para búsquedas)
-4. `supabase/rpc_get_user_holdings.sql` (Lógica de cálculo de tenencias en servidor)
-5. `supabase/performance_indexes.sql` (Índices para optimizar consultas)
+3. `supabase/migration_market_badge_setting.sql` (Configuración de badges de mercado)
+4. `supabase/view_operations_search.sql` (Vista optimizada para búsquedas)
+5. `supabase/rpc_get_user_holdings.sql` (Lógica de cálculo de tenencias por ALyC)
+6. `supabase/rpc_get_user_holdings_global.sql` (Lógica de cálculo de tenencias consolidada)
+7. `supabase/performance_indexes.sql` (Índices para optimizar consultas)
 
 ### 5. Configurar variables de entorno
 
@@ -100,47 +104,39 @@ stocker/
 ├── public/
 │   ├── js/
 │   │   ├── pages/              # Lógica de cada pantalla (SPA)
-│   │   │   ├── holdings-analysis.js # Análisis de cartera
-│   │   │   ├── operations.js        # Historial y formularios
-│   │   │   └── ...
-│   │   ├── api-client.js       # Cliente HTTP con fetch, auth y manejo de sesión expirada
-│   │   ├── app.js              # Inicialización y Layout
+│   │   │   ├── dashboard.js         # Resumen ejecutivo, KPIs y Heatmap
+│   │   │   ├── holdings-analysis.js # Análisis por ALyC con P&L en tiempo real
+│   │   │   ├── operations.js        # Historial, formularios e importación
+│   │   │   ├── instruments.js       # Gestión de activos
+│   │   │   ├── instrument-types.js  # Tipos de activos
+│   │   │   ├── alycs.js             # Gestión de Brokers/ALyCs
+│   │   │   ├── settings.js          # Configuración de usuario
+│   │   │   └── login.js             # Autenticación y registro
+│   │   ├── api-client.js       # Cliente HTTP con fetch y manejo de auth
+│   │   ├── app.js              # Inicialización, Layout y Toasts
 │   │   ├── router.js           # Manejo de rutas mediante hash
-│   │   └── utils.js            # Utilidades compartidas (esc, etc.)
+│   │   ├── cache.js            # Cache de respuestas API
+│   │   ├── auth.js             # Integración con Supabase Auth
+│   │   └── utils.js            # Utilidades (modales, escape, etc.)
 │   └── css/
 ├── supabase/
 │   ├── schema.sql              # Estructura base: tablas, relaciones y políticas RLS
-│   ├── migration_app_settings.sql # Configuración global (ej: habilitar registros)
-│   ├── view_operations_search.sql # Vista optimizada para el buscador de operaciones
-│   ├── rpc_get_user_holdings.sql  # Lógica de cálculo de cartera (ejecutada en DB)
-│   ├── performance_indexes.sql    # Índices para acelerar consultas frecuentes
-│   └── ...
+│   ├── migration_app_settings.sql # Configuración global
+│   ├── migration_market_badge_setting.sql # Configuración de UI
+│   ├── view_operations_search.sql # Vista para buscador de operaciones
+│   ├── rpc_get_user_holdings.sql  # Cálculo de cartera por ALyC
+│   ├── rpc_get_user_holdings_global.sql # Cálculo de cartera consolidada
+│   └── performance_indexes.sql    # Optimización de consultas
 ├── views/
-│   └── renderPage.js           # Template base (Server Side Rendering mínimo)
-├── server.js                   # Endpoints API y validaciones
+│   └── renderPage.js           # Template base (SSR mínimo)
+├── server.js                   # API, proxy de precios y validaciones
 └── logger.js                   # Configuración de logs (Pino)
 ```
-
-## TODO
-
-Mejoras pendientes ordenadas por prioridad:
-
-| # | Mejora | Área | Prioridad |
-|---|--------|------|-----------|
-| ~~1~~ | ~~Modal de confirmación antes de eliminar registros~~ | ~~UX~~ | ✅ Hecho |
-| ~~2~~ | ~~Filtros en historial de operaciones (fecha, tipo, moneda, instrumento)~~ | ~~Funcionalidad~~ | ✅ Hecho |
-| ~~3~~ | ~~Paginación en historial de operaciones~~ | ~~Performance~~ | ✅ Hecho |
-| 4 | Recordar posición del scroll al volver de un formulario | UX | 🟡 Media |
-| 5 | Botón de refresh manual de precios en Análisis de Tenencia | UX | 🟡 Media |
-| 6 | Indicador visual de mercado abierto/cerrado | UX | 🟡 Media |
-| ~~7~~ | ~~Totales P&L globales en los KPIs de Análisis de Tenencia~~ | ~~Funcionalidad~~ | ✅ Hecho |
-| ~~8~~ | ~~Validación de formularios en el frontend antes de enviar al servidor~~ | ~~UX~~ | ✅ Hecho |
-| 9 | Mensajes de error más descriptivos (mostrar qué campo falló) | UX | 🟢 Baja |
-| ~~10~~ | ~~Ordenamiento de columnas clickeable en las tablas~~ | ~~UX~~ | ✅ Hecho |
 
 ---
 
 ## Seguridad
+
 
 - **Validación Local:** El servidor utiliza la librería `jose` para verificar la firma de los tokens JWT de Supabase antes de procesar cualquier mutación, reduciendo la latencia y mejorando la seguridad.
 - **RLS (Row Level Security):** Todas las tablas de PostgreSQL tienen políticas activas que garantizan que un usuario solo pueda acceder a sus propios registros (`user_id = auth.uid()`).

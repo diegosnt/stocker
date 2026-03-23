@@ -17,9 +17,6 @@ export const DashboardPage = {
       <div id="dash-kpis" class="kpi-grid">
         <div class="kpi-card loading-skeleton"></div>
         <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
       </div>
       <div id="dash-content">
         <div class="card">
@@ -97,25 +94,11 @@ export const DashboardPage = {
 
     // ── KPIs ──────────────────────────────────────────────────
     kpiEl.innerHTML = `
-      <div class="kpi-card kpi-card--compact">
-        <div class="kpi-label">Total Invertido ARS</div>
-        <div class="kpi-value">${fmt(data.totalARS)}</div>
-      </div>
       ${hasUSD ? `
       <div class="kpi-card kpi-card--compact">
         <div class="kpi-label">Total Invertido USD</div>
         <div class="kpi-value">${fmt(data.totalUSD)}</div>
-      </div>` : ''}
-      <div class="kpi-card kpi-card--compact">
-        <div class="kpi-label">Instrumentos</div>
-        <div class="kpi-value">${data.items.length}</div>
       </div>
-      <div class="kpi-card kpi-card--compact">
-        <div class="kpi-label">P&amp;L Total ARS</div>
-        <div class="kpi-value" id="dash-pnl-ars">${skeleton}</div>
-        <div class="kpi-sub"  id="dash-pnl-ars-sub"></div>
-      </div>
-      ${hasUSD ? `
       <div class="kpi-card kpi-card--compact">
         <div class="kpi-label">P&amp;L Total USD</div>
         <div class="kpi-value" id="dash-pnl-usd">${skeleton}</div>
@@ -132,29 +115,14 @@ export const DashboardPage = {
 
     const totalInvested = data.totalARS + data.totalUSD
 
-    // ── Gráficos ──────────────────────────────────────────────
-    const pnlChartId = 'dash-pnl-chart'
-    this._pnlItems = data.items.map(h => ({
-      ticker: h.ticker, quantity: h.quantity, avgBuyPrice: h.avgBuyPrice
-    }))
-
+    // ── Contenido Principal (Heatmap y Tabla) ────────────────
     mainEl.innerHTML = `
       <div class="card" style="margin-bottom:1.5rem">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
-          <div class="chart-panel">
-            <div class="chart-panel-title">Distribución de Tenencia</div>
-            ${this._renderDonutChart(data.items, totalInvested)}
-          </div>
-          <div class="chart-panel">
-            <div class="chart-panel-title">Por Tipo de Instrumento</div>
-            ${this._renderSolidPieChart(data.items)}
-          </div>
-        </div>
-        <div>
-          <div class="chart-panel-title" style="margin-bottom:0.75rem">Rendimiento Individual (P&amp;L $)</div>
-          <div id="${pnlChartId}" class="pnl-chart-container">
+        <div style="margin-bottom:0.5rem">
+          <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor de Cartera (Peso vs Rendimiento %)</div>
+          <div id="dash-heatmap" class="heatmap-container">
             <div style="display:flex;gap:0.5rem;align-items:center;color:var(--text-muted);font-size:0.85rem">
-              <span class="spinner"></span> Esperando precios...
+              <span class="spinner"></span> Generando mapa de calor...
             </div>
           </div>
         </div>
@@ -264,7 +232,7 @@ export const DashboardPage = {
       el.innerHTML = `<span style="color:${pnlColor(pct)};font-weight:600">${sign(pct)}${pct.toFixed(2)}%</span>`
     })
 
-    this._refreshPnlChart()
+    this._refreshHeatmap()
     this._updatePnlKpis()
     if (['marketPrice', 'marketValue', 'pnl', 'pnlPct'].includes(this._sortCol)) {
       this._sortTable()
@@ -308,139 +276,93 @@ export const DashboardPage = {
     }
   },
 
-  _refreshPnlChart() {
-    const el = document.getElementById('dash-pnl-chart')
-    if (!el || !this._pnlItems) return
-    const fmt  = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
-    const sign = v => v > 0 ? '+' : ''
+  _refreshHeatmap() {
+    const el = document.getElementById('dash-heatmap')
+    if (!el || !this._summary) return
 
-    const withPnl = this._pnlItems
-      .map(h => {
-        const price = this._resolvedPrices?.[h.ticker] ?? null
-        return price !== null ? { ticker: h.ticker, pnl: (price - h.avgBuyPrice) * h.quantity } : null
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.pnl - a.pnl)
+    const data = Object.entries(this._summary).map(([ticker, h]) => {
+      const price = this._resolvedPrices?.[ticker] ?? null
+      const invested = h.quantity * h.avgBuyPrice
+      const pct = price !== null && h.avgBuyPrice > 0 ? (price / h.avgBuyPrice - 1) * 100 : 0
+      return { ticker, value: invested, pct }
+    }).filter(d => d.value > 0).sort((a, b) => b.value - a.value)
 
-    if (!withPnl.length) return
+    if (!data.length) return
 
-    const maxAbs = Math.max(...withPnl.map(h => Math.abs(h.pnl)), 1)
-    el.innerHTML = `
-      <div class="pnl-bar-chart pnl-bar-chart--wide">
-        ${withPnl.map(h => {
-          const pct     = (Math.abs(h.pnl) / maxAbs) * 44
-          const isPos   = h.pnl >= 0
-          const color   = isPos ? '#10b981' : '#ef4444'
-          const barStyle = isPos ? `left:50%;width:${pct}%` : `left:calc(50% - ${pct}%);width:${pct}%`
-          return `
-            <div class="pnl-bar-row">
-              <span class="pnl-bar-label">${h.ticker}</span>
-              <div class="pnl-bar-track">
-                <div class="pnl-bar-axis"></div>
-                <div class="pnl-bar-fill" style="background:${color};${barStyle}"></div>
-              </div>
-              <span class="pnl-bar-value" style="color:${color}">${sign(h.pnl)}${fmt(h.pnl)}</span>
-            </div>`
-        }).join('')}
-      </div>`
-  },
+    const width = el.clientWidth || 800
+    const height = 300
+    const nodes = this._layoutTreemap(data, width, height)
 
-  // ── Gráfico donut (distribución por ticker) ────────────────
-  _renderDonutChart(items, total) {
-    const colors = [
-      '#4f46e6','#10b981','#f59e0b','#ef4444','#8b5cf6',
-      '#ec4899','#06b6d4','#f97316','#14b8a6','#6366f1'
-    ]
-    const cx = 150, cy = 150, R = 120, hole = 68
-    const midR = (R + hole) / 2
-    const MIN_LABEL = 0.06
-
-    const lbl = (x, y, l1, l2) => `
-      <text x="${x.toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle"
-            font-size="13" font-weight="800" fill="white"
-            stroke="rgba(0,0,0,0.45)" stroke-width="3" paint-order="stroke">${l1}</text>
-      <text x="${x.toFixed(1)}" y="${(y+11).toFixed(1)}" text-anchor="middle"
-            font-size="12" fill="rgba(255,255,255,0.95)"
-            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${l2}</text>`
-
-    if (items.length === 1) return `<svg viewBox="0 0 300 300" class="pie-svg">
-      <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
-      <circle cx="${cx}" cy="${cy}" r="${hole}" fill="var(--bg-card)"/>
-      ${lbl(cx, cy, items[0].ticker, '100%')}
-    </svg>`
-
-    let angle = -Math.PI / 2
-    const sectors = [], labels = []
-    items.forEach((h, i) => {
-      const pct = h.invested / total, sweep = pct * 2 * Math.PI
-      const end = angle + sweep, large = sweep > Math.PI ? 1 : 0
-      const color = colors[i % colors.length], mid = angle + sweep / 2
-      const x1 = cx + R    * Math.cos(angle), y1 = cy + R    * Math.sin(angle)
-      const x2 = cx + R    * Math.cos(end),   y2 = cy + R    * Math.sin(end)
-      const x3 = cx + hole * Math.cos(end),   y3 = cy + hole * Math.sin(end)
-      const x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
-      const d  = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${large} 0 ${x4} ${y4}Z`
-      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2" class="pie-sector"><title>${h.ticker}: ${(pct*100).toFixed(1)}%</title></path>`)
-      if (pct >= MIN_LABEL) {
-        const lx = cx + midR * Math.cos(mid), ly = cy + midR * Math.sin(mid)
-        labels.push(lbl(lx, ly, h.ticker, `${(pct*100).toFixed(0)}%`))
-      }
-      angle = end
-    })
-    return `<svg viewBox="0 0 300 300" class="pie-svg">${sectors.join('')}${labels.join('')}</svg>`
-  },
-
-  // ── Gráfico torta sólida (por tipo de instrumento) ─────────
-  _renderSolidPieChart(items) {
-    const byType = {}
-    for (const h of items) {
-      const t = h.instrumentType || 'Sin tipo'
-      byType[t] = (byType[t] || 0) + h.invested
+    const getColor = (pct) => {
+      if (pct > 5) return '#065f46'
+      if (pct > 2) return '#10b981'
+      if (pct > 0.5) return '#6ee7b7'
+      if (pct > -0.5) return '#94a3b8'
+      if (pct > -2) return '#fca5a5'
+      if (pct > -5) return '#ef4444'
+      return '#991b1b'
     }
-    const typeItems = Object.entries(byType)
-      .map(([name, val]) => ({ name, val }))
-      .sort((a, b) => b.val - a.val)
-    const total = typeItems.reduce((acc, t) => acc + t.val, 0)
 
-    const colors = [
-      '#4f46e6','#10b981','#f59e0b','#ef4444','#8b5cf6',
-      '#ec4899','#06b6d4','#f97316','#14b8a6','#6366f1'
-    ]
-    const cx = 150, cy = 150, R = 120, MIN_LABEL = 0.06
-
-    const lbl = (x, y, l1, l2) => `
-      <text x="${x.toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle"
-            font-size="13" font-weight="800" fill="white"
-            stroke="rgba(0,0,0,0.5)" stroke-width="3" paint-order="stroke">${l1}</text>
-      <text x="${x.toFixed(1)}" y="${(y+11).toFixed(1)}" text-anchor="middle"
-            font-size="12" fill="rgba(255,255,255,0.95)"
-            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${l2}</text>`
-
-    if (typeItems.length === 1) return `<svg viewBox="0 0 300 300" class="pie-svg">
-      <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
-      ${lbl(cx, cy, typeItems[0].name, '100%')}
-    </svg>`
-
-    let angle = -Math.PI / 2
-    const sectors = [], labels = []
-    typeItems.forEach((t, i) => {
-      const pct = t.val / total, sweep = pct * 2 * Math.PI
-      const end = angle + sweep, large = sweep > Math.PI ? 1 : 0
-      const color = colors[i % colors.length], mid = angle + sweep / 2
-      const x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle)
-      const x2 = cx + R * Math.cos(end),   y2 = cy + R * Math.sin(end)
-      const d  = `M${cx} ${cy} L${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2}Z`
-      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2" class="pie-sector"><title>${t.name}: ${(pct*100).toFixed(1)}%</title></path>`)
-      if (pct >= MIN_LABEL) {
-        const lx = cx + (R * 0.65) * Math.cos(mid), ly = cy + (R * 0.65) * Math.sin(mid)
-        labels.push(lbl(lx, ly, t.name, `${(pct*100).toFixed(0)}%`))
-      }
-      angle = end
-    })
-    return `<svg viewBox="0 0 300 300" class="pie-svg">${sectors.join('')}${labels.join('')}</svg>`
+    el.innerHTML = `
+      <svg width="${width}" height="${height}" style="display:block; border-radius:var(--radius); overflow:hidden">
+        ${nodes.map(n => `
+          <g class="heatmap-rect" transform="translate(${n.x},${n.y})">
+            <rect width="${n.dx}" height="${n.dy}" fill="${getColor(n.pct)}" stroke="var(--bg-card)" stroke-width="1.5">
+              <title>${n.ticker}: ${n.pct.toFixed(2)}% (Peso: ${n.value.toLocaleString('es-AR')})</title>
+            </rect>
+            ${n.dx > 30 && n.dy > 20 ? `
+              <text x="${n.dx/2}" y="${n.dy/2 + 4}" text-anchor="middle" fill="white" font-weight="700" font-size="${Math.min(n.dx/4, 14)}px" style="pointer-events:none; text-shadow: 0 1px 2px rgba(0,0,0,0.4)">
+                ${n.ticker}
+              </text>
+            ` : ''}
+          </g>
+        `).join('')}
+      </svg>`
   },
 
-  // ── Toggle tabla ───────────────────────────────────────────
+  _layoutTreemap(data, width, height) {
+    const total = data.reduce((s, d) => s + d.value, 0)
+    const nodes = []
+    
+    function squarify(items, x, y, dx, dy) {
+      if (!items.length) return
+      const isHorizontal = dx > dy
+      const sum = items.reduce((s, i) => s + i.value, 0)
+      let offset = 0
+      items.forEach(item => {
+        const itemRatio = item.value / sum
+        if (isHorizontal) {
+          const w = dx * itemRatio
+          nodes.push({ ...item, x: x + offset, y, dx: w, dy })
+          offset += w
+        } else {
+          const h = dy * itemRatio
+          nodes.push({ ...item, x, y: y + offset, dx, dy: h })
+          offset += h
+        }
+      })
+    }
+
+    if (data.length > 4) {
+      const mid = Math.ceil(data.length / 2)
+      const sum1 = data.slice(0, mid).reduce((s, d) => s + d.value, 0)
+      const sum2 = data.slice(mid).reduce((s, d) => s + d.value, 0)
+      const totalSum = sum1 + sum2
+      if (width > height) {
+        const w1 = width * (sum1 / totalSum)
+        squarify(data.slice(0, mid), 0, 0, w1, height)
+        squarify(data.slice(mid), w1, 0, width - w1, height)
+      } else {
+        const h1 = height * (sum1 / totalSum)
+        squarify(data.slice(0, mid), 0, 0, width, h1)
+        squarify(data.slice(mid), 0, h1, width, height - h1)
+      }
+    } else {
+      squarify(data, 0, 0, width, height)
+    }
+    return nodes
+  },
+
   _bindTableToggle() {
     const header  = document.getElementById('dash-table-header')
     const body    = document.getElementById('dash-table-body')
@@ -453,7 +375,6 @@ export const DashboardPage = {
     })
   },
 
-  // ── Ordenamiento de tabla ──────────────────────────────────
   _bindSortHeaders() {
     document.querySelectorAll('#dash-table th.sortable').forEach(th => {
       th.addEventListener('click', () => {

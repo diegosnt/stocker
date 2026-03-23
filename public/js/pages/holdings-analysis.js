@@ -43,9 +43,6 @@ export const HoldingsAnalysisPage = {
       <div id="holdings-kpis" class="kpi-grid">
         <div class="kpi-card loading-skeleton"></div>
         <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
       </div>
 
       <div id="holdings-content" class="holdings-sections">
@@ -87,7 +84,8 @@ export const HoldingsAnalysisPage = {
   _renderAlycBody(alyc, alycIdx) {
     let bodyHtml = ''
     for (const [curr, items] of Object.entries(alyc.currencies)) {
-      const totalVal = items.reduce((acc, h) => acc + h.currentValue, 0)
+      const totalInv = items.reduce((acc, h) => acc + h.currentValue, 0)
+      const totalVal = totalInv // para compatibilidad con el resto del código
       items.sort((a, b) => b.currentValue - a.currentValue)
 
       const chartId = `pnl-chart-${alycIdx}-${curr}`
@@ -95,8 +93,25 @@ export const HoldingsAnalysisPage = {
         ticker: h.ticker, quantity: h.quantity, avgBuyPrice: h.avgBuyPrice
       }))
 
+      const skeleton = `<span class="cell-skeleton" style="width:100px; height:1.5rem; display:inline-block"></span>`
+      
       bodyHtml += `
         <div class="currency-group" style="margin-bottom: 2rem">
+          <div class="alyc-summary-row" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 1rem">
+            <div class="kpi-card kpi-card--compact" style="flex: 1; min-width: 150px">
+              <div class="kpi-label">Total Invertido (${curr})</div>
+              <div class="kpi-value">${totalInv.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+            </div>
+            <div class="kpi-card kpi-card--compact" style="flex: 1; min-width: 150px">
+              <div class="kpi-label">Valor Actual (${curr})</div>
+              <div class="kpi-value alyc-current-value-kpi" data-alyc-idx="${alycIdx}" data-currency="${curr}">${skeleton}</div>
+            </div>
+            <div class="kpi-card kpi-card--compact" style="flex: 1; min-width: 150px">
+              <div class="kpi-label">Diferencia / P&amp;L</div>
+              <div class="kpi-value alyc-pnl-value-kpi" data-alyc-idx="${alycIdx}" data-currency="${curr}">${skeleton}</div>
+              <div class="kpi-sub alyc-pnl-pct-kpi" data-alyc-idx="${alycIdx}" data-currency="${curr}"></div>
+            </div>
+          </div>
 
 
           <div class="charts-row">
@@ -107,14 +122,6 @@ export const HoldingsAnalysisPage = {
             <div class="chart-panel">
               <div class="chart-panel-title">Por Tipo de Instrumento</div>
               ${this._renderTypeChart(items)}
-            </div>
-            <div class="chart-panel">
-              <div class="chart-panel-title">Rendimiento Individual (P&amp;L $)</div>
-              <div id="${chartId}" class="pnl-chart-container">
-                <div style="display:flex; gap:0.5rem; align-items:center; color:var(--text-muted); font-size:0.85rem">
-                  <span class="spinner"></span> Esperando precios...
-                </div>
-              </div>
             </div>
           </div>
 
@@ -229,6 +236,11 @@ export const HoldingsAnalysisPage = {
     const prices    = this._resolvedPrices
     const totalTickers = Object.keys(summary).length
 
+    const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const sign     = v => v > 0 ? '+' : ''
+    const color    = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-main)'
+    const dash     = '<span style="color:var(--text-muted)">—</span>'
+
     let pnlARS = 0, pnlUSD = 0
     let resolvedARS = 0, totalARS = 0
     let resolvedUSD = 0, totalUSD = 0
@@ -249,10 +261,6 @@ export const HoldingsAnalysisPage = {
       }
     }
 
-    const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
-    const sign     = v => v > 0 ? '+' : ''
-    const color    = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-main)'
-    const dash     = '<span style="color:var(--text-muted)">—</span>'
     const pending  = resolvedARS + resolvedUSD < totalTickers
     const subLabel = pending
       ? `<span style="font-size:0.7rem;color:var(--text-muted)">${resolvedARS + resolvedUSD}/${totalTickers} tickers</span>`
@@ -262,13 +270,50 @@ export const HoldingsAnalysisPage = {
     const arsSub   = document.getElementById('kpi-pnl-ars-sub')
     const usdEl    = document.getElementById('kpi-pnl-usd-value')
     const usdSub   = document.getElementById('kpi-pnl-usd-sub')
-    if (!arsEl) return
 
-    if (totalARS === 0) {
-      arsEl.innerHTML = dash
-    } else if (resolvedARS > 0) {
-      arsEl.innerHTML = `<span style="color:${color(pnlARS)};font-weight:700">${sign(pnlARS)}${fmt(pnlARS)}</span>`
-      if (arsSub) arsSub.innerHTML = pending ? `<span style="font-size:0.7rem;color:var(--text-muted)">${resolvedARS}/${totalARS} tickers</span>` : ''
+    // ── Actualización de KPIs por ALyC ──────────────────────
+    document.querySelectorAll('.alyc-card').forEach(card => {
+      const idx = parseInt(card.dataset.alycIndex)
+      const alyc = this._currentAlycData?.[idx]
+      if (!alyc) return
+
+      for (const curr in alyc.currencies) {
+        const items = alyc.currencies[curr]
+        let currentVal = 0, investedVal = 0, resolved = 0
+        
+        for (const h of items) {
+          investedVal += h.currentValue
+          const price = prices[h.ticker]
+          if (price !== undefined && price !== null) {
+            currentVal += price * h.quantity
+            resolved++
+          }
+        }
+
+        const valEl = card.querySelector(`.alyc-current-value-kpi[data-currency="${curr}"]`)
+        const pnlEl = card.querySelector(`.alyc-pnl-value-kpi[data-currency="${curr}"]`)
+        const pctEl = card.querySelector(`.alyc-pnl-pct-kpi[data-currency="${curr}"]`)
+        
+        if (valEl && resolved > 0) {
+          valEl.innerHTML = `<strong>${fmt(currentVal)}</strong>`
+          const diff = currentVal - investedVal
+          if (pnlEl) pnlEl.innerHTML = `<span style="color:${color(diff)}; font-weight:700">${sign(diff)}${fmt(diff)}</span>`
+          if (pctEl && investedVal > 0) {
+            const pct = (currentVal / investedVal - 1) * 100
+            pctEl.innerHTML = `<span style="color:${color(pct)}; font-weight:600; font-size:0.85rem">${sign(pct)}${pct.toFixed(2)}%</span>`
+          }
+        }
+      }
+    })
+
+    // ── Actualización de KPIs Globales (Opcionales) ─────────
+    if (arsEl) {
+      if (totalARS === 0) {
+        arsEl.innerHTML = dash
+      } else if (resolvedARS > 0) {
+        arsEl.innerHTML = `<span style="color:${color(pnlARS)};font-weight:700">${sign(pnlARS)}${fmt(pnlARS)}</span>`
+        if (arsSub) arsSub.innerHTML = pending ? `<span style="font-size:0.7rem;color:var(--text-muted)">${resolvedARS}/${totalARS} tickers</span>` : ''
+      }
     }
 
     if (usdEl) {
@@ -393,25 +438,11 @@ export const HoldingsAnalysisPage = {
 
     // Render KPIs
     kpiContainer.innerHTML = `
-      <div class="kpi-card">
-        <div class="kpi-label">Total Estimado ARS</div>
-        <div class="kpi-value">${fmt(data.totalARS)}</div>
-      </div>
       ${hasUSD ? `
       <div class="kpi-card">
         <div class="kpi-label">Total Estimado USD</div>
         <div class="kpi-value">${fmt(data.totalUSD)}</div>
-      </div>` : ''}
-      <div class="kpi-card">
-        <div class="kpi-label">ALyCs Activas</div>
-        <div class="kpi-value">${data.alycs.length}</div>
       </div>
-      <div class="kpi-card" id="kpi-pnl-ars">
-        <div class="kpi-label">P&amp;L Total ARS</div>
-        <div class="kpi-value" id="kpi-pnl-ars-value">${skeleton}</div>
-        <div class="kpi-sub" id="kpi-pnl-ars-sub"></div>
-      </div>
-      ${hasUSD ? `
       <div class="kpi-card" id="kpi-pnl-usd">
         <div class="kpi-label">P&amp;L Total USD</div>
         <div class="kpi-value" id="kpi-pnl-usd-value">${skeleton}</div>
@@ -427,6 +458,7 @@ export const HoldingsAnalysisPage = {
       return
     }
 
+    this._currentAlycData   = data.alycs
     this._pendingAlycs      = {}
     this._pnlChartItems     = {}
     this._holdingsSortCol   = ''
@@ -439,11 +471,6 @@ export const HoldingsAnalysisPage = {
 
       if (idx > 0) this._pendingAlycs[idx] = alyc
 
-      const alycTotals = Object.entries(alyc.currencies).map(([curr, items]) => {
-        const t = items.reduce((acc, h) => acc + h.currentValue, 0)
-        return `<span class="alyc-header-total"><span class="badge badge-${curr.toLowerCase()}">${curr}</span>${t.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>`
-      }).join('')
-
       html += `
         <div class="card alyc-card${collapsed}" data-alyc-index="${idx}">
           <div class="alyc-card-header">
@@ -451,7 +478,6 @@ export const HoldingsAnalysisPage = {
               <span style="color:var(--color-primary)">🏦</span> ${alyc.name}
             </h3>
             <div class="alyc-header-right">
-              <div class="alyc-header-totals">${alycTotals}</div>
               <span class="alyc-chevron">▾</span>
             </div>
           </div>
