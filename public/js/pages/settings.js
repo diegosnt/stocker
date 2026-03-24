@@ -1,5 +1,5 @@
 import { supabase } from '../supabase-client.js'
-import { showToast } from '../app.js'
+import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 
 export const SettingsPage = {

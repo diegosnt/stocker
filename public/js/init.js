@@ -13,6 +13,25 @@ import { DashboardPage }        from './pages/dashboard.js'
 
 const app = document.getElementById('app')
 
+// ── Toast ──────────────────────────────────────────────────
+let toastContainer = null
+
+export function showToast(msg, type = 'info') {
+  if (!toastContainer) {
+    toastContainer = document.createElement('div')
+    toastContainer.className = 'toast-container'
+    document.body.appendChild(toastContainer)
+  }
+  const toast = document.createElement('div')
+  toast.className = `toast toast-${type}`
+  toast.textContent = msg
+  toastContainer.appendChild(toast)
+  setTimeout(() => {
+    toast.style.opacity = '0'
+    setTimeout(() => toast.remove(), 300)
+  }, 3000)
+}
+
 function renderShell(userEmail) {
   app.innerHTML = `
     <div class="app-shell">

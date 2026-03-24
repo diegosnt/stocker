@@ -1,5 +1,5 @@
 import { supabase } from '../supabase-client.js'
-import { showToast } from '../app.js'
+import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
 import { esc, confirmModal, setFieldError } from '../utils.js'

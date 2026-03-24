@@ -16,9 +16,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'", "https://esm.sh"],
+      scriptSrc:  ["'self'", "'unsafe-inline'", "https://esm.sh", "https://cdn.jsdelivr.net"],
       styleSrc:   ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "https://esm.sh", "https://*.supabase.co"],
+      connectSrc: ["'self'", "https://esm.sh", "https://*.supabase.co", "https://cdn.jsdelivr.net"],
       imgSrc:     ["'self'", "data:"],
       fontSrc:    ["'self'"],
     }
@@ -26,7 +26,7 @@ app.use(helmet({
 }))
 app.use(compression())
 app.use(express.json())
-app.use(express.static(path.join(__dirname, 'public')))
+app.use(express.static(path.join(__dirname, '../public')))
 
 app.get('/', (req, res) => {
   res.send(renderPage({

@@ -1,6 +1,6 @@
 import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
-import { showToast } from '../app.js'
+import { showToast } from '../init.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -340,7 +340,7 @@ export const AnalysisPage = {
 
   async _loadChartJS() {
     if (!window.Chart) {
-      const mod = await import('https://cdn.jsdelivr.net/npm/chart.js/+esm')
+      const mod = await import('https://cdn.jsdelivr.net/npm/chart.js/auto/+esm')
       window.Chart = mod.Chart || mod.default || mod
     }
   },
