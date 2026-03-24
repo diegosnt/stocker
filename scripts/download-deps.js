@@ -4,6 +4,15 @@ const fs    = require('fs')
 const path  = require('path')
 
 const deps = [
+  // ... (otros assets)
+  {
+    url:  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js',
+    dest: path.join(__dirname, '../public/js/vendor/supabase.js')
+  },
+  {
+    url:  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js',
+    dest: path.join(__dirname, '../public/js/vendor/chart.js')
+  },
   {
     url:  'https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css',
     dest: path.join(__dirname, '../public/css/water.min.css')
@@ -45,6 +54,13 @@ function download(url, dest) {
 }
 
 async function main() {
+  const dirs = [
+    path.join(__dirname, '../public/css'),
+    path.join(__dirname, '../public/fonts'),
+    path.join(__dirname, '../public/js/vendor')
+  ]
+  dirs.forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }) })
+
   for (const dep of deps) {
     console.log(`Descargando ${path.basename(dep.dest)}...`)
     await download(dep.url, dep.dest)

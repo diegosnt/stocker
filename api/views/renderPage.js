@@ -7,6 +7,8 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <title>Stocker</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/vendor/supabase.js"></script>
+  <script src="/js/vendor/chart.js"></script>
 </head>
 <body>
   <div id="app">

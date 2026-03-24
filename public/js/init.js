@@ -121,3 +121,12 @@ onAuthChange((session) => {
     LoginPage.mount(app)
   }
 })
+
+// ── Service Worker ─────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => console.log('[SW] Registrado OK:', reg.scope))
+      .catch((err) => console.error('[SW] Error:', err))
+  })
+}

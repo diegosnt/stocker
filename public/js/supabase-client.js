@@ -1,4 +1,5 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+// Supabase ya está cargado globalmente desde /js/vendor/supabase.js vía renderPage.js
+const { createClient } = window.supabase
 
 const url = window.__SUPABASE_URL__
 const key = window.__SUPABASE_ANON_KEY__

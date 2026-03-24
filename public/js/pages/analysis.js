@@ -340,8 +340,7 @@ export const AnalysisPage = {
 
   async _loadChartJS() {
     if (!window.Chart) {
-      const mod = await import('https://cdn.jsdelivr.net/npm/chart.js/auto/+esm')
-      window.Chart = mod.Chart || mod.default || mod
+      console.error('Chart.js no se cargó correctamente desde vendor.')
     }
   },
 
