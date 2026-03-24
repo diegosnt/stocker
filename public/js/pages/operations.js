@@ -184,7 +184,7 @@ export const OperationsPage = {
 
       try {
         res = await apiRequest('POST', '/api/operations/bulk', { operations })
-        if (res.data?.failed_entities) allFailedEntities = res.data.failed_entities
+        if (res.failed_entities) allFailedEntities = res.failed_entities
       } catch (err) {
         if (err.status === 409) {
           const { duplicates, clean_ops, failed_entities } = err.response
@@ -216,9 +216,9 @@ export const OperationsPage = {
         }
       }
       
-      const { imported, skipped, errors } = res.data
-      if (res.data?.failed_entities && allFailedEntities.length === 0) {
-        allFailedEntities = res.data.failed_entities
+      const { imported, skipped } = res
+      if (res.failed_entities && allFailedEntities.length === 0) {
+        allFailedEntities = res.failed_entities
       }
 
       let msg = `Importación finalizada: ${imported} importados, ${skipped} omitidos/duplicados.`

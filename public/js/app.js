@@ -47,6 +47,8 @@ const MOON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
 const MENU_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>`
 
 // ── Layout principal ───────────────────────────────────────
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
 function renderShell(userEmail) {
   app.innerHTML = `
     <div class="app-shell">
@@ -59,7 +61,7 @@ function renderShell(userEmail) {
           <span>Stocker</span>
         </span>
         <div class="navbar-actions" style="display:flex; gap:0.75rem; align-items:center">
-          <span class="navbar-user">${userEmail}</span>
+          <span class="navbar-user">${esc(userEmail)}</span>
           <button class="dark-mode-toggle" id="btn-dark-mode" title="Cambiar tema">
             ${SUN_SVG}${MOON_SVG}
           </button>
@@ -154,10 +156,16 @@ window.addEventListener('session-expired', async () => {
 // ── Punto de entrada ───────────────────────────────────────
 initDarkMode()
 
+let _currentUserId = null
+
 onAuthChange((session) => {
   if (session) {
-    renderShell(session.user.email)
+    if (_currentUserId !== session.user.id) {
+      _currentUserId = session.user.id
+      renderShell(session.user.email)
+    }
   } else {
+    _currentUserId = null
     app.innerHTML = ''
     LoginPage.mount(app)
   }

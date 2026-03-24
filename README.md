@@ -4,17 +4,16 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 
 ## Características
 
-- **Autenticación** — Login y registro de usuarios vía Supabase Auth.
-- **Dashboard** — Resumen ejecutivo de la cartera con KPIs enfocados (en USD si están disponibles) junto a un heatmap de distribución y detalle de activos con cotizaciones en tiempo real.
-- **Análisis de Tenencia** — Visualización de la cartera segmentada por ALyC con un diseño simplificado y libre de ruidos. Cada ALyC presenta su propio **Resumen de Cartera** con "Total Invertido", "Valor Actual" y "P&L" (monto/porcentaje) dinámico. Se eliminaron los totales globales en ARS y el gráfico de barras de rendimiento individual para agilizar el análisis.
+- **Autenticación** — Login y registro de usuarios vía Supabase Auth con persistencia de sesión inteligente que evita refrescos innecesarios.
+- **Dashboard Moderno** — Resumen ejecutivo de la cartera con tarjetas KPI rediseñadas, visualización de **Composición de Cartera** mediante un gráfico circular dinámico y un **Mapa de Calor** de distribución. La tabla de activos incluye indicadores visuales de "peso" en la cartera.
+- **Análisis de Tenencia** — Visualización de la cartera segmentada por ALyC con un diseño limpio. Cada ALyC presenta su propio gráfico de distribución y resumen de P&L dinámico.
+- **Importación de Operaciones** — Carga masiva de transacciones mediante archivos CSV con motor de normalización de datos, detección inteligente de duplicados y gestión de errores detallada.
 - **Historial de operaciones** — Registro completo de compras y ventas con soporte para múltiples monedas (ARS/USD).
-- **Importación de Operaciones** — Carga masiva de transacciones mediante archivos CSV con detección inteligente de duplicados y previsualización de errores.
 - **Búsqueda y Filtrado Avanzado** — Motor de búsqueda optimizado mediante vistas SQL que permite filtrar por ticker, nombre, notas o ALyC en tiempo real.
 - **Gestión de Maestros** — ABM (Alta, Baja, Modificación) de Instrumentos, Tipos de Instrumento y ALyCs / Brokers.
-- **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y validación de esquemas en servidor.
-- **Experiencia de Usuario** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas (oscuro/claro) con iconos SVG minimalistas, notificaciones (toasts) y formularios inteligentes con detección de cambios sin guardar.
-- **Optimización Mobile** — Historial ultra-compacto con columnas dinámicas, código de colores semántico (Verde/Rojo) para montos, filas expandibles para acceso a detalles/acciones y paginación táctil con indicador de progreso.
-- **Registro Adaptativo** — La interfaz de login oculta automáticamente las opciones de registro si la configuración del sistema las deshabilita, simplificando la entrada al usuario.
+- **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y política de seguridad de contenidos (CSP) estricta.
+- **Experiencia de Usuario** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas (oscuro/claro) con iconos SVG minimalistas, notificaciones (toasts) y persistencia de estado entre ventanas.
+- **Optimización Mobile** — Interfaz adaptativa con tarjetas compactas y tablas simplificadas para una gestión fluida desde el celular.
 - **Logs Estructurados** — Registro detallado de actividad en el servidor utilizando Pino.
 
 ## Stack tecnológico
@@ -23,7 +22,8 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 |---|---|
 | **Servidor** | Node.js + Express.js |
 | **Frontend** | Vanilla JS ES6+ (Módulos nativos, sin bundler) |
-| **Estilos** | CSS3 + Water.css (Light/Dark mode automático) |
+| **Gráficos** | Motor SVG Custom (ligero y sin dependencias externas) |
+| **Estilos** | CSS3 Moderno (Variables, Grid, Flexbox) |
 | **Base de Datos** | Supabase (PostgreSQL) |
 | **Seguridad** | Supabase Auth + JWT (jose) + RLS + Helmet |
 | **Logging** | Pino + pino-pretty |
@@ -50,25 +50,19 @@ cd stocker
 pnpm install
 ```
 
-### 3. Descargar dependencias de frontend (Water.css)
-
-```bash
-pnpm run setup
-```
-
-### 4. Configurar Supabase
+### 3. Configurar Supabase
 
 En el **SQL Editor** de Supabase, ejecutar los scripts en el siguiente orden para una instalación limpia:
 
 1. `supabase/schema.sql` (Estructura base, relaciones y RLS)
 2. `supabase/migration_app_settings.sql` (Tabla de configuración global)
 3. `supabase/migration_market_badge_setting.sql` (Configuración de badges de mercado)
-4. `supabase/view_operations_search.sql` (Vista optimizada para búsquedas)
+4. `supabase/view_operations_search.sql` (Vista optimizada para buscas)
 5. `supabase/rpc_get_user_holdings.sql` (Lógica de cálculo de tenencias por ALyC)
 6. `supabase/rpc_get_user_holdings_global.sql` (Lógica de cálculo de tenencias consolidada)
 7. `supabase/performance_indexes.sql` (Índices para optimizar consultas)
 
-### 5. Configurar variables de entorno
+### 4. Configurar variables de entorno
 
 Crea un archivo `.env` basado en `.env.example`:
 
@@ -83,11 +77,7 @@ FINANCE_URL=https://finance
 FINANCE_EXCHANGE=BA
 ```
 
-> **Nota:** El `SUPABASE_JWT_SECRET` es necesario para la validación local de tokens y se encuentra en **Settings -> API -> JWT Settings**.
->
-> **`FINANCE_EXCHANGE`** define el sufijo de bolsa para los tickers (ej: `BA` = Bolsa de Buenos Aires). Dejar vacío para tickers sin sufijo (mercados internacionales).
-
-### 6. Iniciar la aplicación
+### 5. Iniciar la aplicación
 
 ```bash
 # Desarrollo (con hot-reload)
@@ -104,31 +94,17 @@ stocker/
 ├── public/
 │   ├── js/
 │   │   ├── pages/              # Lógica de cada pantalla (SPA)
-│   │   │   ├── dashboard.js         # Resumen ejecutivo, KPIs y Heatmap
-│   │   │   ├── holdings-analysis.js # Análisis por ALyC con P&L en tiempo real
-│   │   │   ├── operations.js        # Historial, formularios e importación
-│   │   │   ├── instruments.js       # Gestión de activos
-│   │   │   ├── instrument-types.js  # Tipos de activos
-│   │   │   ├── alycs.js             # Gestión de Brokers/ALyCs
-│   │   │   ├── settings.js          # Configuración de usuario
-│   │   │   └── login.js             # Autenticación y registro
-│   │   ├── api-client.js       # Cliente HTTP con fetch y manejo de auth
-│   │   ├── app.js              # Inicialización, Layout y Toasts
-│   │   ├── router.js           # Manejo de rutas mediante hash
-│   │   ├── cache.js            # Cache de respuestas API
-│   │   ├── auth.js             # Integración con Supabase Auth
-│   │   └── utils.js            # Utilidades (modales, escape, etc.)
+│   │   │   ├── dashboard.js         # KPIs modernos, Gráfico Composición y Heatmap
+│   │   │   ├── holdings-analysis.js # Análisis por ALyC con gráficos SVG
+│   │   │   ├── operations.js        # Historial e importación masiva CSV
+│   │   │   └── ...
+│   │   ├── api-client.js       # Cliente HTTP con manejo de auth
+│   │   ├── app.js              # Inicialización y Layout principal
+│   │   └── ...
 │   └── css/
+│       └── styles.css          # Estilos personalizados y componentes modernos
 ├── supabase/
-│   ├── schema.sql              # Estructura base: tablas, relaciones y políticas RLS
-│   ├── migration_app_settings.sql # Configuración global
-│   ├── migration_market_badge_setting.sql # Configuración de UI
-│   ├── view_operations_search.sql # Vista para buscador de operaciones
-│   ├── rpc_get_user_holdings.sql  # Cálculo de cartera por ALyC
-│   ├── rpc_get_user_holdings_global.sql # Cálculo de cartera consolidada
-│   └── performance_indexes.sql    # Optimización de consultas
-├── views/
-│   └── renderPage.js           # Template base (SSR mínimo)
+│   └── ...                     # Scripts de base de datos
 ├── server.js                   # API, proxy de precios y validaciones
 └── logger.js                   # Configuración de logs (Pino)
 ```
@@ -137,10 +113,8 @@ stocker/
 
 ## Seguridad
 
-
-- **Validación Local:** El servidor utiliza la librería `jose` para verificar la firma de los tokens JWT de Supabase antes de procesar cualquier mutación, reduciendo la latencia y mejorando la seguridad.
-- **RLS (Row Level Security):** Todas las tablas de PostgreSQL tienen políticas activas que garantizan que un usuario solo pueda acceder a sus propios registros (`user_id = auth.uid()`).
-- **Validación de Datos:** Se implementa un middleware de validación riguroso para asegurar que los datos recibidos en el servidor cumplan con los formatos esperados (UUID, fechas ISO, montos positivos).
-- **Cabeceras HTTP:** Helmet.js configura cabeceras de seguridad (CSP, X-Frame-Options, HSTS, Referrer-Policy, etc.) en todas las respuestas.
-- **Rate Limiting:** El endpoint de precios limita las consultas reales a Finance a 30 por IP cada 5 minutos (las respuestas cacheadas no consumen quota).
-- **Sesión Expirada:** El cliente detecta respuestas 401 automáticamente, cierra la sesión y redirige al login con un mensaje de aviso.
+- **Validación Local:** El servidor utiliza la librería `jose` para verificar la firma de los tokens JWT de Supabase antes de procesar cualquier mutación.
+- **RLS (Row Level Security):** Garantiza que un usuario solo pueda acceder a sus propios registros.
+- **CSP (Content Security Policy):** Políticas estrictas que limitan la carga de scripts externos a fuentes confiables (como `esm.sh`).
+- **Rate Limiting:** Control de flujo para las peticiones de precios externos.
+- **Sesión Inteligente:** El frontend detecta cambios de foco y sincroniza la sesión sin recargar la página, manteniendo el estado de navegación del usuario.

@@ -27,7 +27,7 @@ export const DashboardPage = {
     try {
       const data = await this._loadHoldings()
       this._renderDashboard(data)
-      this._updateMarketPrices(data.tickers)
+      await this._updateMarketPrices(data.tickers)
     } catch (err) {
       console.error(err)
       content.innerHTML = `
@@ -68,9 +68,10 @@ export const DashboardPage = {
     return { items, totalARS, totalUSD, tickers, summary }
   },
 
-  _updateMarketPrices(tickers) {
+  async _updateMarketPrices(tickers) {
     this._resolvedPrices = {}
-    tickers.forEach(async ticker => {
+    // ✅ Corregido anti-pattern forEach async
+    await Promise.all(tickers.map(async ticker => {
       let price = null
       try {
         const data = await apiRequest('GET', `/api/quote/${encodeURIComponent(ticker)}`)
@@ -78,7 +79,7 @@ export const DashboardPage = {
       } catch {}
       this._resolvedPrices[ticker] = price
       this._updatePriceCells(ticker, price)
-    })
+    }))
   },
 
   _renderDashboard(data) {
@@ -92,18 +93,53 @@ export const DashboardPage = {
     const hasUSD  = data.items.some(h => h.currency === 'USD')
     const skeleton = `<span class="cell-skeleton" style="width:80px;height:1.25rem;display:inline-block"></span>`
 
+    const totalInvested = data.totalARS + data.totalUSD
+
     // ── KPIs ──────────────────────────────────────────────────
     kpiEl.innerHTML = `
-      ${hasUSD ? `
-      <div class="kpi-card kpi-card--compact">
-        <div class="kpi-label">Total Invertido USD</div>
-        <div class="kpi-value">${fmt(data.totalUSD)}</div>
+      <div class="kpi-card kpi-card--modern">
+        <div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: #10b981">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-label">Total Invertido ARS</div>
+          <div class="kpi-value">${fmt(data.totalARS)}</div>
+        </div>
       </div>
-      <div class="kpi-card kpi-card--compact">
-        <div class="kpi-label">P&amp;L Total USD</div>
-        <div class="kpi-value" id="dash-pnl-usd">${skeleton}</div>
-        <div class="kpi-sub"  id="dash-pnl-usd-sub"></div>
-      </div>` : ''}`
+      
+      <div class="kpi-card kpi-card--modern">
+        <div class="kpi-icon-circle" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-label">P&amp;L Total ARS</div>
+          <div class="kpi-value" id="dash-pnl-ars">${skeleton}</div>
+          <div class="kpi-sub"  id="dash-pnl-ars-sub"></div>
+        </div>
+      </div>
+
+      ${hasUSD ? `
+      <div class="kpi-card kpi-card--modern">
+        <div class="kpi-icon-circle" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-label">Total Invertido USD</div>
+          <div class="kpi-value">${fmt(data.totalUSD)}</div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-card--modern">
+        <div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-label">P&amp;L Total USD</div>
+          <div class="kpi-value" id="dash-pnl-usd">${skeleton}</div>
+          <div class="kpi-sub"  id="dash-pnl-usd-sub"></div>
+        </div>
+      </div>` : ''}
+    `
 
     if (!data.items.length) {
       mainEl.innerHTML = `
@@ -113,15 +149,29 @@ export const DashboardPage = {
       return
     }
 
-    const totalInvested = data.totalARS + data.totalUSD
+    const byType = {}
+    data.items.forEach(h => {
+      const type = h.instrumentType || 'Otros'
+      byType[type] = (byType[type] || 0) + h.invested
+    })
+    const typeItems = Object.entries(byType)
+      .map(([ticker, currentValue]) => ({ ticker, currentValue }))
+      .sort((a, b) => b.currentValue - a.currentValue)
 
-    // ── Contenido Principal (Heatmap y Tabla) ────────────────
+    // ── Contenido Principal (Gráficos y Tabla) ───────────────
     mainEl.innerHTML = `
-      <div class="card" style="margin-bottom:1.5rem">
-        <div style="margin-bottom:0.5rem">
-          <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor de Cartera (Peso vs Rendimiento %)</div>
-          <div id="dash-heatmap" class="heatmap-container">
-            <div style="display:flex;gap:0.5rem;align-items:center;color:var(--text-muted);font-size:0.85rem">
+      <div class="dash-charts-row">
+        <div class="card dash-chart-card" style="min-height: 360px; display: flex; flex-direction: column;">
+          <div class="chart-panel-title" style="margin-bottom:1rem">Composición de Cartera por Tipo</div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            ${this._renderPieChart(typeItems, totalInvested)}
+          </div>
+        </div>
+
+        <div class="card" style="display: flex; flex-direction: column; min-height: 360px;">
+          <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor (Peso vs P&L %)</div>
+          <div id="dash-heatmap" class="heatmap-container" style="flex: 1; min-height: 220px">
+            <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">
               <span class="spinner"></span> Generando mapa de calor...
             </div>
           </div>
@@ -134,73 +184,114 @@ export const DashboardPage = {
           <span class="alyc-chevron" id="dash-table-chevron">▾</span>
         </div>
         <div id="dash-table-body" style="margin-top:1rem">
-        <div class="table-wrapper desktop-only">
-          <table class="holdings-table" id="dash-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-col="ticker">Ticker</th>
-                <th style="text-align:right">Tipo</th>
-                <th class="sortable" data-col="quantity"    style="text-align:right">Cantidad</th>
-                <th class="sortable" data-col="avgBuyPrice" style="text-align:right">Precio Prom. Compra</th>
-                <th class="sortable" data-col="invested"    style="text-align:right">Valor Invertido</th>
-                <th class="sortable" data-col="marketPrice" style="text-align:right">Precio Actual</th>
-                <th class="sortable" data-col="marketValue" style="text-align:right">Valor Actual</th>
-                <th class="sortable" data-col="pnl"         style="text-align:right">P&amp;L $</th>
-                <th class="sortable" data-col="pnlPct"      style="text-align:right">P&amp;L %</th>
-                <th style="text-align:right">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.items.map(h => `
-                <tr data-ticker="${h.ticker}" data-quantity="${h.quantity}"
-                    data-avg-buy-price="${h.avgBuyPrice}" data-invested="${h.invested}">
-                  <td><span class="ticker-chip" title="${h.name}">${h.ticker}</span></td>
-                  <td style="font-size:0.8rem;color:var(--text-muted)">${h.instrumentType}</td>
-                  <td class="amount">${h.quantity.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
-                  <td class="amount">${fmt(h.avgBuyPrice)}</td>
-                  <td class="amount"><strong>${fmt(h.invested)}</strong></td>
-                  <td class="amount market-price-cell" data-ticker="${h.ticker}"><span class="cell-skeleton"></span></td>
-                  <td class="amount market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}"><span class="cell-skeleton"></span></td>
-                  <td class="amount pnl-amount-cell"   data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
-                  <td class="amount pnl-pct-cell"      data-ticker="${h.ticker}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
-                  <td class="amount" style="color:var(--text-muted);font-weight:600">${((h.invested / totalInvested) * 100).toFixed(1)}%</td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="mobile-only" style="display:none">
-          ${data.items.map(h => `
-            <div class="mobile-card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-                <span class="ticker-chip">${h.ticker}</span>
-                <span style="font-size:0.75rem;color:var(--text-muted)">${h.instrumentType}</span>
-                <span style="font-weight:700">${((h.invested / totalInvested) * 100).toFixed(1)}%</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.875rem">
-                <div style="color:var(--text-muted)">Cantidad:</div>
-                <div style="text-align:right;font-weight:500">${h.quantity.toLocaleString('es-AR')}</div>
-                <div style="color:var(--text-muted)">Valor Invertido:</div>
-                <div style="text-align:right;font-weight:700;color:var(--color-primary)">${fmt(h.invested)}</div>
-                <div style="color:var(--text-muted)">Precio Actual:</div>
-                <div class="market-price-cell" data-ticker="${h.ticker}" style="text-align:right;font-weight:500"><span class="cell-skeleton"></span></div>
-                <div style="color:var(--text-muted)">Valor Actual:</div>
-                <div class="market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" style="text-align:right;font-weight:700;color:var(--color-primary)"><span class="cell-skeleton"></span></div>
-                <div style="color:var(--text-muted)">P&amp;L $:</div>
-                <div class="pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}" style="text-align:right"><span class="cell-skeleton"></span></div>
-                <div style="color:var(--text-muted)">P&amp;L %:</div>
-                <div class="pnl-pct-cell" data-ticker="${h.ticker}" data-avg-buy-price="${h.avgBuyPrice}" style="text-align:right"><span class="cell-skeleton"></span></div>
-              </div>
-            </div>`).join('')}
-        </div>
+          <div class="table-wrapper desktop-only">
+            <table class="holdings-table" id="dash-table">
+              <thead>
+                <tr>
+                  <th class="sortable" data-col="ticker">Ticker</th>
+                  <th style="text-align:right">Tipo</th>
+                  <th class="sortable" data-col="quantity"    style="text-align:right">Cantidad</th>
+                  <th class="sortable" data-col="avgBuyPrice" style="text-align:right">Promedio Compra</th>
+                  <th class="sortable" data-col="invested"    style="text-align:right">Valor Invertido</th>
+                  <th class="sortable" data-col="marketPrice" style="text-align:right">Precio Actual</th>
+                  <th class="sortable" data-col="marketValue" style="text-align:right">Valor Actual</th>
+                  <th class="sortable" data-col="pnl"         style="text-align:right">P&amp;L $</th>
+                  <th class="sortable" data-col="pnlPct"      style="text-align:right">P&amp;L %</th>
+                  <th style="text-align:right; width: 150px">Peso</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.items.map(h => {
+                  const weight = (h.invested / totalInvested) * 100
+                  return `
+                  <tr data-ticker="${h.ticker}" data-quantity="${h.quantity}"
+                      data-avg-buy-price="${h.avgBuyPrice}" data-invested="${h.invested}">
+                    <td><span class="ticker-chip" title="${h.name}">${h.ticker}</span></td>
+                    <td style="font-size:0.8rem;color:var(--text-muted)">${h.instrumentType}</td>
+                    <td class="amount">${h.quantity.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
+                    <td class="amount">${fmt(h.avgBuyPrice)}</td>
+                    <td class="amount"><strong>${fmt(h.invested)}</strong></td>
+                    <td class="amount market-price-cell" data-ticker="${h.ticker}"><span class="cell-skeleton"></span></td>
+                    <td class="amount market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}"><span class="cell-skeleton"></span></td>
+                    <td class="amount pnl-amount-cell"   data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
+                    <td class="amount pnl-pct-cell"      data-ticker="${h.ticker}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
+                    <td class="amount">
+                      <div class="weight-bar-container">
+                        <div class="weight-bar" style="width: ${weight}%"></div>
+                        <span class="weight-label">${weight.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                  </tr>`}).join('')}
+              </tbody>
+            </table>
+          </div>
         </div><!-- dash-table-body -->
       </div>`
 
     this._bindSortHeaders()
     this._bindTableToggle()
+    this._refreshHeatmap()
   },
 
-  // ── Precios de mercado ─────────────────────────────────────
+  _renderPieChart(items, total) {
+    const colors = [
+      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+      '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+    ]
+    const cx = 150, cy = 150, R = 120, hole = 68
+    const midR = (R + hole) / 2
+    const MIN_LABEL = 0.05
+
+    const label = (x, y, line1, line2) => `
+      <text x="${x.toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle"
+            font-size="12" font-weight="800" fill="white"
+            stroke="rgba(0,0,0,0.45)" stroke-width="3" paint-order="stroke">${line1}</text>
+      <text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" text-anchor="middle"
+            font-size="11" fill="rgba(255,255,255,0.95)"
+            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${line2}</text>`
+
+    if (items.length === 1) {
+      return `<svg viewBox="0 0 300 300" style="max-height: 280px; width: auto; display: block; margin: 0 auto;">
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
+        <circle cx="${cx}" cy="${cy}" r="${hole}" fill="var(--bg-card)"/>
+        ${label(cx, cy, items[0].ticker, '100%')}
+      </svg>`
+    }
+
+    let angle = -Math.PI / 2
+    const sectors = []
+    const labels  = []
+
+    items.forEach((h, i) => {
+      const pct   = h.currentValue / total
+      const sweep = pct * 2 * Math.PI
+      const end   = angle + sweep
+      const large = sweep > Math.PI ? 1 : 0
+      const color = colors[i % colors.length]
+      const mid   = angle + sweep / 2
+
+      const x1 = cx + R    * Math.cos(angle), y1 = cy + R    * Math.sin(angle)
+      const x2 = cx + R    * Math.cos(end),   y2 = cy + R    * Math.sin(end)
+      const x3 = cx + hole * Math.cos(end),   y3 = cy + hole * Math.sin(end)
+      const x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
+
+      const d = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${large} 0 ${x4} ${y4}Z`
+      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2">
+        <title>${h.ticker}: ${(pct * 100).toFixed(1)}%</title></path>`)
+
+      if (pct >= MIN_LABEL) {
+        const lx = cx + midR * Math.cos(mid)
+        const ly = cy + midR * Math.sin(mid)
+        labels.push(label(lx, ly, h.ticker, `${(pct * 100).toFixed(0)}%`))
+      }
+      angle = end
+    })
+
+    return `<svg viewBox="0 0 300 300" style="max-height: 280px; width: auto; display: block; margin: 0 auto;">
+      ${sectors.join('')}${labels.join('')}
+    </svg>`
+  },
+
   _updatePriceCells(ticker, price) {
     const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
     const dash     = '<span style="color:var(--text-muted)">—</span>'
@@ -321,7 +412,7 @@ export const DashboardPage = {
   },
 
   _layoutTreemap(data, width, height) {
-    const total = data.reduce((s, d) => s + d.value, 0)
+    // ✅ Corregido: Variable total muerta eliminada
     const nodes = []
     
     function squarify(items, x, y, dx, dy) {
