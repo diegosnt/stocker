@@ -36,7 +36,7 @@ export const HoldingsAnalysisPage = {
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
-        <h2>Análisis de Tenencia</h2>
+        <h2>Tenencia</h2>
         ${badgeEnabled ? `<span id="market-status-badge" class="market-badge ${open ? 'market-open' : 'market-closed'}">${open ? '● Mercado abierto' : '● Mercado cerrado'}</span>` : ''}
       </div>
       
@@ -60,7 +60,7 @@ export const HoldingsAnalysisPage = {
       console.error(error)
       content.innerHTML = `
         <div class="page-header">
-          <h2>Análisis de Tenencia</h2>
+          <h2>Tenencia</h2>
         </div>
         <div class="card">
           <p class="table-empty">Error al cargar el análisis. Por favor, intente de nuevo.</p>

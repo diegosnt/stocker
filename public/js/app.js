@@ -7,6 +7,7 @@ import { AlycsPage }           from './pages/alycs.js'
 import { OperationsPage }      from './pages/operations.js'
 import { SettingsPage }        from './pages/settings.js'
 import { HoldingsAnalysisPage } from './pages/holdings-analysis.js'
+import { AnalysisPage }         from './pages/analysis.js'
 import { DashboardPage }        from './pages/dashboard.js'
 
 const app = document.getElementById('app')
@@ -77,7 +78,8 @@ function renderShell(userEmail) {
             <div class="sidebar-section-title">Operaciones</div>
             <a class="sidebar-link" data-route="dashboard">Dashboard</a>
             <a class="sidebar-link" data-route="operations">Operaciones</a>
-            <a class="sidebar-link" data-route="holdings-analysis">Análisis de Tenencia</a>
+            <a class="sidebar-link" data-route="holdings-analysis">Tenencia</a>
+            <a class="sidebar-link" data-route="analysis">Análisis</a>
           </div>
           <div class="sidebar-section">
             <div class="sidebar-section-title">Maestros</div>
@@ -139,6 +141,7 @@ function renderShell(userEmail) {
   register('dashboard',         () => DashboardPage.render())
   register('operations',        () => OperationsPage.render())
   register('holdings-analysis', () => HoldingsAnalysisPage.render())
+  register('analysis',          () => AnalysisPage.render())
   register('instrument-types',  () => InstrumentTypesPage.render())
   register('instruments',       () => InstrumentsPage.render())
   register('alycs',             () => AlycsPage.render())

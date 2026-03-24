@@ -646,8 +646,11 @@ app.get('/api/quote/:ticker', requireAuth, async (req, res) => {
   }
 
   try {
-    const yfBase   = process.env.FINANCE_URL ?? process.env.FINANCE_URL
-    const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
+    const yfBase = process.env.FINANCE_URL
+    // Solo agregar sufijo si el ticker NO tiene punto (ej: BYMA -> BYMA.BA, pero XLV -> XLV)
+    const needsSuffix = !ticker.includes('.')
+    const yfSuffix = (needsSuffix && process.env.FINANCE_EXCHANGE) ? `.${process.env.FINANCE_EXCHANGE}` : ''
+    
     const url = `${yfBase}/${encodeURIComponent(ticker)}${yfSuffix}?interval=1d&range=1d&includeTimestamps=false`
     const yfRes = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Stocker/1.0)' }
@@ -672,6 +675,63 @@ app.get('/api/quote/:ticker', requireAuth, async (req, res) => {
   } catch (err) {
     logger.warn({ ticker, err: err.message }, 'Error al consultar Finance')
     res.status(500).json({ error: 'Error interno al consultar precio' })
+  }
+})
+
+app.get('/api/history/:ticker', requireAuth, async (req, res) => {
+  const { ticker } = req.params
+  const range = req.query.range || '6mo'
+
+  if (!TICKER_RE.test(ticker)) {
+    return res.status(400).json({ error: 'Ticker inválido' })
+  }
+
+  async function fetchFromYahoo(symbol) {
+    const yfBase = process.env.FINANCE_URL
+    const url = `${yfBase}/${encodeURIComponent(symbol)}?interval=1d&range=${range}&includeTimestamps=true`
+    try {
+      const yfRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+      if (!yfRes.ok) return []
+      const data = await yfRes.json()
+      const result = data?.chart?.result?.[0]
+      if (!result || !result.timestamp) return []
+      
+      const timestamps = result.timestamp || []
+      const closes     = result.indicators.quote[0].close || []
+      return timestamps
+        .map((t, i) => ({ date: t, price: closes[i] }))
+        .filter(h => h.price !== null && h.price !== undefined && typeof h.price === 'number')
+    } catch { return [] }
+  }
+
+  try {
+    const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
+    
+    // Consultar ambos en paralelo
+    const tasks = [fetchFromYahoo(ticker)] // USA / As-is
+    if (!ticker.includes('.') && yfSuffix) {
+      tasks.push(fetchFromYahoo(`${ticker}${yfSuffix}`)) // Local (BA)
+    }
+
+    const [globalData, localData = []] = await Promise.all(tasks)
+
+    console.log(`[Backend Debug] Ticker: ${ticker} | Global: ${globalData.length} pts | Local: ${localData.length} pts`)
+
+    // El que tenga más historia gana
+    let history = globalData.length >= localData.length ? globalData : localData
+
+    if (history.length === 0) {
+      return res.status(404).json({ error: 'No se encontró historial' })
+    }
+
+    const first = new Date(history[0].date * 1000).toISOString().split('T')[0]
+    const last  = new Date(history[history.length - 1].date * 1000).toISOString().split('T')[0]
+    console.log(`[Backend Debug] Elegido: ${history.length} pts (${first} a ${last})`)
+
+    res.json(history)
+  } catch (err) {
+    logger.warn({ ticker, err: err.message }, 'Error al consultar historial')
+    res.status(500).json({ error: 'Error interno' })
   }
 })
 

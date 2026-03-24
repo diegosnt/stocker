@@ -5,16 +5,21 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 ## Características
 
 - **Autenticación** — Login y registro de usuarios vía Supabase Auth con persistencia de sesión inteligente que evita refrescos innecesarios.
-- **Dashboard Moderno** — Resumen ejecutivo de la cartera con tarjetas KPI rediseñadas, visualización de **Composición de Cartera** mediante un gráfico circular dinámico y un **Mapa de Calor** de distribución. La tabla de activos incluye indicadores visuales de "peso" en la cartera.
+- **Dashboard Avanzado** — Resumen ejecutivo de la cartera con tarjetas KPI rediseñadas, visualización de **Composición de Cartera** mediante un gráfico circular dinámico y un **Mapa de Calor** de distribución. La tabla de activos incluye indicadores visuales de "peso" en la cartera.
+- **Análisis de Cartera Profesional** — Módulo avanzado de análisis cuantitativo para la toma de decisiones informada:
+  - **Modelo de Markowitz**: Cálculo de la Frontera Eficiente para identificar la combinación óptima de activos (Max Sharpe).
+  - **Métricas CAPM**: Evaluación de **Beta** (sensibilidad al mercado), **Alpha** (exceso de retorno) y **Correlación (R²)** frente a un Benchmark.
+  - **Simulaciones de Monte Carlo**: Proyección probabilística de 50 escenarios posibles para la cartera a 1 año de vista.
+  - **Backtesting Histórico**: Comparativa de rendimiento acumulado de tu cartera real vs. Benchmarks globales (SPY, QQQ, etc.).
+  - **Gestión de Riesgo**: Visualización detallada de **Drawdown** (caídas históricas), contribución al riesgo por activo y matriz de correlación Pearson.
+  - **Stress Testing**: Simulación de impacto directo en la cartera ante escenarios de crisis históricas (Crash COVID, Crisis 2008, etc.).
 - **Análisis de Tenencia** — Visualización de la cartera segmentada por ALyC con un diseño limpio. Cada ALyC presenta su propio gráfico de distribución y resumen de P&L dinámico.
-- **Importación de Operaciones** — Carga masiva de transacciones mediante archivos CSV con motor de normalización de datos, detección inteligente de duplicados y gestión de errores detallada.
+- **Importación de Operaciones** — Carga masiva mediante archivos CSV con motor de normalización de datos. Soporta el formato estándar: `Alyc;Operacion;Fecha Operacion;Precio;Moneda;Especie;Cantidad`.
 - **Historial de operaciones** — Registro completo de compras y ventas con soporte para múltiples monedas (ARS/USD).
 - **Búsqueda y Filtrado Avanzado** — Motor de búsqueda optimizado mediante vistas SQL que permite filtrar por ticker, nombre, notas o ALyC en tiempo real.
 - **Gestión de Maestros** — ABM (Alta, Baja, Modificación) de Instrumentos, Tipos de Instrumento y ALyCs / Brokers.
 - **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y política de seguridad de contenidos (CSP) estricta.
-- **Experiencia de Usuario** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas (oscuro/claro) con iconos SVG minimalistas, notificaciones (toasts) y persistencia de estado entre ventanas.
-- **Optimización Mobile** — Interfaz adaptativa con tarjetas compactas y tablas simplificadas para una gestión fluida desde el celular.
-- **Logs Estructurados** — Registro detallado de actividad en el servidor utilizando Pino.
+- **Experiencia de Usuario** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas (oscuro/claro) con iconos SVG minimalistas y persistencia de estado entre ventanas.
 
 ## Stack tecnológico
 
@@ -22,7 +27,7 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 |---|---|
 | **Servidor** | Node.js + Express.js |
 | **Frontend** | Vanilla JS ES6+ (Módulos nativos, sin bundler) |
-| **Gráficos** | Motor SVG Custom (ligero y sin dependencias externas) |
+| **Gráficos** | Motor SVG Custom & Chart.js (vía ESM para análisis avanzado) |
 | **Estilos** | CSS3 Moderno (Variables, Grid, Flexbox) |
 | **Base de Datos** | Supabase (PostgreSQL) |
 | **Seguridad** | Supabase Auth + JWT (jose) + RLS + Helmet |
@@ -80,7 +85,7 @@ FINANCE_EXCHANGE=BA
 ### 5. Iniciar la aplicación
 
 ```bash
-# Desarrollo (con hot-reload)
+# Desarrollo (con hot-reload nativo)
 pnpm dev
 
 # Producción
@@ -95,6 +100,7 @@ stocker/
 │   ├── js/
 │   │   ├── pages/              # Lógica de cada pantalla (SPA)
 │   │   │   ├── dashboard.js         # KPIs modernos, Gráfico Composición y Heatmap
+│   │   │   ├── analysis.js          # Markowitz, CAPM, Monte Carlo y Stress Testing
 │   │   │   ├── holdings-analysis.js # Análisis por ALyC con gráficos SVG
 │   │   │   ├── operations.js        # Historial e importación masiva CSV
 │   │   │   └── ...
