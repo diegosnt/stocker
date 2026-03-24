@@ -10,6 +10,7 @@ const { renderPage } = require('./views/renderPage')
 const app  = express()
 const PORT = process.env.PORT || 3000
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET
+const josePromise = import('jose')
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -49,7 +50,7 @@ async function requireAuth(req, res, next) {
   }
 
   try {
-    const { jwtVerify, importJWK } = await import('jose')
+    const { jwtVerify, importJWK } = await josePromise
     
     let secretStr = SUPABASE_JWT_SECRET.trim()
     
@@ -75,6 +76,7 @@ async function requireAuth(req, res, next) {
     })
     
     req.userId = payload.sub
+    req.userRole = payload.user_metadata?.role
     
     if (!req.userId) {
       logger.warn({ payload }, 'Token válido pero sin campo "sub"')
@@ -83,9 +85,18 @@ async function requireAuth(req, res, next) {
 
     next()
   } catch (err) {
-    logger.warn({ err: err.message, stack: err.stack }, 'Error en validación de token')
+    logger.warn({ err: err.message }, 'Error en validación de token')
     return res.status(401).json({ error: `Sesión inválida: ${err.message}` })
   }
+}
+
+// Nuevo Middleware: Solo para el jefe (admin)
+function requireAdmin(req, res, next) {
+  if (req.userRole !== 'admin') {
+    logger.warn({ userId: req.userId, role: req.userRole }, 'Intento de acceso no autorizado a ruta de admin')
+    return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de administrador' })
+  }
+  next()
 }
 
 // ── Validación ────────────────────────────────────────────
@@ -97,6 +108,13 @@ const isUuid     = v => UUID_RE.test(v)
 const isDate     = v => DATE_RE.test(v) && !isNaN(Date.parse(v))
 const isPositive = v => { const n = Number(v); return Number.isFinite(n) && n > 0 }
 const isUrl      = v => { try { new URL(v); return true } catch { return false } }
+
+// Limpieza básica contra XSS: remueve tags de HTML.
+function sanitize(v) {
+  if (typeof v !== 'string') return v
+  return v.replace(/<[^>]*>?/gm, '') // Vuela cualquier cosa que parezca un tag
+          .trim()
+}
 
 // Wrapper de fetch a Supabase REST. Lanza un error con { status, payload } si la respuesta no es ok.
 async function supabaseFetch(path, method, authHeader, body) {
@@ -149,7 +167,7 @@ app.post('/api/instrument-types', requireAuth, async (req, res) => {
 
   try {
     const data = await supabaseFetch('instrument_types', 'POST', req.headers.authorization,
-      { name, description: description || null, user_id: userId })
+      { name: sanitize(name), description: description ? sanitize(description) : null, user_id: userId })
     logger.info({ id: data[0]?.id, name }, 'Tipo de instrumento creado OK')
     res.status(201).json({ data })
   } catch (err) {
@@ -176,7 +194,7 @@ app.post('/api/instruments', requireAuth, async (req, res) => {
 
   try {
     const data = await supabaseFetch('instruments', 'POST', req.headers.authorization,
-      { ticker, name, instrument_type_id, user_id: userId })
+      { ticker: sanitize(ticker), name: sanitize(name), instrument_type_id, user_id: userId })
     logger.info({ id: data[0]?.id, ticker }, 'Instrumento creado OK')
     res.status(201).json({ data })
   } catch (err) {
@@ -202,7 +220,7 @@ app.post('/api/alycs', requireAuth, async (req, res) => {
 
   try {
     const data = await supabaseFetch('alycs', 'POST', req.headers.authorization,
-      { name, cuit: cuit || null, website: website || null, user_id: userId })
+      { name: sanitize(name), cuit: cuit || null, website: website || null, user_id: userId })
     logger.info({ id: data[0]?.id, name }, 'ALyC creada OK')
     res.status(201).json({ data })
   } catch (err) {
@@ -236,7 +254,7 @@ app.post('/api/operations', requireAuth, async (req, res) => {
   try {
     const data = await supabaseFetch('operations', 'POST', req.headers.authorization, {
       type, instrument_id, alyc_id, quantity, price, currency,
-      operated_at, notes: notes || null, user_id: userId
+      operated_at, notes: notes ? sanitize(notes) : null, user_id: userId
     })
     logger.info({ id: data[0]?.id, type, instrument_id }, 'Operación creada OK')
     res.status(201).json({ data })
@@ -398,7 +416,7 @@ app.patch('/api/instrument-types/:id', requireAuth, async (req, res) => {
 
   try {
     const data = await supabaseFetch(`instrument_types?id=eq.${id}`, 'PATCH', req.headers.authorization,
-      { name, description: description || null })
+      { name: sanitize(name), description: description ? sanitize(description) : null })
     logger.info({ id, name }, 'Tipo de instrumento actualizado OK')
     res.json({ data })
   } catch (err) {
@@ -427,7 +445,7 @@ app.patch('/api/instruments/:id', requireAuth, async (req, res) => {
 
   try {
     const data = await supabaseFetch(`instruments?id=eq.${id}`, 'PATCH', req.headers.authorization,
-      { ticker, name, instrument_type_id })
+      { ticker: sanitize(ticker), name: sanitize(name), instrument_type_id })
     logger.info({ id, ticker }, 'Instrumento actualizado OK')
     res.json({ data })
   } catch (err) {
@@ -455,7 +473,7 @@ app.patch('/api/alycs/:id', requireAuth, async (req, res) => {
 
   try {
     const data = await supabaseFetch(`alycs?id=eq.${id}`, 'PATCH', req.headers.authorization,
-      { name, cuit: cuit || null, website: website || null })
+      { name: sanitize(name), cuit: cuit || null, website: website || null })
     logger.info({ id, name }, 'ALyC actualizada OK')
     res.json({ data })
   } catch (err) {
@@ -491,7 +509,7 @@ app.patch('/api/operations/:id', requireAuth, async (req, res) => {
   try {
     const data = await supabaseFetch(`operations?id=eq.${id}`, 'PATCH', req.headers.authorization, {
       type, instrument_id, alyc_id, quantity, price, currency,
-      operated_at, notes: notes || null
+      operated_at, notes: notes ? sanitize(notes) : null
     })
     logger.info({ id, type, instrument_id }, 'Operación actualizada OK')
     res.json({ data })
@@ -580,7 +598,7 @@ app.delete('/api/operations/:id', requireAuth, async (req, res) => {
 // ── PATCH /api/settings/:key ───────────────────────────────
 const ALLOWED_SETTINGS = new Set(['registration_enabled', 'market_badge_enabled'])
 
-app.patch('/api/settings/:key', requireAuth, async (req, res) => {
+app.patch('/api/settings/:key', requireAuth, requireAdmin, async (req, res) => {
   const { key }                  = req.params
   const { value, updated_by }    = req.body
   const userId = req.userId
@@ -604,6 +622,73 @@ app.patch('/api/settings/:key', requireAuth, async (req, res) => {
   } catch (err) {
     logger.warn({ status: err.status, error: err.payload }, 'Error al actualizar configuración')
     res.status(err.status ?? 500).json({ error: err.payload })
+  }
+})
+
+// ── GET /api/quotes ───────────────────────────────────────
+// Recibe una lista de tickers (query param ?tickers=AAPL,GGAL,...)
+// y devuelve un objeto con los precios de todos.
+app.get('/api/quotes', requireAuth, async (req, res) => {
+  const { tickers: tickersStr } = req.query
+  if (!tickersStr) return res.status(400).json({ error: 'Faltan tickers' })
+
+  const tickers = [...new Set(tickersStr.split(',').filter(t => TICKER_RE.test(t)))]
+  if (tickers.length === 0) return res.status(400).json({ error: 'Tickers inválidos' })
+
+  const results = {}
+  const toFetch = []
+
+  // 1. Revisar cache
+  for (const ticker of tickers) {
+    const cached = quoteCache.get(ticker)
+    if (cached && Date.now() < cached.expiresAt) {
+      results[ticker] = { price: cached.price, currency: cached.currency }
+    } else {
+      toFetch.push(ticker)
+    }
+  }
+
+  if (toFetch.length === 0) return res.json(results)
+
+  // 2. Rate limiting (simplificado para bulk)
+  const ip = req.ip ?? req.socket.remoteAddress
+  if (!checkFetchLimit(ip)) {
+    // Si estamos limitados, devolvemos lo que tenemos en cache
+    return res.json(results)
+  }
+
+  try {
+    const yfBase = process.env.FINANCE_URL
+    const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
+
+    // Consultar los que faltan en paralelo (con un límite de concurrencia implícito por el Promise.all)
+    await Promise.all(toFetch.map(async (ticker) => {
+      try {
+        const needsSuffix = !ticker.includes('.')
+        const symbol = (needsSuffix && yfSuffix) ? `${ticker}${yfSuffix}` : ticker
+        
+        const url = `${yfBase}/${encodeURIComponent(symbol)}?interval=1d&range=1d&includeTimestamps=false`
+        const yfRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+        
+        if (yfRes.ok) {
+          const data = await yfRes.json()
+          const meta = data?.chart?.result?.[0]?.meta
+          if (meta) {
+            const price = meta.regularMarketPrice ?? null
+            const currency = meta.currency ?? null
+            quoteCache.set(ticker, { price, currency, expiresAt: Date.now() + QUOTE_TTL })
+            results[ticker] = { price, currency }
+          }
+        }
+      } catch (err) {
+        logger.warn({ ticker, err: err.message }, 'Error en bulk quote individual')
+      }
+    }))
+
+    res.json(results)
+  } catch (err) {
+    logger.error({ err: err.message }, 'Error general en /api/quotes')
+    res.status(500).json({ error: 'Error interno' })
   }
 })
 

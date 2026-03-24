@@ -41,14 +41,18 @@ export const HoldingsAnalysisPage = {
       </div>
       
       <div id="holdings-kpis" class="kpi-grid">
-        <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
+        ${Array(2).fill(`
+          <div class="kpi-card">
+            <div class="skeleton" style="height:10px; width:60%; margin-bottom:8px"></div>
+            <div class="skeleton" style="height:20px; width:90%"></div>
+          </div>
+        `).join('')}
       </div>
 
       <div id="holdings-content" class="holdings-sections">
-        <div class="card">
-          <p class="table-empty"><span class="spinner"></span> Cargando análisis detallado...</p>
-        </div>
+        ${Array(2).fill(`
+          <div class="card skeleton" style="height: 100px; margin-bottom: 1.5rem; border:none"></div>
+        `).join('')}
       </div>`
 
     try {
@@ -68,17 +72,24 @@ export const HoldingsAnalysisPage = {
     }
   },
 
-  _updateMarketPrices(tickers) {
+  async _updateMarketPrices(tickers) {
     this._resolvedPrices = {}
-    tickers.forEach(async ticker => {
-      let price = null
-      try {
-        const data = await apiRequest('GET', `/api/quote/${encodeURIComponent(ticker)}`)
-        price = data?.price ?? null
-      } catch {}
-      this._resolvedPrices[ticker] = price
-      this._updatePriceCells(ticker, price)
-    })
+    if (!tickers || tickers.length === 0) return
+
+    try {
+      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(tickers.join(','))}`)
+      for (const ticker of tickers) {
+        const price = data[ticker]?.price ?? null
+        this._resolvedPrices[ticker] = price
+        this._updatePriceCells(ticker, price)
+      }
+    } catch (err) {
+      console.error('Error al actualizar precios masivos:', err)
+      tickers.forEach(t => {
+        this._resolvedPrices[t] = null
+        this._updatePriceCells(t, null)
+      })
+    }
   },
 
   _renderAlycBody(alyc, alycIdx) {

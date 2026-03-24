@@ -18,8 +18,9 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 - **Historial de operaciones** — Registro completo de compras y ventas con soporte para múltiples monedas (ARS/USD).
 - **Búsqueda y Filtrado Avanzado** — Motor de búsqueda optimizado mediante vistas SQL que permite filtrar por ticker, nombre, notas o ALyC en tiempo real.
 - **Gestión de Maestros** — ABM (Alta, Baja, Modificación) de Instrumentos, Tipos de Instrumento y ALyCs / Brokers.
-- **Seguridad Robusta** — Validación local de tokens JWT, Row Level Security (RLS) en base de datos y política de seguridad de contenidos (CSP) estricta.
-- **Experiencia de Usuario** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas (oscuro/claro) con iconos SVG minimalistas y persistencia de estado entre ventanas.
+- **Seguridad Avanzada** — Implementación de **Rol de Administrador** para restringir configuraciones críticas, **Sanitización XSS** en el servidor para proteger notas y maestros, y **Optimización de JWT** mediante la carga persistente de la librería `jose`.
+- **Rendimiento & Escalabilidad** — Uso de **Bulk Quotes API** (`/api/quotes`) para reducir drásticamente el número de peticiones al cargar el dashboard y **Service Workers (PWA Ready)** con estrategia *Stale-While-Revalidate* para carga instantánea de assets.
+- **Experiencia de Usuario (UX)** — Interfaz responsiva con diseño de "isla" para tablas, sistema de temas y reemplazo de spinners por **Skeleton Screens (Shimmer)** en Dashboard, Operaciones y Tenencias para una carga percibida superior.
 
 ## Stack tecnológico
 
@@ -28,11 +29,12 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 | **Servidor** | Node.js + Express.js |
 | **Frontend** | Vanilla JS ES6+ (Módulos nativos, sin bundler) |
 | **Gráficos** | Motor SVG Custom & Chart.js (vía ESM para análisis avanzado) |
-| **Estilos** | CSS3 Moderno (Variables, Grid, Flexbox) |
+| **Estilos** | CSS3 Moderno (Variables, Grid, Flexbox, Shimmer effects) |
 | **Base de Datos** | Supabase (PostgreSQL) |
-| **Seguridad** | Supabase Auth + JWT (jose) + RLS + Helmet |
+| **Seguridad** | Supabase Auth + JWT (jose persistente) + RLS + Sanitización XSS + Helmet |
+| **PWA / Cache** | Service Worker (Stale-While-Revalidate) |
 | **Logging** | Pino + pino-pretty |
-| **Precios** | Finance API (proxy server-side con cache TTL 5 min) |
+| **Precios** | Finance API (Bulk Quotes API con cache TTL 5 min) |
 
 ## Requisitos previos
 
@@ -97,21 +99,22 @@ pnpm start
 ```
 stocker/
 ├── public/
+│   ├── sw.js                   # Service Worker (Estrategia SWR)
 │   ├── js/
 │   │   ├── pages/              # Lógica de cada pantalla (SPA)
-│   │   │   ├── dashboard.js         # KPIs modernos, Gráfico Composición y Heatmap
-│   │   │   ├── analysis.js          # Markowitz, CAPM, Monte Carlo y Stress Testing
-│   │   │   ├── holdings-analysis.js # Análisis por ALyC con gráficos SVG
-│   │   │   ├── operations.js        # Historial e importación masiva CSV
+│   │   │   ├── dashboard.js         # KPIs modernos y Skeletons
+│   │   │   ├── analysis.js          # Análisis avanzado (Markowitz, Monte Carlo)
+│   │   │   ├── holdings-analysis.js # Análisis por ALyC
+│   │   │   ├── operations.js        # Historial e importación CSV
 │   │   │   └── ...
-│   │   ├── api-client.js       # Cliente HTTP con manejo de auth
+│   │   ├── api-client.js       # Cliente HTTP con soporte Bulk Quotes
 │   │   ├── app.js              # Inicialización y Layout principal
 │   │   └── ...
 │   └── css/
-│       └── styles.css          # Estilos personalizados y componentes modernos
+│       └── styles.css          # Estilos personalizados y animaciones Shimmer
 ├── supabase/
 │   └── ...                     # Scripts de base de datos
-├── server.js                   # API, proxy de precios y validaciones
+├── server.js                   # API, sanitización XSS y middleware Admin
 └── logger.js                   # Configuración de logs (Pino)
 ```
 
@@ -119,8 +122,9 @@ stocker/
 
 ## Seguridad
 
-- **Validación Local:** El servidor utiliza la librería `jose` para verificar la firma de los tokens JWT de Supabase antes de procesar cualquier mutación.
-- **RLS (Row Level Security):** Garantiza que un usuario solo pueda acceder a sus propios registros.
-- **CSP (Content Security Policy):** Políticas estrictas que limitan la carga de scripts externos a fuentes confiables (como `esm.sh`).
-- **Rate Limiting:** Control de flujo para las peticiones de precios externos.
+- **Validación Local & Optimización:** El servidor utiliza la librería `jose` precargada para verificar la firma de los tokens JWT de Supabase, reduciendo la latencia en cada petición.
+- **Rol de Administrador:** Restricción de acceso a configuraciones críticas mediante metadatos de usuario en Supabase (`auth.jwt() -> role`), validado en el servidor mediante un middleware específico.
+- **Sanitización XSS:** Todas las entradas de texto (notas, maestros, etc.) son filtradas mediante un motor de sanitización en el servidor para prevenir inyecciones de código HTML malicioso.
+- **RLS (Row Level Security):** Garantiza que un usuario solo pueda acceder a sus propios registros directamente en la capa de datos.
+- **CSP (Content Security Policy):** Políticas estrictas que limitan la carga de scripts externos a fuentes confiables.
 - **Sesión Inteligente:** El frontend detecta cambios de foco y sincroniza la sesión sin recargar la página, manteniendo el estado de navegación del usuario.

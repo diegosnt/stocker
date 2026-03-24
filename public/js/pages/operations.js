@@ -90,12 +90,25 @@ export const OperationsPage = {
                 </tr>
               </thead>
               <tbody id="ops-tbody">
-                <tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>
+                ${Array(10).fill(`
+                  <tr>
+                    <td><div class="skeleton" style="height:14px; width:80px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:60px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:120px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:40px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:70px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:70px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:40px"></div></td>
+                    <td><div class="skeleton" style="height:14px; width:60px"></div></td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
           </div>
           <div id="ops-cards" class="ops-cards-grid">
-            <div class="table-empty"><span class="spinner"></span></div>
+            ${Array(5).fill(`
+              <div class="op-card skeleton" style="height: 120px; border: none"></div>
+            `).join('')}
           </div>
           <div id="ops-pagination"></div>
         </div>

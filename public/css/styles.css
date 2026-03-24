@@ -1061,11 +1061,6 @@ input:focus, select:focus, textarea:focus {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-@keyframes shimmer {
-  0%   { opacity: 0.4; }
-  50%  { opacity: 1;   }
-  100% { opacity: 0.4; }
-}
 .cell-skeleton {
   display: inline-block;
   width: 70px;
@@ -1402,4 +1397,42 @@ input:focus, select:focus, textarea:focus {
   .dash-kpi-column {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Skeletons (Shimmer Animation) ───────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, 
+    var(--bg-card) 25%, 
+    var(--bg-main) 50%, 
+    var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer-anim 1.5s infinite linear;
+  border-radius: var(--radius);
+  border: none !important;
+}
+
+.skeleton-text {
+  height: 1rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
+}
+
+.skeleton-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+@keyframes shimmer-anim {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Modo oscuro: ajustamos los colores del shimmer */
+.dark-mode .skeleton {
+  background: linear-gradient(90deg, 
+    #1e293b 25%, 
+    #334155 50%, 
+    #1e293b 75%);
+  background-size: 200% 100%;
 }

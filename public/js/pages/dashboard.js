@@ -14,13 +14,29 @@ export const DashboardPage = {
       <div class="page-header">
         <h2>Dashboard</h2>
       </div>
+      
       <div id="dash-kpis" class="kpi-grid">
-        <div class="kpi-card loading-skeleton"></div>
-        <div class="kpi-card loading-skeleton"></div>
+        ${Array(4).fill(`
+          <div class="kpi-card--modern">
+            <div class="kpi-icon-circle skeleton"></div>
+            <div class="kpi-content" style="flex:1">
+              <div class="skeleton" style="height:10px; width:60%; margin-bottom:8px"></div>
+              <div class="skeleton" style="height:20px; width:90%"></div>
+            </div>
+          </div>
+        `).join('')}
       </div>
+
       <div id="dash-content">
+        <div class="dash-charts-row">
+          <div class="card skeleton" style="height: 360px"></div>
+          <div class="card skeleton" style="height: 360px"></div>
+        </div>
         <div class="card">
-          <p class="table-empty"><span class="spinner"></span> Cargando dashboard...</p>
+          <div class="skeleton" style="height: 30px; width: 200px; margin-bottom: 1.5rem"></div>
+          ${Array(5).fill(`
+            <div class="skeleton" style="height: 40px; margin-bottom: 8px"></div>
+          `).join('')}
         </div>
       </div>`
 
@@ -70,16 +86,25 @@ export const DashboardPage = {
 
   async _updateMarketPrices(tickers) {
     this._resolvedPrices = {}
-    // ✅ Corregido anti-pattern forEach async
-    await Promise.all(tickers.map(async ticker => {
-      let price = null
-      try {
-        const data = await apiRequest('GET', `/api/quote/${encodeURIComponent(ticker)}`)
-        price = data?.price ?? null
-      } catch {}
-      this._resolvedPrices[ticker] = price
-      this._updatePriceCells(ticker, price)
-    }))
+    if (!tickers || tickers.length === 0) return
+
+    try {
+      // Un solo request masivo en lugar de uno por cada ticker
+      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(tickers.join(','))}`)
+      
+      for (const ticker of tickers) {
+        const price = data[ticker]?.price ?? null
+        this._resolvedPrices[ticker] = price
+        this._updatePriceCells(ticker, price)
+      }
+    } catch (err) {
+      console.error('Error al actualizar precios masivos:', err)
+      // Fallback: marcar como nulo para quitar skeletons si falla
+      tickers.forEach(t => {
+        this._resolvedPrices[t] = null
+        this._updatePriceCells(t, null)
+      })
+    }
   },
 
   _renderDashboard(data) {
