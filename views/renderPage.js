@@ -20,7 +20,7 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
     window.__SUPABASE_URL__      = ${JSON.stringify(supabaseUrl)};
     window.__SUPABASE_ANON_KEY__ = ${JSON.stringify(supabaseAnonKey)};
   </script>
-  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/app.js?v=3"></script>
 </body>
 </html>`
 }
