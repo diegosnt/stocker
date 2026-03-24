@@ -6,18 +6,13 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stocker</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="stylesheet" href="/css/styles.css">
-  <link rel="modulepreload" href="https://esm.sh/@supabase/supabase-js@2.98.0" crossorigin>
-  <link rel="modulepreload" href="/js/supabase-client.js">
-  <link rel="modulepreload" href="/js/auth.js">
-  <link rel="modulepreload" href="/js/router.js">
-  <link rel="modulepreload" href="/js/api-client.js">
 </head>
 <body>
   <div id="app">
+    <!-- El Skeleton inicial se renderiza vía JS en app.js o DashboardPage -->
     <div class="app-loading">
-      <p>Cargando...</p>
+      <div class="skeleton" style="height: 100vh; width: 100%"></div>
     </div>
   </div>
 
