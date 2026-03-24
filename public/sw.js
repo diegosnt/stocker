@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stocker-v1';
+const CACHE_NAME = 'stocker-v2';
 const ASSETS = [
   '/',
   '/css/styles.css',
