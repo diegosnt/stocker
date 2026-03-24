@@ -18,6 +18,16 @@ export function setFieldError(fieldId, message) {
   el.addEventListener('change', clear, { once: true })
 }
 
+export function initDarkMode() {
+  const isDark = localStorage.getItem('dark-mode') === 'true'
+  if (isDark) document.body.classList.add('dark-mode')
+}
+
+export function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark-mode')
+  localStorage.setItem('dark-mode', isDark)
+}
+
 export function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

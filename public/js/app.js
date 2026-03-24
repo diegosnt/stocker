@@ -1,5 +1,6 @@
 import { onAuthChange, signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
+import { initDarkMode, toggleDarkMode } from './utils.js'
 import { LoginPage }           from './pages/login.js'
 import { InstrumentTypesPage } from './pages/instrument-types.js'
 import { InstrumentsPage }     from './pages/instruments.js'
@@ -11,17 +12,6 @@ import { AnalysisPage }         from './pages/analysis.js'
 import { DashboardPage }        from './pages/dashboard.js'
 
 const app = document.getElementById('app')
-
-// ── Dark Mode ──────────────────────────────────────────────
-function initDarkMode() {
-  const isDark = localStorage.getItem('dark-mode') === 'true'
-  if (isDark) document.body.classList.add('dark-mode')
-}
-
-export function toggleDarkMode() {
-  const isDark = document.body.classList.toggle('dark-mode')
-  localStorage.setItem('dark-mode', isDark)
-}
 
 // ── Toast ──────────────────────────────────────────────────
 let toastContainer = null
