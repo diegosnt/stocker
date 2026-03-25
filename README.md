@@ -5,14 +5,16 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 ## Características
 
 - **Autenticación** — Login y registro de usuarios vía Supabase Auth con persistencia de sesión inteligente que evita refrescos innecesarios.
+- **Reportes de Élite en PDF** — Generación de reportes profesionales en alta resolución (Screen-to-PDF). Captura íntegra del análisis respetando el diseño exacto de la pantalla, con encabezados dinámicos (ALyC y fecha), contenido educativo integrado desde Supabase y optimización de peso (JPEG High Quality).
 - **Dashboard Avanzado** — Resumen ejecutivo de la cartera con tarjetas KPI rediseñadas, visualización de **Composición de Cartera** mediante un gráfico circular dinámico y un **Mapa de Calor** de distribución. La tabla de activos incluye indicadores visuales de "peso" en la cartera.
-- **Análisis de Cartera Profesional** — Módulo avanzado de análisis cuantitativo para la toma de decisiones informada:
-  - **Modelo de Markowitz**: Cálculo de la Frontera Eficiente para identificar la combinación óptima de activos (Max Sharpe).
-  - **Métricas CAPM**: Evaluación de **Beta** (sensibilidad al mercado), **Alpha** (exceso de retorno) y **Correlación (R²)** frente a un Benchmark.
-  - **Simulaciones de Monte Carlo**: Proyección probabilística de 50 escenarios posibles para la cartera a 1 año de vista.
-  - **Backtesting Histórico**: Comparativa de rendimiento acumulado de tu cartera real vs. Benchmarks globales (SPY, QQQ, etc.).
-  - **Gestión de Riesgo**: Visualización detallada de **Drawdown** (caídas históricas), contribución al riesgo por activo y matriz de correlación Pearson.
-  - **Stress Testing**: Simulación de impacto directo en la cartera ante escenarios de crisis históricas (Crash COVID, Crisis 2008, etc.).
+- **Análisis de Cartera Avanzado (Mejorado)** — Módulo cuantitativo profesional optimizado:
+  - **Situación Actual**: Tabla de tenencia 100% sincronizada con precios de mercado y gráfico Donut de distribución.
+  - **Optimización de Markowitz Pro**: Restricción de diversificación mínima (piso del 5% por activo) para carteras más realistas (Max Sharpe).
+  - **Métricas CAPM**: Evaluación de **Beta**, **Alpha** y **Correlación (R²)** frente a un Benchmark.
+  - **Simulaciones de Monte Carlo**: Proyección probabilística de escenarios posibles a 1 año.
+  - **Backtesting Histórico**: Comparativa de rendimiento acumulado vs. Benchmarks globales.
+  - **Gestión de Riesgo**: Visualización de **Drawdown** y Riesgo con diseño dinámico que se adapta al contenido vecino.
+  - **Stress Testing**: Simulación de impacto ante escenarios de crisis históricas.
 - **Análisis de Tenencia** — Visualización de la cartera segmentada por ALyC con un diseño limpio. Cada ALyC presenta su propio gráfico de distribución y resumen de P&L dinámico.
 - **Importación de Operaciones** — Carga masiva mediante archivos CSV con motor de normalización de datos. Soporta el formato estándar: `Alyc;Operacion;Fecha Operacion;Precio;Moneda;Especie;Cantidad`.
 - **Historial de operaciones** — Registro completo de compras y ventas con soporte para múltiples monedas (ARS/USD).
@@ -26,9 +28,11 @@ Aplicación web para el registro y seguimiento de operaciones bursátiles person
 
 | Capa | Tecnología |
 |---|---|
-| **Servidor** | Node.js + Express.js |
-| **Frontend** | Vanilla JS ES6+ (Módulos nativos, sin bundler) |
-| **Gráficos** | Motor SVG Custom & Chart.js (vía ESM para análisis avanzado) |
+| **Infraestructura** | [Vercel](https://vercel.com/) (Serverless Functions) |
+| **Servidor** | Node.js + Express.js (Optimizado para API routes) |
+| **Frontend** | Vanilla JS ES6+ (Módulos nativos, total independencia de CDNs) |
+| **Reportes PDF** | **jsPDF** & **html2canvas** (Generación en cliente) |
+| **Gráficos** | Motor SVG Custom & **Chart.js** (vía ESM / Vendor) |
 | **Estilos** | CSS3 Moderno (Variables, Grid, Flexbox, Shimmer effects) |
 | **Base de Datos** | Supabase (PostgreSQL) |
 | **Seguridad** | Supabase Auth + JWT (jose persistente) + RLS + Sanitización XSS + Helmet |
@@ -98,24 +102,22 @@ pnpm start
 
 ```
 stocker/
-├── public/
-│   ├── sw.js                   # Service Worker (Estrategia SWR)
+├── api/                    # Serverless Functions (Vercel)
+│   ├── server.js           # API, sanitización XSS y middleware
+│   ├── logger.js           # Configuración de logs (Pino)
+│   └── views/              # Renderizado de vistas del lado servidor
+├── public/                 # Assets estáticos y cliente
+│   ├── sw.js               # Service Worker (Estrategia SWR)
 │   ├── js/
-│   │   ├── pages/              # Lógica de cada pantalla (SPA)
-│   │   │   ├── dashboard.js         # KPIs modernos y Skeletons
-│   │   │   ├── analysis.js          # Análisis avanzado (Markowitz, Monte Carlo)
-│   │   │   ├── holdings-analysis.js # Análisis por ALyC
-│   │   │   ├── operations.js        # Historial e importación CSV
-│   │   │   └── ...
-│   │   ├── api-client.js       # Cliente HTTP con soporte Bulk Quotes
-│   │   ├── app.js              # Inicialización y Layout principal
-│   │   └── ...
-│   └── css/
-│       └── styles.css          # Estilos personalizados y animaciones Shimmer
-├── supabase/
-│   └── ...                     # Scripts de base de datos
-├── server.js                   # API, sanitización XSS y middleware Admin
-└── logger.js                   # Configuración de logs (Pino)
+│   │   ├── pages/          # Lógica de cada pantalla (SPA)
+│   │   ├── vendor/         # Librerías locales (Chart.js, jsPDF, etc.)
+│   │   ├── api-client.js   # Cliente HTTP optimizado
+│   │   └── init.js         # Inicialización del sistema
+│   ├── css/
+│   │   └── styles.css      # CSS Moderno y animaciones Shimmer
+│   └── fonts/              # Tipografías auto-hospedadas (Inter)
+├── supabase/               # Scripts de base de datos y migraciones
+└── vercel.json             # Configuración de despliegue
 ```
 
 ---

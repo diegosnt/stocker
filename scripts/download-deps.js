@@ -14,6 +14,14 @@ const deps = [
     dest: path.join(__dirname, '../public/js/vendor/chart.js')
   },
   {
+    url:  'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    dest: path.join(__dirname, '../public/js/vendor/jspdf.js')
+  },
+  {
+    url:  'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+    dest: path.join(__dirname, '../public/js/vendor/html2canvas.js')
+  },
+  {
     url:  'https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css',
     dest: path.join(__dirname, '../public/css/water.min.css')
   },

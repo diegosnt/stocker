@@ -9,6 +9,8 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <link rel="stylesheet" href="/css/styles.css">
   <script src="/js/vendor/supabase.js"></script>
   <script src="/js/vendor/chart.js"></script>
+  <script src="/js/vendor/jspdf.js"></script>
+  <script src="/js/vendor/html2canvas.js"></script>
 </head>
 <body>
   <div id="app">
@@ -22,9 +24,10 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
     window.__SUPABASE_URL__      = ${JSON.stringify(supabaseUrl)};
     window.__SUPABASE_ANON_KEY__ = ${JSON.stringify(supabaseAnonKey)};
   </script>
-  <script type="module" src="/js/init.js"></script>
-</body>
-</html>`
-}
+  <script type="module" src="/js/init.js?v=4"></script>
+  </body>
+  </html>`
+  }
+
 
 module.exports = { renderPage }

@@ -8,7 +8,7 @@ import { AlycsPage }           from './pages/alycs.js'
 import { OperationsPage }      from './pages/operations.js'
 import { SettingsPage }        from './pages/settings.js'
 import { HoldingsAnalysisPage } from './pages/holdings-analysis.js'
-import { AnalysisPage }         from './pages/analysis.js'
+import { AnalysisPage }         from './pages/analysis.js?v=4'
 import { DashboardPage }        from './pages/dashboard.js'
 
 const app = document.getElementById('app')
