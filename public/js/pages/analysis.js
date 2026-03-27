@@ -40,49 +40,68 @@ export const AnalysisPage = {
 
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
-        <div style="display: grid; grid-template-columns: 7fr 3fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div id="analysis-section-0" style="display: grid; grid-template-columns: 6fr 2fr 2fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="margin-bottom: 0; padding: 1.25rem">
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual</h3>
             <div id="current-holdings-table" style="overflow-x: auto"></div>
           </div>
           <div class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 1rem; margin-bottom: 1rem">Distribución</h3>
+            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Activo</h3>
             <div id="current-holdings-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
+          </div>
+          <div id="type-distribution-card" class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
+            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Tipo</h3>
+            <div id="current-type-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
           </div>
         </div>
 
         <!-- SECCIÓN 1: KPIs y Eficiencia -->
-        <div style="display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div style="display: grid; grid-template-columns: 300px 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0">
             <h3 style="font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--text-muted)">Riesgo y Retorno</h3>
             <div id="analysis-kpis-container" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 0.4rem">
-              <div style="padding: 0.4rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center">
-                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin-bottom: 0.1rem">Beta</h4>
-                <div id="capm-beta" style="font-size: 1rem; font-weight: 700">--</div>
-                <p id="capm-beta-desc" style="font-size: 0.55rem; margin-top: 0.05rem">Cargando...</p>
+              <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Beta</h4>
+                <div id="capm-beta" style="font-size: 1.1rem; font-weight: 700; line-height: 1">--</div>
+                <p id="capm-beta-desc" style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Cargando...</p>
               </div>
-              <div style="padding: 0.4rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center">
-                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin-bottom: 0.1rem">VaR (95%)</h4>
-                <div id="analysis-var" style="font-size: 1rem; font-weight: 700; color: #ef4444">--</div>
-                <p style="font-size: 0.55rem; margin-top: 0.05rem">Pérdida diaria prob.</p>
+              <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">VaR (95%)</h4>
+                <div id="analysis-var" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">--</div>
+                <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Pérdida diaria prob.</p>
               </div>
-              <div style="padding: 0.4rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center">
-                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin-bottom: 0.1rem">Max Drawdown</h4>
-                <div id="analysis-mdd" style="font-size: 1rem; font-weight: 700; color: #ef4444">--</div>
-                <p style="font-size: 0.55rem; margin-top: 0.05rem">Mayor caída hist.</p>
+              <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Max Drawdown</h4>
+                <div id="analysis-mdd" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">--</div>
+                <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Mayor caída hist.</p>
               </div>
-              <div style="padding: 0.4rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center">
-                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin-bottom: 0.1rem">Alpha</h4>
-                <div id="capm-alpha" style="font-size: 1rem; font-weight: 700; color: #10b981">--</div>
-                <p style="font-size: 0.55rem; margin-top: 0.05rem">Excedente anual</p>
+              <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Alpha</h4>
+                <div id="capm-alpha" style="font-size: 1.1rem; font-weight: 700; color: #10b981; line-height: 1">--</div>
+                <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Excedente anual</p>
               </div>
-              <div style="padding: 0.4rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center">
-                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin-bottom: 0.1rem">Corr. (R²)</h4>
-                <div id="capm-r2" style="font-size: 1rem; font-weight: 700">--</div>
-                <p style="font-size: 0.55rem; margin-top: 0.05rem">Vs Benchmark</p>
+              <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Corr. (R²)</h4>
+                <div id="capm-r2" style="font-size: 1.1rem; font-weight: 700; line-height: 1">--</div>
+                <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Vs Benchmark</p>
               </div>
             </div>
           </div>
+
+          <div class="card" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0">
+            <h3 style="font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--text-muted)">Stress Test</h3>
+            <div id="stress-test-container" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 0.4rem">
+              <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Expected Shortfall (95%)</h4>
+                <div id="analysis-es" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">--</div>
+                <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Pérdida promedio en días de pánico</p>
+              </div>
+              <div id="stress-test-results" style="display: contents">
+                <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem">Calculando escenarios...</div>
+              </div>
+            </div>
+          </div>
+
           <div class="card" style="padding: 1.25rem; height: 100%; margin-bottom: 0">
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Frontera Eficiente (Markowitz Pro)</h3>
             <div style="height: 350px; position: relative"><canvas id="markowitz-chart"></canvas></div>
@@ -105,7 +124,7 @@ export const AnalysisPage = {
         </div>
 
         <!-- SECCIÓN 3: Composición y Riesgo -->
-        <div style="display: grid; grid-template-columns: 6fr 2fr 2fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div style="display: grid; grid-template-columns: 7fr 3fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Optimización: Sharpe vs Michaud vs HRP</h3>
             <div id="redistribution-table" style="font-size: 0.8rem"></div>
@@ -115,10 +134,6 @@ export const AnalysisPage = {
             <div style="flex: 1; min-height: 250px; position: relative">
               <canvas id="risk-contribution-chart"></canvas>
             </div>
-          </div>
-          <div class="card" style="margin-bottom: 0; padding: 1rem">
-            <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem">Stress Test</h3>
-            <div id="stress-test-results" style="display: flex; flex-direction: column; gap: 0.5rem"></div>
           </div>
         </div>
 
@@ -271,7 +286,8 @@ export const AnalysisPage = {
 
   _renderCurrentHoldings(holdings) {
     const tableContainer = document.getElementById('current-holdings-table')
-    const chartContainer = document.getElementById('current-holdings-chart')
+    const assetChartContainer = document.getElementById('current-holdings-chart')
+    const typeChartContainer = document.getElementById('current-type-chart')
     const byCurrency = {}
     holdings.forEach(h => { if (!byCurrency[h.currency]) byCurrency[h.currency] = []; byCurrency[h.currency].push(h) })
 
@@ -279,6 +295,9 @@ export const AnalysisPage = {
     const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
     const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
     const sign = v => v > 0 ? '+' : ''
+
+    const typeGroups = {}
+    const assetData = []
 
     for (const [curr, items] of Object.entries(byCurrency)) {
       const totalInv = items.reduce((acc, h) => acc + (h.total_quantity * h.avg_buy_price), 0)
@@ -311,6 +330,12 @@ export const AnalysisPage = {
         const pnl = price ? (price - h.avg_buy_price) * h.total_quantity : 0
         const pnlPct = (h.avg_buy_price > 0 && price) ? ((price / h.avg_buy_price) - 1) * 100 : 0
         const weight = (currentVal / totalMarket) * 100
+        
+        // Datos para gráficos
+        assetData.push({ ticker: h.ticker, currentValue: currentVal })
+        const type = h.instrument_type_name || 'Sin tipo'
+        typeGroups[type] = (typeGroups[type] || 0) + currentVal
+
         html += `
           <tr>
             <td><span class="ticker-chip">${h.ticker}</span></td>
@@ -326,9 +351,48 @@ export const AnalysisPage = {
       })
       html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(2)}%</td><td class="amount">100%</td></tr></tfoot></table></div></div>`
     }
-    tableContainer.innerHTML = html
-    const chartData = holdings.map(h => ({ ticker: h.ticker, currentValue: h.total_quantity * (this._resolvedPrices?.[h.ticker] ?? h.avg_buy_price) }))
-    chartContainer.innerHTML = this._renderDonutChart(chartData, totalMarketValueAll)
+    tableContainer.innerHTML = html || '<div class="table-empty">No hay tenencias registradas.</div>'
+
+    // Renderizar gráficos si hay datos
+    const numAssets = assetData.length
+    const numTypes = Object.keys(typeGroups).length
+    const section0 = document.getElementById('analysis-section-0')
+    const typeCard = document.getElementById('type-distribution-card')
+    const assetCard = assetChartContainer.parentElement
+
+    if (numAssets > 0) {
+      // Caso 1: Solo 1 tipo -> Ocultar gráfico de tipo y ensanchar tabla/otros
+      if (numTypes <= 1) {
+        typeCard.style.display = 'none'
+        section0.style.gridTemplateColumns = '7fr 3fr'
+      } else {
+        typeCard.style.display = 'flex'
+        section0.style.gridTemplateColumns = '6fr 2fr 2fr'
+      }
+
+      // Renderizar gráfico de activos (siempre que haya más de 1, o si es el único gráfico visible)
+      if (numAssets > 1 || numTypes > 1) {
+        assetCard.style.display = 'flex'
+        const sortedAssets = assetData.sort((a, b) => b.currentValue - a.currentValue)
+        assetChartContainer.innerHTML = this._renderDonutChart(sortedAssets, totalMarketValueAll)
+      } else {
+        // Si solo hay 1 activo y 1 tipo, ocultamos ambos gráficos y dejamos la tabla sola
+        assetCard.style.display = 'none'
+        section0.style.gridTemplateColumns = '1fr'
+      }
+
+      // Renderizar gráfico de tipos si hay más de 1
+      if (numTypes > 1) {
+        const typeItems = Object.entries(typeGroups)
+          .map(([ticker, currentValue]) => ({ ticker, currentValue }))
+          .sort((a, b) => b.currentValue - a.currentValue)
+        typeChartContainer.innerHTML = this._renderDonutChart(typeItems, totalMarketValueAll)
+      }
+    } else {
+      assetCard.style.display = 'none'
+      typeCard.style.display = 'none'
+      section0.style.gridTemplateColumns = '1fr'
+    }
   },
 
   _renderDonutChart(items, total) {
@@ -338,7 +402,14 @@ export const AnalysisPage = {
     items.forEach((h, i) => {
       const pct = h.currentValue / total, sweep = pct * 2 * Math.PI, end = angle + sweep, color = colors[i % colors.length], mid = angle + sweep / 2, x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle), x2 = cx + R * Math.cos(end), y2 = cy + R * Math.sin(end), x3 = cx + hole * Math.cos(end), y3 = cy + hole * Math.sin(end), x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
       sectors.push(`<path d="M${x1} ${y1} A${R} ${R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${sweep > Math.PI ? 1 : 0} 0 ${x4} ${y4}Z" fill="${color}" stroke="var(--bg-card)" stroke-width="1"></path>`)
-      if (pct > 0.05) labels.push(`<text x="${cx + midR * Math.cos(mid)}" y="${cy + midR * Math.sin(mid) + 3}" text-anchor="middle" font-size="8" font-weight="bold" fill="white">${h.ticker}</text>`)
+      if (pct > 0.05) {
+        const lx = cx + midR * Math.cos(mid)
+        const ly = cy + midR * Math.sin(mid)
+        labels.push(`
+          <text x="${lx}" y="${ly - 1}" text-anchor="middle" font-size="8" font-weight="bold" fill="white" stroke="rgba(0,0,0,0.3)" stroke-width="2" paint-order="stroke">${h.ticker}</text>
+          <text x="${lx}" y="${ly + 8}" text-anchor="middle" font-size="7" font-weight="normal" fill="white" stroke="rgba(0,0,0,0.3)" stroke-width="1.5" paint-order="stroke">${(pct * 100).toFixed(1)}%</text>
+        `)
+      }
       angle = end
     })
     return `<svg viewBox="0 0 200 200" style="width: 100%; max-width: 300px; height: auto">${sectors.join('')}${labels.join('')}</svg>`
@@ -464,12 +535,17 @@ export const AnalysisPage = {
     const mR = benchmarkReturns.slice(0, numDays), mAvg = mR.reduce((a,b)=>a+b,0)/numDays, pAvg = pDR.reduce((a,b)=>a+b,0)/numDays
     let cov = 0, vM = 0; for (let i = 0; i < numDays; i++) { cov += (pDR[i] - pAvg) * (mR[i] - mAvg); vM += Math.pow(mR[i] - mAvg, 2) }
     const beta = vM === 0 ? 0 : cov / vM, r2 = vM === 0 ? 0 : Math.pow(cov, 2) / (vM * pDR.reduce((a, r) => a + Math.pow(r - pAvg, 2), 0))
-    const alpha = (pAvg * 252) - (beta * (mAvg * 252)), sorted = [...pDR].sort((a,b)=>a-b), vR = sorted[Math.floor(sorted.length * 0.05)] || 0
+    const alpha = (pAvg * 252) - (beta * (mAvg * 252)), sorted = [...pDR].sort((a,b)=>a-b)
+    const varIdx = Math.floor(sorted.length * 0.05)
+    const vR = sorted[varIdx] || 0
+    const es = sorted.slice(0, varIdx + 1).reduce((a, b) => a + b, 0) / (varIdx + 1)
+
     document.getElementById('capm-beta').textContent = beta.toFixed(2)
     document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(0) + '%'
     document.getElementById('capm-alpha').textContent = (alpha > 0 ? '+' : '') + (alpha * 100).toFixed(1) + '%'
     document.getElementById('capm-alpha').style.color = alpha >= 0 ? '#10b981' : '#ef4444'
     document.getElementById('analysis-var').textContent = (vR * 100).toFixed(2) + '%'
+    document.getElementById('analysis-es').textContent = (es * 100).toFixed(2) + '%'
     const bD = document.getElementById('capm-beta-desc')
     bD.textContent = beta > 1.2 ? 'Agresivo' : (beta < 0.8 ? 'Defensivo' : 'Neutral')
     bD.style.color = beta > 1.2 ? '#ef4444' : (beta < 0.8 ? '#3b82f6' : 'var(--text-muted)')
@@ -477,11 +553,17 @@ export const AnalysisPage = {
   },
 
   _renderStressTest(beta) {
-    const scenarios = [{ name: 'Crash COVID', drop: -34 }, { name: 'Crisis 2008', drop: -50 }, { name: 'Shock Tech', drop: -15 }, { name: 'Cisne Negro', drop: -10 }]
+    const scenarios = [
+      { name: 'Crisis 2008', drop: -50 },
+      { name: 'Burbuja Dotcom', drop: -49 },
+      { name: 'Crash COVID', drop: -34 },
+      { name: 'Lunes Negro 1987', drop: -22.6 }
+    ]
     document.getElementById('stress-test-results').innerHTML = scenarios.map(s => `
-      <div style="padding: 0.6rem 0.8rem; border-radius: var(--radius); background: var(--bg-main); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center">
-        <div><div style="font-size: 0.75rem; font-weight: 700">${s.name}</div><div style="font-size: 0.6rem; color: var(--text-muted)">Mkt: ${s.drop}%</div></div>
-        <div style="text-align: right; font-size: 1rem; font-weight: 800; color: #ef4444">${(beta * s.drop).toFixed(1)}%</div>
+      <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
+        <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">${s.name}</h4>
+        <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">${(beta * s.drop).toFixed(1)}%</div>
+        <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Mkt: ${s.drop}%</p>
       </div>`).join('')
   },
 
