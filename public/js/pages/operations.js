@@ -196,10 +196,26 @@ export const OperationsPage = {
         operated_at = `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
       }
 
-      // Precios y cantidades: 25.260,00 -> 25260.00
+      // Precios y cantidades: 25.260,00 -> 25260.00 (soporta formato europeo y anglosajón)
       const parseNum = (s) => {
         if (!s) return 0
-        return parseFloat(s.replace(/\./g, '').replace(',', '.'))
+        const cleaned = s.trim()
+        const hasComma = cleaned.includes(',')
+        const hasDot = cleaned.includes('.')
+        if (hasComma && hasDot) {
+          const lastComma = cleaned.lastIndexOf(',')
+          const lastDot = cleaned.lastIndexOf('.')
+          if (lastComma > lastDot) {
+            return parseFloat(cleaned.replace(/\./g, '').replace(',', '.'))
+          } else {
+            return parseFloat(cleaned.replace(/,/g, ''))
+          }
+        } else if (hasComma) {
+          return parseFloat(cleaned.replace(',', '.'))
+        } else if (hasDot) {
+          return parseFloat(cleaned.replace(/,/g, ''))
+        }
+        return parseFloat(cleaned) || 0
       }
       const price = parseNum(raw['precio'])
       const quantity = parseNum(raw['cantidad'])

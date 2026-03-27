@@ -261,6 +261,7 @@ export const AnalysisPage = {
       const validHistories = []
       const validTickers = []
       const validHoldings = []
+      const failedTickers = []
       this._resolvedPrices = {}
 
       assetResults.forEach((res, i) => {
@@ -271,8 +272,14 @@ export const AnalysisPage = {
           validHoldings.push(h)
           const lastPoint = res.value[res.value.length - 1]
           if (lastPoint) this._resolvedPrices[h.ticker] = lastPoint.price
+        } else {
+          failedTickers.push(h.ticker)
         }
       })
+
+      if (failedTickers.length > 0) {
+        console.warn(`[Analysis] Failed to load history for: ${failedTickers.join(', ')}`)
+      }
 
       if (validTickers.length < 2) throw new Error('No hay suficientes datos históricos.')
       if (benchmarkResult.status === 'rejected') throw new Error('No se pudo cargar el Benchmark.')
@@ -303,6 +310,11 @@ export const AnalysisPage = {
       this._renderComparisonChart(validHoldings)
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${benchmarkTicker}.`
+      
+      if (failedTickers.length > 0) {
+        showToast(`Algunos datos no estarán completos: ${failedTickers.join(', ')}`, 'warning')
+      }
+      
       loadingDiv.style.display = 'none'
       resultsDiv.style.display = 'block'
       pdfBtn.style.display = 'inline-flex'
@@ -587,6 +599,31 @@ export const AnalysisPage = {
     return `<svg viewBox="0 0 200 200" style="width: 100%; max-width: 300px; height: auto">${sectors.join('')}${labels.join('')}</svg>`
   },
 
+  async _loadPdfLibraries() {
+    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = '/js/vendor/jspdf.js'
+      s.onload = () => {
+        const check = () => {
+          if (window.jspdf && window.jspdf.jsPDF) resolve()
+          else setTimeout(check, 10)
+        }
+        check()
+      }
+      s.onerror = reject
+      document.head.appendChild(s)
+    })
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = '/js/vendor/html2canvas.js'
+      s.onload = resolve
+      s.onerror = reject
+      document.head.appendChild(s)
+    })
+    return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
+  },
+
   async _generatePDF() {
     const resultsEl = document.getElementById('analysis-results')
     if (!resultsEl) return
@@ -594,18 +631,67 @@ export const AnalysisPage = {
     const alycName = alycSelect.options[alycSelect.selectedIndex]?.text || 'Cartera'
     const pdfBtn = document.getElementById('btn-generate-pdf'), originalText = pdfBtn.textContent
     pdfBtn.textContent = 'Generando...'; pdfBtn.disabled = true
+    
+    const updateProgress = (msg) => { pdfBtn.textContent = msg }
+    
     try {
-      const canvas = await window.html2canvas(resultsEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#f1f5f9' })
+      updateProgress('Cargando librerías...')
+      const { html2canvas, jsPDF } = await this._loadPdfLibraries()
+      
+      updateProgress('Capturando análisis...')
+      
+      // Use requestIdleCallback to avoid blocking the main thread
+      const captureCanvas = () => new Promise((resolve) => {
+        const attempt = () => {
+          html2canvas(resultsEl, { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false, 
+            backgroundColor: '#f1f5f9',
+            allowTaint: true,
+            onclone: (clonedDoc) => {
+              // Hide elements that shouldn't be in the PDF
+              clonedDoc.querySelectorAll('.no-print, button, [role="button"]').forEach(el => el.style.display = 'none')
+            }
+          }).then(resolve).catch(err => {
+            // Retry once on error
+            setTimeout(() => html2canvas(resultsEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#f1f5f9' }).then(resolve).catch(reject), 100)
+          })
+        }
+        
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(attempt, { timeout: 5000 })
+        } else {
+          setTimeout(attempt, 0)
+        }
+      })
+      
+      const canvas = await captureCanvas()
+      
+      updateProgress('Generando PDF...')
+      
+      // Yield to main thread before PDF generation
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
       const imgData = canvas.toDataURL('image/jpeg', 0.95), imgW = canvas.width / 2, imgH = canvas.height / 2
-      const mmW = imgW * 0.264583, mmH = imgH * 0.264583, { jsPDF } = window.jspdf
+      const mmW = imgW * 0.264583, mmH = imgH * 0.264583
+      
+      // Generate PDF in chunks
       const doc = new jsPDF({ orientation: mmW > mmH ? 'l' : 'p', unit: 'mm', format: [mmW + 20, mmH + 35], compress: true })
       doc.setFont('helvetica', 'bold').setFontSize(16).setTextColor(79, 70, 230)
       doc.text(`REPORTE DE ANÁLISIS ESTRATÉGICO - ${alycName.toUpperCase()}`, 10, 15)
       doc.setFontSize(8).setTextColor(148, 163, 184).text(`Generado el ${new Date().toLocaleString()} | Stocker Intelligence`, 10, 20)
       doc.addImage(imgData, 'PNG', 10, 25, mmW, mmH)
       doc.save(`Stocker_Analisis_${alycName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`)
+      
       showToast('Captura generada con éxito', 'success')
-    } catch (err) { console.error(err); showToast('Error PDF', 'error') } finally { pdfBtn.textContent = originalText; pdfBtn.disabled = false }
+    } catch (err) { 
+      console.error(err); 
+      showToast('Error PDF', 'error') 
+    } finally { 
+      pdfBtn.textContent = originalText; 
+      pdfBtn.disabled = false 
+    }
   },
 
   _calculateReturns(histories, masterCalendar) {

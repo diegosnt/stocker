@@ -5,6 +5,7 @@ const path           = require('path')
 const compression    = require('compression')
 const helmet         = require('helmet')
 const rateLimit      = require('express-rate-limit')
+const { ipKeyGenerator } = require('express-rate-limit')
 const logger         = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
@@ -33,7 +34,7 @@ app.use(express.static(path.join(__dirname, '../public')))
 const financeLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,  // 5 minutos
   max: 30,                   // 30 requests por window por IP
-  keyGenerator: (req) => req.ip ?? req.socket.remoteAddress,
+  keyGenerator: ipKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas consultas. Intentá de nuevo en unos minutos.' }
@@ -120,11 +121,16 @@ const isDate     = v => DATE_RE.test(v) && !isNaN(Date.parse(v))
 const isPositive = v => { const n = Number(v); return Number.isFinite(n) && n > 0 }
 const isUrl      = v => { try { new URL(v); return true } catch { return false } }
 
-// Limpieza básica contra XSS: remueve tags de HTML.
+// Limpieza básica contra XSS: remueve tags de HTML y event handlers.
 function sanitize(v) {
   if (typeof v !== 'string') return v
-  return v.replace(/<[^>]*>?/gm, '') // Vuela cualquier cosa que parezca un tag
-          .trim()
+  return v
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+\s*=\s*["']?[^"'>]+["']?/gi, '')
+    .replace(/\bjavascript\s*:/gi, '')
+    .replace(/\bdata\s*:/gi, '')
+    .replace(/<[^>]*>?/gm, '')
+    .trim()
 }
 
 // Wrapper de fetch a Supabase REST. Lanza un error con { status, payload } si la respuesta no es ok.

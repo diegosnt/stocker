@@ -23,9 +23,15 @@ export function initDarkMode() {
   if (isDark) document.body.classList.add('dark-mode')
 }
 
+let darkModeTimeout = null
+
 export function toggleDarkMode() {
   const isDark = document.body.classList.toggle('dark-mode')
-  localStorage.setItem('dark-mode', isDark)
+  if (darkModeTimeout) clearTimeout(darkModeTimeout)
+  darkModeTimeout = setTimeout(() => {
+    localStorage.setItem('dark-mode', isDark)
+    darkModeTimeout = null
+  }, 300)
 }
 
 export function esc(str) {

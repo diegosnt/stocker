@@ -1,5 +1,4 @@
-// Supabase ya está cargado globalmente desde /js/vendor/supabase.js vía renderPage.js
-const { createClient } = window.supabase
+import { createClient } from './supabase-minimal.js'
 
 const url = window.__SUPABASE_URL__
 const key = window.__SUPABASE_ANON_KEY__

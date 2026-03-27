@@ -106,18 +106,32 @@ initDarkMode()
 
 let _currentUserId = null
 
-onAuthChange((session) => {
+async function initAuth() {
+  const { getSession } = await import('./auth.js')
+  const session = await getSession()
   if (session) {
-    if (_currentUserId !== session.user.id) {
-      _currentUserId = session.user.id
-      renderShell(session.user.email)
-    }
+    _currentUserId = session.user.id
+    renderShell(session.user.email)
   } else {
-    _currentUserId = null
     app.innerHTML = ''
     LoginPage.mount(app)
   }
-})
+
+  onAuthChange((session) => {
+    if (session) {
+      if (_currentUserId !== session.user.id) {
+        _currentUserId = session.user.id
+        renderShell(session.user.email)
+      }
+    } else {
+      _currentUserId = null
+      app.innerHTML = ''
+      LoginPage.mount(app)
+    }
+  })
+}
+
+initAuth()
 
 // ── Service Worker ─────────────────────────────────────────
 if ('serviceWorker' in navigator) {

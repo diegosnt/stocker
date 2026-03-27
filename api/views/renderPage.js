@@ -6,12 +6,13 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stocker</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-500.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/styles.css">
-  <script src="/js/vendor/supabase.js"></script>
   <script src="/js/vendor/chart.js"></script>
   <script src="/js/vendor/chartjs-chart-treemap.js"></script>
-  <script src="/js/vendor/jspdf.js"></script>
-  <script src="/js/vendor/html2canvas.js"></script>
 </head>
 <body>
   <div id="app">
