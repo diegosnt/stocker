@@ -7,8 +7,7 @@ import { InstrumentsPage }     from './pages/instruments.js'
 import { AlycsPage }           from './pages/alycs.js'
 import { OperationsPage }      from './pages/operations.js'
 import { SettingsPage }        from './pages/settings.js'
-import { HoldingsAnalysisPage } from './pages/holdings-analysis.js'
-import { AnalysisPage }         from './pages/analysis.js?v=4'
+import { AnalysisPage }         from './pages/analysis.js'
 import { DashboardPage }        from './pages/dashboard.js'
 
 const app = document.getElementById('app')
@@ -53,7 +52,6 @@ function renderShell(userEmail) {
             <div class="sidebar-section-title">Cartera</div>
             <a href="#dashboard" class="sidebar-link" data-path="dashboard">Dashboard</a>
             <a href="#operations" class="sidebar-link" data-path="operations">Operaciones</a>
-            <a href="#holdings-analysis" class="sidebar-link" data-path="holdings-analysis">Tenencia</a>
             <a href="#analysis" class="sidebar-link" data-path="analysis">Análisis Pro</a>
           </div>
           <div class="sidebar-section">
@@ -88,14 +86,13 @@ function renderShell(userEmail) {
   updateActiveLink()
 
   // Registrar rutas
-  register('dashboard',         () => DashboardPage.render())
+  register('dashboard',         () => DashboardPage.render(), () => DashboardPage.cleanup?.())
   register('operations',        () => OperationsPage.render())
-  register('holdings-analysis', () => HoldingsAnalysisPage.render())
-  register('analysis',          () => AnalysisPage.render())
+  register('analysis',          () => AnalysisPage.render(), () => AnalysisPage.cleanup?.())
   register('instrument-types',  () => InstrumentTypesPage.render())
   register('instruments',       () => InstrumentsPage.render())
   register('alycs',             () => AlycsPage.render())
-  register('settings',          () => SettingsPage.render())
+  register('settings',         () => SettingsPage.render())
 
   start()
 }

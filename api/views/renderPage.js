@@ -9,6 +9,7 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <link rel="stylesheet" href="/css/styles.css">
   <script src="/js/vendor/supabase.js"></script>
   <script src="/js/vendor/chart.js"></script>
+  <script src="/js/vendor/chartjs-chart-treemap.js"></script>
   <script src="/js/vendor/jspdf.js"></script>
   <script src="/js/vendor/html2canvas.js"></script>
 </head>

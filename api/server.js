@@ -4,6 +4,7 @@ const express        = require('express')
 const path           = require('path')
 const compression    = require('compression')
 const helmet         = require('helmet')
+const rateLimit      = require('express-rate-limit')
 const logger         = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
@@ -27,6 +28,16 @@ app.use(helmet({
 app.use(compression())
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../public')))
+
+// Rate limiter para llamadas a Finance API (rate limit real, no en memoria)
+const financeLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,  // 5 minutos
+  max: 30,                   // 30 requests por window por IP
+  keyGenerator: (req) => req.ip ?? req.socket.remoteAddress,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas consultas. Intentá de nuevo en unos minutos.' }
+})
 
 app.get('/', (req, res) => {
   res.send(renderPage({
@@ -628,7 +639,7 @@ app.patch('/api/settings/:key', requireAuth, requireAdmin, async (req, res) => {
 // ── GET /api/quotes ───────────────────────────────────────
 // Recibe una lista de tickers (query param ?tickers=AAPL,GGAL,...)
 // y devuelve un objeto con los precios de todos.
-app.get('/api/quotes', requireAuth, async (req, res) => {
+app.get('/api/quotes', financeLimiter, requireAuth, async (req, res) => {
   const { tickers: tickersStr } = req.query
   if (!tickersStr) return res.status(400).json({ error: 'Faltan tickers' })
 
@@ -650,40 +661,50 @@ app.get('/api/quotes', requireAuth, async (req, res) => {
 
   if (toFetch.length === 0) return res.json(results)
 
-  // 2. Rate limiting (simplificado para bulk)
-  const ip = req.ip ?? req.socket.remoteAddress
-  if (!checkFetchLimit(ip)) {
-    // Si estamos limitados, devolvemos lo que tenemos en cache
-    return res.json(results)
-  }
-
+  // Rate limiting ya maneja por financeLimiter middleware
   try {
     const yfBase = process.env.FINANCE_URL
     const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
 
-    // Consultar los que faltan en paralelo (con un límite de concurrencia implícito por el Promise.all)
-    await Promise.all(toFetch.map(async (ticker) => {
-      try {
-        const needsSuffix = !ticker.includes('.')
-        const symbol = (needsSuffix && yfSuffix) ? `${ticker}${yfSuffix}` : ticker
-        
-        const url = `${yfBase}/${encodeURIComponent(symbol)}?interval=1d&range=1d&includeTimestamps=false`
-        const yfRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        
-        if (yfRes.ok) {
-          const data = await yfRes.json()
-          const meta = data?.chart?.result?.[0]?.meta
-          if (meta) {
-            const price = meta.regularMarketPrice ?? null
-            const currency = meta.currency ?? null
-            quoteCache.set(ticker, { price, currency, expiresAt: Date.now() + QUOTE_TTL })
-            results[ticker] = { price, currency }
+    // Pool de concurrencia: máximo 5 requests simultáneos a Finance
+    const CONCURRENCY_LIMIT = 5
+    
+    async function fetchWithLimit(ticker) {
+      const needsSuffix = !ticker.includes('.')
+      const symbol = (needsSuffix && yfSuffix) ? `${ticker}${yfSuffix}` : ticker
+      
+      const url = `${yfBase}/${encodeURIComponent(symbol)}?interval=1d&range=1d&includeTimestamps=false`
+      const yfRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+      
+      if (yfRes.ok) {
+        const data = await yfRes.json()
+        const meta = data?.chart?.result?.[0]?.meta
+        if (meta) {
+          const price = meta.regularMarketPrice ?? null
+          const currency = meta.currency ?? null
+          quoteCache.set(ticker, { price, currency, expiresAt: Date.now() + QUOTE_TTL })
+          results[ticker] = { price, currency }
+        }
+      }
+    }
+    
+    const queue = [...toFetch]
+    const workers = []
+    
+    for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, queue.length); i++) {
+      workers.push((async () => {
+        while (queue.length > 0) {
+          const ticker = queue.shift()
+          try {
+            await fetchWithLimit(ticker)
+          } catch (err) {
+            logger.warn({ ticker, err: err.message }, 'Error en bulk quote individual')
           }
         }
-      } catch (err) {
-        logger.warn({ ticker, err: err.message }, 'Error en bulk quote individual')
-      }
-    }))
+      })())
+    }
+    
+    await Promise.all(workers)
 
     res.json(results)
   } catch (err) {
@@ -697,24 +718,14 @@ const TICKER_RE  = /^[A-Za-z0-9.\-^=]{1,20}$/
 
 // Rate limit solo sobre llamadas reales a Finance (cache miss), no sobre hits de cache
 const QUOTE_TTL      = 5 * 60 * 1000  // 5 minutos en ms
-const FETCH_LIMIT    = 30              // máx llamadas a Finance por IP por ventana
-const FETCH_WINDOW   = 5 * 60 * 1000  // ventana de 5 minutos
 const quoteCache     = new Map()       // ticker → { price, currency, expiresAt }
-const fetchCounters  = new Map()       // ip → { count, resetAt }
 
-function checkFetchLimit(ip) {
-  const now   = Date.now()
-  const entry = fetchCounters.get(ip)
-  if (!entry || now > entry.resetAt) {
-    fetchCounters.set(ip, { count: 1, resetAt: now + FETCH_WINDOW })
-    return true
-  }
-  if (entry.count >= FETCH_LIMIT) return false
-  entry.count++
-  return true
-}
+// ==============================================================
+// NOTA: El rate limiting ahora usa express-rate-limit (middleware)
+// ver: financeLimiter definido al inicio del archivo
+// ==============================================================
 
-app.get('/api/quote/:ticker', requireAuth, async (req, res) => {
+app.get('/api/quote/:ticker', financeLimiter, requireAuth, async (req, res) => {
   const { ticker } = req.params
   if (!TICKER_RE.test(ticker)) {
     return res.status(400).json({ error: 'Ticker inválido' })
@@ -725,10 +736,8 @@ app.get('/api/quote/:ticker', requireAuth, async (req, res) => {
     return res.json({ price: cached.price, currency: cached.currency, marketState: cached.marketState })
   }
 
-  const ip = req.ip ?? req.socket.remoteAddress
-  if (!checkFetchLimit(ip)) {
-    return res.status(429).json({ error: 'Demasiadas consultas. Intentá de nuevo en unos minutos.' })
-  }
+  // El rate limiting ya está manejado por financeLimiter middleware
+  // Solo necesitamos hacer la llamada a Finance
 
   try {
     const yfBase = process.env.FINANCE_URL

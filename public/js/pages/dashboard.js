@@ -1,16 +1,26 @@
 import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
+import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 
 export const DashboardPage = {
 
-  async render() {
+  cleanup() {
+    if (this._heatmapChart) {
+      this._heatmapChart.destroy()
+      this._heatmapChart = null
+    }
     if (this._marketInterval) {
       clearInterval(this._marketInterval)
       this._marketInterval = null
     }
+    clearRenderCache(document.getElementById('page-content'))
+  },
+
+  async render() {
+    this.cleanup()
 
     const content = document.getElementById('page-content')
-    content.innerHTML = `
+    const skeletonHTML = `
       <div class="page-header">
         <h2>Dashboard</h2>
       </div>
@@ -40,12 +50,15 @@ export const DashboardPage = {
         </div>
       </div>`
 
+    renderIfChanged(content, skeletonHTML)
+
     try {
       const data = await this._loadHoldings()
       this._renderDashboard(data)
       await this._updateMarketPrices(data.tickers)
     } catch (err) {
       console.error(err)
+      // Forzar re-render en error (no usar cache)
       content.innerHTML = `
         <div class="page-header"><h2>Dashboard</h2></div>
         <div class="card">
@@ -195,7 +208,7 @@ export const DashboardPage = {
 
         <div class="card" style="display: flex; flex-direction: column; min-height: 360px;">
           <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor (Peso vs P&L %)</div>
-          <div id="dash-heatmap" class="heatmap-container" style="flex: 1; min-height: 220px">
+          <div id="dash-heatmap" style="flex: 1; min-height: 220px; position: relative">
             <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">
               <span class="spinner"></span> Generando mapa de calor...
             </div>
@@ -396,87 +409,67 @@ export const DashboardPage = {
     const el = document.getElementById('dash-heatmap')
     if (!el || !this._summary) return
 
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+    const getColor = (p) => {
+      if (p > 0) return p > 10 ? '#065f46' : '#10b981'
+      if (p < 0) return p < -10 ? '#991b1b' : '#ef4444'
+      return '#64748b'
+    }
+
     const data = Object.entries(this._summary).map(([ticker, h]) => {
       const price = this._resolvedPrices?.[ticker] ?? null
       const invested = h.quantity * h.avgBuyPrice
       const pct = price !== null && h.avgBuyPrice > 0 ? (price / h.avgBuyPrice - 1) * 100 : 0
-      return { ticker, value: invested, pct }
+      return { ticker, value: invested, pct, color: getColor(pct) }
     }).filter(d => d.value > 0).sort((a, b) => b.value - a.value)
 
     if (!data.length) return
 
-    const width = el.clientWidth || 800
-    const height = 300
-    const nodes = this._layoutTreemap(data, width, height)
+    if (this._heatmapChart) { this._heatmapChart.destroy(); this._heatmapChart = null }
+    el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    const canvas = el.querySelector('canvas')
 
-    const getColor = (pct) => {
-      if (pct > 5) return '#065f46'
-      if (pct > 2) return '#10b981'
-      if (pct > 0.5) return '#6ee7b7'
-      if (pct > -0.5) return '#94a3b8'
-      if (pct > -2) return '#fca5a5'
-      if (pct > -5) return '#ef4444'
-      return '#991b1b'
-    }
-
-    el.innerHTML = `
-      <svg width="${width}" height="${height}" style="display:block; border-radius:var(--radius); overflow:hidden">
-        ${nodes.map(n => `
-          <g class="heatmap-rect" transform="translate(${n.x},${n.y})">
-            <rect width="${n.dx}" height="${n.dy}" fill="${getColor(n.pct)}" stroke="var(--bg-card)" stroke-width="1.5">
-              <title>${n.ticker}: ${n.pct.toFixed(2)}% (Peso: ${n.value.toLocaleString('es-AR')})</title>
-            </rect>
-            ${n.dx > 30 && n.dy > 20 ? `
-              <text x="${n.dx/2}" y="${n.dy/2 + 4}" text-anchor="middle" fill="white" font-weight="700" font-size="${Math.min(n.dx/4, 14)}px" style="pointer-events:none; text-shadow: 0 1px 2px rgba(0,0,0,0.4)">
-                ${n.ticker}
-              </text>
-            ` : ''}
-          </g>
-        `).join('')}
-      </svg>`
-  },
-
-  _layoutTreemap(data, width, height) {
-    // ✅ Corregido: Variable total muerta eliminada
-    const nodes = []
-    
-    function squarify(items, x, y, dx, dy) {
-      if (!items.length) return
-      const isHorizontal = dx > dy
-      const sum = items.reduce((s, i) => s + i.value, 0)
-      let offset = 0
-      items.forEach(item => {
-        const itemRatio = item.value / sum
-        if (isHorizontal) {
-          const w = dx * itemRatio
-          nodes.push({ ...item, x: x + offset, y, dx: w, dy })
-          offset += w
-        } else {
-          const h = dy * itemRatio
-          nodes.push({ ...item, x, y: y + offset, dx, dy: h })
-          offset += h
+    this._heatmapChart = new window.Chart(canvas, {
+      type: 'treemap',
+      data: {
+        datasets: [{
+          tree: data,
+          key: 'value',
+          spacing: 1,
+          borderWidth: 0,
+          borderRadius: 4,
+          backgroundColor: (ctx) => ctx.raw?._data?.color ?? '#64748b',
+          labels: {
+            display: true,
+            formatter: (ctx) => {
+              const d = ctx.raw?._data
+              if (!d) return []
+              return [d.ticker, fmt(d.pct) + '%']
+            },
+            font: { size: 13, weight: 'bold' },
+            color: '#ffffff',
+            overflow: 'fit'
+          }
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const d = ctx.raw?._data
+                if (!d) return ''
+                return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
+              }
+            }
+          }
         }
-      })
-    }
-
-    if (data.length > 4) {
-      const mid = Math.ceil(data.length / 2)
-      const sum1 = data.slice(0, mid).reduce((s, d) => s + d.value, 0)
-      const sum2 = data.slice(mid).reduce((s, d) => s + d.value, 0)
-      const totalSum = sum1 + sum2
-      if (width > height) {
-        const w1 = width * (sum1 / totalSum)
-        squarify(data.slice(0, mid), 0, 0, w1, height)
-        squarify(data.slice(mid), w1, 0, width - w1, height)
-      } else {
-        const h1 = height * (sum1 / totalSum)
-        squarify(data.slice(0, mid), 0, 0, width, h1)
-        squarify(data.slice(mid), 0, h1, width, height - h1)
       }
-    } else {
-      squarify(data, 0, 0, width, height)
-    }
-    return nodes
+    })
   },
 
   _bindTableToggle() {

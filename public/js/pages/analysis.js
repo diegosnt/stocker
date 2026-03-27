@@ -1,6 +1,8 @@
 import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
 import { showToast } from '../init.js'
+import { get as cacheGet, set as cacheSet } from '../cache.js'
+import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -8,9 +10,27 @@ export const AnalysisPage = {
   _btChart: null,
   _rcChart: null,
   _ddChart: null,
+  _treemapChart: null,
   _resolvedPrices: {},
 
+  cleanup() {
+    const charts = [this._chart, this._mcChart, this._btChart, this._rcChart, this._ddChart, this._treemapChart]
+    charts.forEach(chart => {
+      if (chart) {
+        chart.destroy()
+      }
+    })
+    this._chart = null
+    this._mcChart = null
+    this._btChart = null
+    this._rcChart = null
+    this._ddChart = null
+    this._treemapChart = null
+    clearRenderCache(document.getElementById('page-content'))
+  },
+
   async render() {
+    this.cleanup()
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
@@ -124,7 +144,7 @@ export const AnalysisPage = {
         </div>
 
         <!-- SECCIÓN 3: Composición y Riesgo -->
-        <div style="display: grid; grid-template-columns: 7fr 3fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div style="display: grid; grid-template-columns: 5fr 2.5fr 2.5fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Optimización: Sharpe vs Michaud vs HRP</h3>
             <div id="redistribution-table" style="font-size: 0.8rem"></div>
@@ -135,22 +155,31 @@ export const AnalysisPage = {
               <canvas id="risk-contribution-chart"></canvas>
             </div>
           </div>
+          <div class="card" style="margin-bottom: 0; padding: 1rem">
+            <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Matriz de Correlación</h3>
+            <div id="correlation-matrix" style="overflow-x: auto; font-size: 0.75rem"></div>
+          </div>
         </div>
 
-        <!-- SECCIÓN 4: Drawdown y Correlación -->
+        <!-- SECCIÓN 4: Comparativa y Mapa de Calor -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Historial de Caídas (Drawdown)</h3>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Comparativa: Inversión vs Valor Actual ($)</h3>
             <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
-              Profundidad de caídas históricas desde picos máximos.
+              Capital invertido frente a valoración de mercado actual por activo.
             </p>
             <div style="flex: 1; min-height: 220px; position: relative">
-              <canvas id="drawdown-chart"></canvas>
+              <canvas id="comparison-chart"></canvas>
             </div>
           </div>
-          <div class="card" style="margin-bottom: 0">
-            <h3 style="font-size: 0.95rem; margin-bottom: 1rem">Matriz de Correlación</h3>
-            <div id="correlation-matrix" style="overflow-x: auto; font-size: 0.75rem"></div>
+          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Mapa de Calor (Peso vs P&L %)</h3>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+              El tamaño representa el peso en cartera y el color el rendimiento.
+            </p>
+            <div id="analysis-heatmap" style="flex: 1; min-height: 220px; position: relative">
+              <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; width: 100%">Calculando mapa...</div>
+            </div>
           </div>
         </div>
 
@@ -171,8 +200,13 @@ export const AnalysisPage = {
   async _loadAlycs() {
     const select = document.getElementById('analysis-alyc-select')
     try {
-      const { data, error } = await supabase.rpc('get_user_holdings')
-      if (error) throw error
+      let data = cacheGet('user_holdings')
+      if (!data) {
+        const result = await supabase.rpc('get_user_holdings', { p_limit: 500, p_offset: 0 })
+        if (result.error) throw result.error
+        data = result.data
+        if (data) cacheSet('user_holdings', data)
+      }
       const alycs = [...new Set(data.map(h => JSON.stringify({ id: h.alyc_id, name: h.alyc_name })))]
         .map(s => JSON.parse(s))
       if (alycs.length === 0) {
@@ -204,8 +238,13 @@ export const AnalysisPage = {
     loadingDiv.style.display = 'block'
 
     try {
-      const { data: holdings, error } = await supabase.rpc('get_user_holdings')
-      if (error) throw error
+      let holdings = cacheGet('user_holdings')
+      if (!holdings) {
+        const result = await supabase.rpc('get_user_holdings', { p_limit: 500, p_offset: 0 })
+        if (result.error) throw result.error
+        holdings = result.data
+        if (holdings) cacheSet('user_holdings', holdings)
+      }
       const alycHoldings = holdings.filter(h => h.alyc_id === alycId)
       if (alycHoldings.length < 2) throw new Error('Se necesitan al menos 2 activos.')
 
@@ -250,7 +289,7 @@ export const AnalysisPage = {
       const capm = this._performCAPM(analysis, returnsMatrix, benchmarkReturns)
       analysis.beta = capm.beta
 
-      this._renderDrawdownChart(analysis, returnsMatrix)
+      this._calculateMDD(analysis, returnsMatrix)
       this._renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker)
       this._renderStressTest(analysis.beta)
       await this._renderChart(analysis)
@@ -261,6 +300,7 @@ export const AnalysisPage = {
 
       await this._updateMarketPrices(validTickers)
       this._renderCurrentHoldings(validHoldings)
+      this._renderComparisonChart(validHoldings)
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${benchmarkTicker}.`
       loadingDiv.style.display = 'none'
@@ -332,7 +372,7 @@ export const AnalysisPage = {
         const weight = (currentVal / totalMarket) * 100
         
         // Datos para gráficos
-        assetData.push({ ticker: h.ticker, currentValue: currentVal })
+        assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnlPct })
         const type = h.instrument_type_name || 'Sin tipo'
         typeGroups[type] = (typeGroups[type] || 0) + currentVal
 
@@ -388,11 +428,143 @@ export const AnalysisPage = {
           .sort((a, b) => b.currentValue - a.currentValue)
         typeChartContainer.innerHTML = this._renderDonutChart(typeItems, totalMarketValueAll)
       }
+
+      // Renderizar Treemap en Mapa de Calor
+      this._renderTreemap(document.getElementById('analysis-heatmap'), assetData.slice().sort((a, b) => b.currentValue - a.currentValue))
     } else {
       assetCard.style.display = 'none'
       typeCard.style.display = 'none'
       section0.style.gridTemplateColumns = '1fr'
+      if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
+      document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
+  },
+
+  _renderHeatmap(holdings) {
+    const container = document.getElementById('analysis-heatmap')
+    if (!container) return
+
+    const byCurrency = {}
+    holdings.forEach(h => {
+      if (!byCurrency[h.currency]) byCurrency[h.currency] = { total: 0, items: {} }
+      const price = this._resolvedPrices?.[h.ticker] ?? h.avg_buy_price
+      const val = h.total_quantity * price
+      const pnl = ((price / h.avg_buy_price) - 1) * 100
+      
+      if (!byCurrency[h.currency].items[h.ticker]) {
+        byCurrency[h.currency].items[h.ticker] = { ticker: h.ticker, value: 0, pnl: pnl }
+      }
+      byCurrency[h.currency].items[h.ticker].value += val
+      byCurrency[h.currency].total += val
+    })
+
+    const getHeatColor = (pnl) => {
+      if (pnl > 3) return '#059669' 
+      if (pnl > 1) return '#10b981'
+      if (pnl > 0.2) return '#6ee7b7'
+      if (pnl < -3) return '#dc2626'
+      if (pnl < -1) return '#ef4444'
+      if (pnl < -0.2) return '#fca5a1'
+      return 'var(--bg-main)'
+    }
+
+    // Limpiamos y preparamos el container principal para ocupar todo el alto
+    container.style.flexDirection = 'column'
+    container.style.alignItems = 'stretch'
+    container.style.gap = '8px'
+
+    let html = ''
+    const currencies = Object.entries(byCurrency)
+    
+    for (const [curr, data] of currencies) {
+      const items = Object.values(data.items).sort((a, b) => b.value - a.value)
+      
+      // Cada bloque de moneda ocupa una fracción del alto total
+      html += `
+        <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
+          <div style="font-size: 0.7rem; font-weight: 800; color: var(--color-primary); padding: 2px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; text-transform: uppercase">
+            Cartera ${curr}
+          </div>
+          <div style="flex: 1; display: flex; gap: 2px; align-items: stretch">
+            ${items.map(item => {
+              const weight = (item.value / data.total) * 100
+              const bg = getHeatColor(item.pnl)
+              const color = Math.abs(item.pnl) > 1 ? 'white' : 'var(--text-main)'
+              const isThin = weight < 12 // Si el cuadro es muy finito, achicamos/ocultamos cosas
+              
+              return `
+                <div style="flex: ${weight} 0 0%; background: ${bg}; border-radius: 4px; border: 1px solid var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 4px">
+                  <div style="font-weight: 800; font-size: ${isThin ? '0.65rem' : '0.9rem'}; color: ${color}; text-shadow: 0 1px 2px rgba(0,0,0,0.2)">${item.ticker}</div>
+                  ${!isThin ? `<div style="font-size: 0.75rem; font-weight: 700; color: ${color}; opacity: 0.95">${(item.pnl > 0 ? '+' : '')}${item.pnl.toFixed(1)}%</div>` : ''}
+                  <div style="font-size: 0.55rem; color: ${color}; opacity: 0.8">${weight.toFixed(0)}%</div>
+                </div>`
+            }).join('')}
+          </div>
+        </div>`
+    }
+    container.innerHTML = html || '<div style="color:var(--text-muted); font-size:0.8rem; padding: 1rem; text-align: center">Sin datos</div>'
+  },
+
+  _renderTreemap(container, items) {
+    if (!container || !items || items.length === 0) return
+    if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
+    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    const canvas = container.querySelector('canvas')
+
+    const getColor = (p) => {
+      if (p > 0) return p > 10 ? '#065f46' : '#10b981'
+      if (p < 0) return p < -10 ? '#991b1b' : '#ef4444'
+      return '#64748b'
+    }
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+    const data = items.map(item => ({
+      ticker: item.ticker,
+      value: item.currentValue,
+      pct: item.pnlPct ?? 0,
+      color: getColor(item.pnlPct ?? 0)
+    })).filter(d => d.value > 0)
+
+    this._treemapChart = new window.Chart(canvas, {
+      type: 'treemap',
+      data: {
+        datasets: [{
+          tree: data,
+          key: 'value',
+          spacing: 1,
+          borderWidth: 0,
+          borderRadius: 4,
+          backgroundColor: (ctx) => ctx.raw?._data?.color ?? '#64748b',
+          labels: {
+            display: true,
+            formatter: (ctx) => {
+              const d = ctx.raw?._data
+              if (!d) return []
+              return [d.ticker, fmt(d.pct) + '%']
+            },
+            font: { size: 13, weight: 'bold' },
+            color: '#ffffff',
+            overflow: 'fit'
+          }
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const d = ctx.raw?._data
+                if (!d) return ''
+                return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
+              }
+            }
+          }
+        }
+      }
+    })
   },
 
   _renderDonutChart(items, total) {
@@ -469,12 +641,14 @@ export const AnalysisPage = {
 
   _renderRedistribution(analysis, holdings) {
     const container = document.getElementById('redistribution-table')
+    const tickers = analysis.tickers || []
     let html = `<table class="table"><thead><tr><th>Activo</th><th>Actual</th><th>Sharpe</th><th style="color: var(--text-muted)">Dif S</th><th>Michaud</th><th style="color: #10b981">Dif M</th><th>HRP</th><th style="color: #4f46e6">Dif HRP</th></tr></thead><tbody>`
-    analysis.tickers.forEach((ticker, i) => {
-      const currentW = analysis.current.weights[i]
-      const sharpeW = (analysis.optimal.weights[i] ?? 0)
-      const michW = (analysis.michaud?.weights?.[i] ?? 0)
-      const hrpW = (analysis.hrp?.weights?.[i] ?? 0)
+    
+    tickers.forEach(ticker => {
+      const currentW = analysis.current.weights[ticker] || 0
+      const sharpeW = (analysis.optimal?.weights?.[ticker] ?? 0)
+      const michW = (analysis.michaud?.weights?.[ticker] ?? 0)
+      const hrpW = (analysis.hrp?.weights?.[ticker] ?? 0)
       
       const sharpeDiff = (sharpeW - currentW) * 100
       const michaudDiff = (michW - currentW) * 100
@@ -510,9 +684,10 @@ export const AnalysisPage = {
   _renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker) {
     const ctx = document.getElementById('backtesting-chart').getContext('2d')
     const numDays = Math.min(returnsMatrix[0].length, benchmarkReturns.length)
+    const currentWeights = Array.isArray(analysis.current.weights) ? analysis.current.weights : Object.values(analysis.current.weights)
     let pE = 100, bE = 100; const pS = [100], bS = [100]
     for (let d = 0; d < numDays; d++) {
-      let dR = 0; analysis.current.weights.forEach((w, i) => dR += w * returnsMatrix[i][d])
+      let dR = 0; currentWeights.forEach((w, i) => dR += w * returnsMatrix[i][d])
       pE *= (1 + dR); bE *= (1 + benchmarkReturns[d]); pS.push(pE); bS.push(bE)
     }
     const diff = (pE - bE).toFixed(1)
@@ -531,7 +706,8 @@ export const AnalysisPage = {
 
   _performCAPM(analysis, returnsMatrix, benchmarkReturns) {
     const numDays = Math.min(returnsMatrix[0].length, benchmarkReturns.length), pDR = []
-    for (let d = 0; d < numDays; d++) { let r = 0; analysis.current.weights.forEach((w, i) => r += w * returnsMatrix[i][d]); pDR.push(r) }
+    const currentWeights = Array.isArray(analysis.current.weights) ? analysis.current.weights : Object.values(analysis.current.weights)
+    for (let d = 0; d < numDays; d++) { let r = 0; currentWeights.forEach((w, i) => r += w * returnsMatrix[i][d]); pDR.push(r) }
     const mR = benchmarkReturns.slice(0, numDays), mAvg = mR.reduce((a,b)=>a+b,0)/numDays, pAvg = pDR.reduce((a,b)=>a+b,0)/numDays
     let cov = 0, vM = 0; for (let i = 0; i < numDays; i++) { cov += (pDR[i] - pAvg) * (mR[i] - mAvg); vM += Math.pow(mR[i] - mAvg, 2) }
     const beta = vM === 0 ? 0 : cov / vM, r2 = vM === 0 ? 0 : Math.pow(cov, 2) / (vM * pDR.reduce((a, r) => a + Math.pow(r - pAvg, 2), 0))
@@ -567,22 +743,91 @@ export const AnalysisPage = {
       </div>`).join('')
   },
 
-  _renderDrawdownChart(analysis, returnsMatrix) {
-    const ctx = document.getElementById('drawdown-chart').getContext('2d')
+  _calculateMDD(analysis, returnsMatrix) {
     const numDays = returnsMatrix[0].length
-    let cumulativeReturn = 1, drawdowns = [0], peak = 1, maxDrawdown = 0
+    const currentWeights = Array.isArray(analysis.current.weights) ? analysis.current.weights : Object.values(analysis.current.weights)
+    let cumulativeReturn = 1, peak = 1, maxDrawdown = 0
     for (let d = 0; d < numDays; d++) {
       let dayReturn = 0
-      analysis.current.weights.forEach((w, i) => dayReturn += w * returnsMatrix[i][d])
+      currentWeights.forEach((w, i) => dayReturn += w * returnsMatrix[i][d])
       cumulativeReturn *= (1 + dayReturn)
       if (cumulativeReturn > peak) peak = cumulativeReturn
       const dd = (cumulativeReturn - peak) / peak
-      drawdowns.push(dd * 100)
       if (dd < maxDrawdown) maxDrawdown = dd
     }
     document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(2) + '%'
-    if (this._ddChart) this._ddChart.destroy()
-    this._ddChart = new window.Chart(ctx, { type: 'line', data: { labels: Array.from({ length: drawdowns.length }, (_, i) => i), datasets: [{ label: 'Drawdown (%)', data: drawdowns, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', fill: true, pointRadius: 0, borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { max: 0 } }, plugins: { legend: { display: false } } } })
+  },
+
+  _renderComparisonChart(holdings) {
+    const ctx = document.getElementById('comparison-chart').getContext('2d')
+    const grouped = {}
+    holdings.forEach(h => {
+      const price = this._resolvedPrices?.[h.ticker] || h.avg_buy_price
+      const qty = parseFloat(h.total_quantity || 0)
+      const avgPrice = parseFloat(h.avg_buy_price || 0)
+      
+      const invested = qty * avgPrice
+      const current = qty * parseFloat(price)
+      
+      const label = `${h.ticker} (${h.currency})`
+      if (!grouped[label]) {
+        grouped[label] = { invested: 0, current: 0, currency: h.currency }
+      }
+      grouped[label].invested += invested
+      grouped[label].current += current
+    })
+
+    const labels = Object.keys(grouped).sort()
+    const investedData = labels.map(l => grouped[l].invested)
+    const currentData = labels.map(l => grouped[l].current)
+
+    if (this._compChart) this._compChart.destroy()
+    this._compChart = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Capital Invertido', data: investedData, backgroundColor: 'rgba(79, 70, 230, 0.6)', borderRadius: 4 },
+          { label: 'Valor de Mercado', data: currentData, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10, weight: 'bold' } } },
+          tooltip: {
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            titleColor: '#1f2937',
+            bodyColor: '#1f2937',
+            borderColor: '#e5e7eb',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: (ctx) => {
+                const label = ctx.dataset.label
+                const val = ctx.raw
+                const currency = grouped[ctx.label]?.currency || ''
+                const prefix = currency === 'USD' ? 'u$s ' : '$'
+                return `${label}: ${prefix}${val.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' } } },
+          y: { 
+            beginAtZero: true, 
+            ticks: { 
+              font: { size: 9 },
+              callback: (v, idx, values) => {
+                return v.toLocaleString('es-AR', { notation: 'compact' })
+              }
+            } 
+          }
+        }
+      }
+    })
   },
 
   _renderCorrelationHeatmap(tickers, returnsMatrix) {
@@ -648,7 +893,8 @@ export const AnalysisPage = {
         for (let a = 0; a < n; a++) { resampled[a][d] = returnsMatrix[a][randomDay] }
       }
       const scenario = this._performMarkowitz(tickers, resampled, Array(n).fill({ total_quantity: 0, avg_buy_price: 0 }))
-      scenario.optimal.weights.forEach((w, idx) => averagedWeights[idx] += w)
+      const optWeights = scenario.optimal?.weights || {}
+      tickers.forEach((t, idx) => { averagedWeights[idx] += (optWeights[t] || 0) })
     }
     return Array.from(averagedWeights).map(w => w / iterations)
   }

@@ -1,10 +1,14 @@
 // Router simple basado en hash (#ruta)
 const routes = {}
+const cleanups = {}
 let currentRoute  = null
 let _hashListener = null
 
-export function register(hash, handler) {
+export function register(hash, handler, cleanup) {
   routes[hash] = handler
+  if (cleanup) {
+    cleanups[hash] = cleanup
+  }
 }
 
 export function navigate(hash) {
@@ -26,6 +30,12 @@ export function start() {
 function resolve() {
   const hash = window.location.hash.replace('#', '') || 'operations'
   if (currentRoute === hash) return
+
+  // Ejecutar cleanup de la ruta actual antes de navegar
+  if (currentRoute && cleanups[currentRoute]) {
+    cleanups[currentRoute]()
+  }
+
   currentRoute = hash
 
   const handler = routes[hash]

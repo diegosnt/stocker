@@ -3,6 +3,15 @@ import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 
 export const HoldingsAnalysisPage = {
+  _marketInterval: null,
+
+  cleanup() {
+    if (this._marketInterval) {
+      clearInterval(this._marketInterval)
+      this._marketInterval = null
+    }
+  },
+
   _isMarketOpen() {
     const now = new Date()
     // ART = UTC-3, sin horario de verano

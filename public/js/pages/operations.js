@@ -7,20 +7,47 @@ import { esc, confirmModal, setFieldError } from '../utils.js'
 const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
 const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
 
-// Estado de edición — persiste entre navegación de lista → formulario
-let _editingOperation  = null
-let _currentPage       = 0
-let _searchQuery       = ''
-let _alycFilter        = ''   // persiste al volver del formulario de edición
-let _instrumentFilter  = ''
-let _typeFilter        = ''
-let _currencyFilter    = ''
-let _dateFrom          = ''
-let _dateTo            = ''
-let _sortCol           = 'operated_at'
-let _sortAsc           = false
-let _searchTimer       = null
 const PAGE_SIZE = 10
+
+const state = {
+  editingOperation: null,
+  pagination: {
+    currentPage: 0,
+    pageSize: PAGE_SIZE,
+    requestId: null
+  },
+  filters: {
+    searchQuery: '',
+    alycFilter: '',
+    instrumentFilter: '',
+    typeFilter: '',
+    currencyFilter: '',
+    dateFrom: '',
+    dateTo: ''
+  },
+  sorting: {
+    column: 'operated_at',
+    ascending: false
+  },
+  searchTimer: null,
+  abortController: null
+}
+
+const get = (path) => path.split('.').reduce((obj, key) => obj?.[key], state)
+const set = (path, value) => {
+  const keys = path.split('.')
+  const last = keys.pop()
+  keys.reduce((obj, key) => obj[key] ??= {}, state)[last] = value
+}
+const updateFilters = (updates) => {
+  Object.assign(state.filters, updates)
+  state.pagination.currentPage = 0
+}
+const setPage = (page) => { state.pagination.currentPage = page }
+const setSort = (col, asc) => {
+  state.sorting.column = col
+  state.sorting.ascending = asc
+}
 
 export const OperationsPage = {
   async render() {
@@ -29,9 +56,9 @@ export const OperationsPage = {
 
   // ── Listado ──────────────────────────────────────────────
   async _renderList() {
-    _currentPage = 0
-    _searchQuery  = ''
-    // _alycFilter NO se resetea — se conserva al volver del formulario de edición
+    state.pagination.currentPage = 0
+    state.filters.searchQuery  = ''
+    // state.filters.alycFilter NO se resetea — se conserva al volver del formulario de edición
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
@@ -58,18 +85,18 @@ export const OperationsPage = {
             </select>
             <select id="ops-type-filter">
               <option value="">Todos los tipos</option>
-              <option value="compra" ${_typeFilter === 'compra' ? 'selected' : ''}>Compra</option>
-              <option value="venta" ${_typeFilter === 'venta' ? 'selected' : ''}>Venta</option>
+              <option value="compra" ${state.filters.typeFilter === 'compra' ? 'selected' : ''}>Compra</option>
+              <option value="venta" ${state.filters.typeFilter === 'venta' ? 'selected' : ''}>Venta</option>
             </select>
             <select id="ops-currency-filter">
               <option value="">Todas las monedas</option>
-              <option value="ARS" ${_currencyFilter === 'ARS' ? 'selected' : ''}>ARS</option>
-              <option value="USD" ${_currencyFilter === 'USD' ? 'selected' : ''}>USD</option>
+              <option value="ARS" ${state.filters.currencyFilter === 'ARS' ? 'selected' : ''}>ARS</option>
+              <option value="USD" ${state.filters.currencyFilter === 'USD' ? 'selected' : ''}>USD</option>
             </select>
             <div class="ops-date-range">
-              <input type="date" id="ops-date-from" title="Fecha desde" value="${_dateFrom}">
+              <input type="date" id="ops-date-from" title="Fecha desde" value="${state.filters.dateFrom}">
               <span>—</span>
-              <input type="date" id="ops-date-to" title="Fecha hasta" value="${_dateTo}">
+              <input type="date" id="ops-date-to" title="Fecha hasta" value="${state.filters.dateTo}">
             </div>
             <input type="search" id="ops-search" class="search-input" placeholder="Buscar por ticker...">
           </div>
@@ -116,7 +143,7 @@ export const OperationsPage = {
     </div>`
 
     document.getElementById('btn-nueva-op').addEventListener('click', () => {
-      _editingOperation = null
+      state.editingOperation = null
       this._showFormModal()
     })
 
@@ -236,6 +263,7 @@ export const OperationsPage = {
 
       let msg = `Importación finalizada: ${imported} importados, ${skipped} omitidos/duplicados.`
       showToast(msg, allFailedEntities.length > 0 ? 'warning' : 'success')
+      if (imported > 0) cacheInvalidate('user_holdings')
       
       if (allFailedEntities.length > 0) {
         await this._showFailedEntitiesModal(allFailedEntities)
@@ -392,44 +420,68 @@ export const OperationsPage = {
     const opsCards = document.getElementById('ops-cards')
     if (!tbody) return
 
+    // Cancelar request anterior si existe
+    if (state.abortController) {
+      state.abortController.abort()
+    }
+    state.abortController = new AbortController()
+
     tbody.innerHTML    = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
     if (opsCards) opsCards.innerHTML = `<div class="table-empty"><span class="spinner"></span></div>`
 
     const from = page * PAGE_SIZE
     const to   = from + PAGE_SIZE - 1
+    const requestId = state.pagination.requestId = {}
+
+    let data = []
+    let count = 0
 
     // Usamos la vista operations_search para filtrar en el servidor
     let query = supabase
       .from('operations_search')
       .select('*', { count: 'exact' })
-      .order(_sortCol, { ascending: _sortAsc })
+      .order(state.sorting.column, { ascending: state.sorting.ascending })
 
-    if (_alycFilter)       query = query.eq('alyc_id', _alycFilter)
-    if (_instrumentFilter) query = query.eq('instrument_id', _instrumentFilter)
-    if (_typeFilter)       query = query.eq('type', _typeFilter)
-    if (_currencyFilter)   query = query.eq('currency', _currencyFilter)
-    if (_dateFrom)         query = query.gte('operated_at', _dateFrom)
-    if (_dateTo)           query = query.lte('operated_at', _dateTo)
+    if (state.filters.alycFilter)       query = query.eq('alyc_id', state.filters.alycFilter)
+    if (state.filters.instrumentFilter) query = query.eq('instrument_id', state.filters.instrumentFilter)
+    if (state.filters.typeFilter)       query = query.eq('type', state.filters.typeFilter)
+    if (state.filters.currencyFilter)   query = query.eq('currency', state.filters.currencyFilter)
+    if (state.filters.dateFrom)         query = query.gte('operated_at', state.filters.dateFrom)
+    if (state.filters.dateTo)           query = query.lte('operated_at', state.filters.dateTo)
 
-    if (_searchQuery) {
-      const q = `%${_searchQuery}%`
+    if (state.filters.searchQuery) {
+      const q = `%${state.filters.searchQuery}%`
       query = query.or(`instrument_ticker.ilike.${q},instrument_name.ilike.${q},alyc_name.ilike.${q},notes.ilike.${q}`)
     }
 
-    const { data, error, count } = await query.range(from, to)
+    try {
+      const result = await query.range(from, to)
+      data = result.data
+      count = result.count
 
-    if (error) {
-      console.error('Error cargando operaciones:', error)
+      // Ignorar respuesta si ya hay una más reciente
+      if (state.pagination.requestId !== requestId) return
+
+      if (result.error) {
+        console.error('Error cargando operaciones:', result.error)
+        tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
+        this._renderPagination(0, 0)
+        return
+      }
+
+      if (!data.length) {
+        const hasFilters = state.filters.searchQuery || state.filters.alycFilter || state.filters.instrumentFilter || state.filters.typeFilter || state.filters.currencyFilter || state.filters.dateFrom || state.filters.dateTo
+        const emptyMsg = hasFilters ? 'No se encontraron resultados para los filtros aplicados.' : 'No hay operaciones registradas.'
+        tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
+        if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
+        this._renderPagination(0, 0)
+        return
+      }
+    } catch (e) {
+      // Request cancelado o error de red
+      if (state.pagination.requestId !== requestId) return
+      console.error('Error cargando operaciones:', e)
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
-      this._renderPagination(0, 0)
-      return
-    }
-
-    if (!data.length) {
-      const hasFilters = _searchQuery || _alycFilter || _instrumentFilter || _typeFilter || _currencyFilter || _dateFrom || _dateTo
-      const emptyMsg = hasFilters ? 'No se encontraron resultados para los filtros aplicados.' : 'No hay operaciones registradas.'
-      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
-      if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
       this._renderPagination(0, 0)
       return
     }
@@ -525,7 +577,7 @@ export const OperationsPage = {
     })
 
     const handleEdit = (btn) => {
-      _editingOperation = { ...data[btn.dataset.opIdx] }
+      state.editingOperation = { ...data[btn.dataset.opIdx] }
       this._showFormModal()
     }
 
@@ -586,20 +638,20 @@ export const OperationsPage = {
 
     container.querySelectorAll('.pag-num').forEach(btn => {
       btn.addEventListener('click', () => {
-        _currentPage = parseInt(btn.dataset.page, 10)
-        this._loadList(_currentPage)
+        state.pagination.currentPage = parseInt(btn.dataset.page, 10)
+        this._loadList(state.pagination.currentPage)
       })
     })
     if (page > 0) {
       document.getElementById('btn-pag-prev').addEventListener('click', () => {
-        _currentPage = page - 1
-        this._loadList(_currentPage)
+        state.pagination.currentPage = page - 1
+        this._loadList(state.pagination.currentPage)
       })
     }
     if (page < totalPages - 1) {
       document.getElementById('btn-pag-next').addEventListener('click', () => {
-        _currentPage = page + 1
-        this._loadList(_currentPage)
+        state.pagination.currentPage = page + 1
+        this._loadList(state.pagination.currentPage)
       })
     }
   },
@@ -614,7 +666,8 @@ export const OperationsPage = {
     try {
       await apiRequest('DELETE', `/api/operations/${id}`)
       showToast('Operación eliminada.', 'success')
-      await this._loadList(_currentPage)
+      cacheInvalidate('user_holdings')
+      await this._loadList(state.pagination.currentPage)
     } catch {
       showToast('Error al eliminar.', 'error')
     }
@@ -632,12 +685,12 @@ export const OperationsPage = {
 
     if (data?.length) {
       sel.innerHTML = '<option value="">Todas las ALyCs</option>' +
-        data.map(a => `<option value="${a.id}" ${a.id === _alycFilter ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+        data.map(a => `<option value="${a.id}" ${a.id === state.filters.alycFilter ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
     }
 
     sel.addEventListener('change', () => {
-      _alycFilter  = sel.value
-      _currentPage = 0
+      state.filters.alycFilter  = sel.value
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
@@ -655,12 +708,12 @@ export const OperationsPage = {
 
     if (data?.length) {
       sel.innerHTML = '<option value="">Todos los instrumentos</option>' +
-        data.map(i => `<option value="${i.id}" ${i.id === _instrumentFilter ? 'selected' : ''}>${esc(i.ticker)} – ${esc(i.name)}</option>`).join('')
+        data.map(i => `<option value="${i.id}" ${i.id === state.filters.instrumentFilter ? 'selected' : ''}>${esc(i.ticker)} – ${esc(i.name)}</option>`).join('')
     }
 
     sel.addEventListener('change', () => {
-      _instrumentFilter = sel.value
-      _currentPage = 0
+      state.filters.instrumentFilter = sel.value
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
@@ -674,35 +727,35 @@ export const OperationsPage = {
     const clearBtn    = document.getElementById('btn-clear-filters')
 
     typeSel?.addEventListener('change', () => {
-      _typeFilter = typeSel.value
-      _currentPage = 0
+      state.filters.typeFilter = typeSel.value
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
 
     currencySel?.addEventListener('change', () => {
-      _currencyFilter = currencySel.value
-      _currentPage = 0
+      state.filters.currencyFilter = currencySel.value
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
 
     dateFrom?.addEventListener('change', () => {
-      _dateFrom = dateFrom.value
-      _currentPage = 0
+      state.filters.dateFrom = dateFrom.value
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
 
     dateTo?.addEventListener('change', () => {
-      _dateTo = dateTo.value
-      _currentPage = 0
+      state.filters.dateTo = dateTo.value
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
 
     clearBtn?.addEventListener('click', () => {
-      _alycFilter = ''; _instrumentFilter = ''; _typeFilter = ''; _currencyFilter = ''; _dateFrom = ''; _dateTo = ''; _searchQuery = ''
+      state.filters.alycFilter = ''; state.filters.instrumentFilter = ''; state.filters.typeFilter = ''; state.filters.currencyFilter = ''; state.filters.dateFrom = ''; state.filters.dateTo = ''; state.filters.searchQuery = ''
       document.getElementById('ops-alyc-filter').value        = ''
       document.getElementById('ops-instrument-filter').value  = ''
       document.getElementById('ops-type-filter').value        = ''
@@ -710,7 +763,7 @@ export const OperationsPage = {
       document.getElementById('ops-date-from').value          = ''
       document.getElementById('ops-date-to').value            = ''
       document.getElementById('ops-search').value             = ''
-      _currentPage = 0
+      state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
     })
@@ -721,19 +774,19 @@ export const OperationsPage = {
   _updateClearBtn() {
     const btn = document.getElementById('btn-clear-filters')
     if (!btn) return
-    const active = _alycFilter || _instrumentFilter || _typeFilter || _currencyFilter || _dateFrom || _dateTo || _searchQuery
+    const active = state.filters.alycFilter || state.filters.instrumentFilter || state.filters.typeFilter || state.filters.currencyFilter || state.filters.dateFrom || state.filters.dateTo || state.filters.searchQuery
     btn.style.display = active ? '' : 'none'
   },
 
   _bindSearch() {
     const input = document.getElementById('ops-search')
     if (!input) return
-    input.value = _searchQuery
+    input.value = state.filters.searchQuery
     input.addEventListener('input', () => {
-      clearTimeout(_searchTimer)
-      _searchTimer = setTimeout(() => {
-        _searchQuery = input.value.trim()
-        _currentPage = 0
+      clearTimeout(state.searchTimer)
+      state.searchTimer = setTimeout(() => {
+        state.filters.searchQuery = input.value.trim()
+        state.pagination.currentPage = 0
         this._updateClearBtn()
         this._loadList(0)
       }, 300)
@@ -744,13 +797,13 @@ export const OperationsPage = {
     document.querySelectorAll('.ops-table th.sortable').forEach(th => {
       th.addEventListener('click', () => {
         const col = th.dataset.col
-        if (_sortCol === col) {
-          _sortAsc = !_sortAsc
+        if (state.sorting.column === col) {
+          state.sorting.ascending = !state.sorting.ascending
         } else {
-          _sortCol = col
-          _sortAsc = (col !== 'operated_at')  // fechas por defecto desc; resto asc
+          state.sorting.column = col
+          state.sorting.ascending = (col !== 'operated_at')  // fechas por defecto desc; resto asc
         }
-        _currentPage = 0
+        state.pagination.currentPage = 0
         this._updateSortHeaders()
         this._loadList(0)
       })
@@ -761,15 +814,15 @@ export const OperationsPage = {
   _updateSortHeaders() {
     document.querySelectorAll('.ops-table th.sortable').forEach(th => {
       th.classList.remove('sort-asc', 'sort-desc')
-      if (th.dataset.col === _sortCol) {
-        th.classList.add(_sortAsc ? 'sort-asc' : 'sort-desc')
+      if (th.dataset.col === state.sorting.column) {
+        th.classList.add(state.sorting.ascending ? 'sort-asc' : 'sort-desc')
       }
     })
   },
 
   // ── Modal formulario (alta y edición) ────────────────────
   async _showFormModal() {
-    const editing = _editingOperation
+    const editing = state.editingOperation
 
     const overlay = document.createElement('div')
     overlay.className = 'modal-overlay'
@@ -872,7 +925,7 @@ export const OperationsPage = {
         : type !== '' || instrId !== '' || alycId !== '' || qty !== '' || price !== '' || notes !== ''
 
       if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
-      _editingOperation = null
+      state.editingOperation = null
       overlay.remove()
     }
 
@@ -1121,7 +1174,7 @@ export const OperationsPage = {
 
   _bindFormSubmit(overlay) {
     const form    = document.getElementById('form-op')
-    const editing = _editingOperation
+    const editing = state.editingOperation
     if (!form) return
 
     form.addEventListener('submit', async (e) => {
@@ -1168,9 +1221,10 @@ export const OperationsPage = {
           await apiRequest('POST', '/api/operations', payload)
           showToast('Operación registrada correctamente.', 'success')
         }
-        _editingOperation = null
+        cacheInvalidate('user_holdings')
+        state.editingOperation = null
         overlay.remove()
-        await this._loadList(_currentPage)
+        await this._loadList(state.pagination.currentPage)
       } catch {
         showToast('Error al guardar la operación.', 'error')
         btn.disabled    = false
