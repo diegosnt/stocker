@@ -57,8 +57,6 @@ export const OperationsPage = {
   // ── Listado ──────────────────────────────────────────────
   async _renderList() {
     state.pagination.currentPage = 0
-    state.filters.searchQuery  = ''
-    // state.filters.alycFilter NO se resetea — se conserva al volver del formulario de edición
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
@@ -467,7 +465,8 @@ export const OperationsPage = {
 
     if (state.filters.searchQuery) {
       const q = `%${state.filters.searchQuery}%`
-      query = query.or(`instrument_ticker.ilike.${q},instrument_name.ilike.${q},alyc_name.ilike.${q},notes.ilike.${q}`)
+      // Ahora .ilike() ya está disponible en nuestra librería minimal
+      query = query.ilike('instrument_ticker', q)
     }
 
     try {
@@ -729,6 +728,14 @@ export const OperationsPage = {
 
     sel.addEventListener('change', () => {
       state.filters.instrumentFilter = sel.value
+      
+      // Si el usuario selecciona un instrumento del combo, reseteamos el buscador manual
+      if (state.filters.instrumentFilter) {
+        state.filters.searchQuery = ''
+        const searchInput = document.getElementById('ops-search')
+        if (searchInput) searchInput.value = ''
+      }
+
       state.pagination.currentPage = 0
       this._updateClearBtn()
       this._loadList(0)
@@ -802,6 +809,15 @@ export const OperationsPage = {
       clearTimeout(state.searchTimer)
       state.searchTimer = setTimeout(() => {
         state.filters.searchQuery = input.value.trim()
+        
+        // Si el usuario busca un ticker por texto, reseteamos el combo de instrumentos 
+        // para evitar el conflicto de filtros (que aparezca vacío porque no coinciden)
+        if (state.filters.searchQuery) {
+          state.filters.instrumentFilter = ''
+          const instFilter = document.getElementById('ops-instrument-filter')
+          if (instFilter) instFilter.value = ''
+        }
+
         state.pagination.currentPage = 0
         this._updateClearBtn()
         this._loadList(0)

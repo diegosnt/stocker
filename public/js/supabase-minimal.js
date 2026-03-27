@@ -71,6 +71,7 @@ export function createClient(supabaseUrl, supabaseAnonKey) {
       lte: (col, val) => { q.path += `&${col}=lte.${encodeURIComponent(val)}`; return chain },
       gt: (col, val) => { q.path += `&${col}=gt.${encodeURIComponent(val)}`; return chain },
       gte: (col, val) => { q.path += `&${col}=gte.${encodeURIComponent(val)}`; return chain },
+      ilike: (col, val) => { q.path += `&${col}=ilike.${encodeURIComponent(val)}`; return chain },
       or: (filter) => { q.path += `&or=${filter}`; return chain },
       limit: (n) => { q.path += `&limit=${n}`; return chain },
       range: (from, to) => { q.headers['Range'] = `${from}-${to}`; return chain },
