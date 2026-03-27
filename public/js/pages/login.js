@@ -19,7 +19,7 @@ export const LoginPage = {
             <p class="subtitle">Registro de operaciones bursátiles</p>
           </div>
           <div class="login-card-body">
-            <div class="login-tabs" id="login-tabs">
+            <div class="login-tabs" id="login-tabs" style="display: none">
               <button class="active" id="tab-signin">Iniciar sesión</button>
               <button id="tab-signup">Registrarse</button>
             </div>
@@ -69,10 +69,15 @@ export const LoginPage = {
       .eq('key', 'registration_enabled')
       .single()
       .then(({ data }) => {
-        if (data?.value === 'false') {
+        if (data?.value === 'true') {
+          tabsContainer.style.display = 'flex'
+        } else {
           tabsContainer.style.display = 'none'
           if (activeTab === 'signup') setTab('signin')
         }
+      })
+      .catch(() => {
+        tabsContainer.style.display = 'none'
       })
 
     form.addEventListener('submit', async (e) => {
