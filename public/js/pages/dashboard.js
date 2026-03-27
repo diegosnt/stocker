@@ -3,11 +3,16 @@ import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 
 export const DashboardPage = {
+  _typeChart: null,
 
   cleanup() {
     if (this._heatmapChart) {
       this._heatmapChart.destroy()
       this._heatmapChart = null
+    }
+    if (this._typeChart) {
+      this._typeChart.destroy()
+      this._typeChart = null
     }
     if (this._marketInterval) {
       clearInterval(this._marketInterval)
@@ -201,8 +206,8 @@ export const DashboardPage = {
       <div class="dash-charts-row">
         <div class="card dash-chart-card" style="min-height: 360px; display: flex; flex-direction: column;">
           <div class="chart-panel-title" style="margin-bottom:1rem">Composición de Cartera por Tipo</div>
-          <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-            ${this._renderPieChart(typeItems, totalInvested)}
+          <div id="dash-type-chart" style="flex: 1; min-height: 280px; position: relative">
+            <!-- Canvas -->
           </div>
         </div>
 
@@ -269,65 +274,89 @@ export const DashboardPage = {
     this._bindSortHeaders()
     this._bindTableToggle()
     this._refreshHeatmap()
+    this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
   },
 
-  _renderPieChart(items, total) {
-    const colors = [
-      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-      '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
-    ]
-    const cx = 150, cy = 150, R = 120, hole = 68
-    const midR = (R + hole) / 2
-    const MIN_LABEL = 0.05
+  _renderPieChart(container, items, total) {
+    if (!container || !items || items.length === 0) return
+    if (this._typeChart) { this._typeChart.destroy(); this._typeChart = null }
+    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    const canvas = container.querySelector('canvas')
 
-    const label = (x, y, line1, line2) => `
-      <text x="${x.toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle"
-            font-size="12" font-weight="800" fill="white"
-            stroke="rgba(0,0,0,0.45)" stroke-width="3" paint-order="stroke">${line1}</text>
-      <text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" text-anchor="middle"
-            font-size="11" fill="rgba(255,255,255,0.95)"
-            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${line2}</text>`
-
-    if (items.length === 1) {
-      return `<svg viewBox="0 0 300 300" style="max-height: 280px; width: auto; display: block; margin: 0 auto;">
-        <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
-        <circle cx="${cx}" cy="${cy}" r="${hole}" fill="var(--bg-card)"/>
-        ${label(cx, cy, items[0].ticker, '100%')}
-      </svg>`
+    const data = {
+      labels: items.map(item => item.ticker),
+      datasets: [{
+        data: items.map(item => item.currentValue),
+        backgroundColor: ['#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'],
+        borderWidth: 0,
+        hoverOffset: 10
+      }]
     }
 
-    let angle = -Math.PI / 2
-    const sectors = []
-    const labels  = []
+    this._typeChart = new window.Chart(canvas, {
+      type: 'doughnut',
+      data: data,
+      plugins: [{
+        id: 'labelsInside',
+        afterDatasetsDraw(chart) {
+          const { ctx, data } = chart;
+          ctx.save();
+          const totalVal = data.datasets[0].data.reduce((a, b) => a + b, 0);
+          
+          chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
+            const { x, y, startAngle, endAngle, innerRadius, outerRadius } = datapoint;
+            const midAngle = (startAngle + endAngle) / 2;
+            const avgRadius = (innerRadius + outerRadius) / 2;
+            
+            const labelX = x + Math.cos(midAngle) * avgRadius;
+            const labelY = y + Math.sin(midAngle) * avgRadius;
 
-    items.forEach((h, i) => {
-      const pct   = h.currentValue / total
-      const sweep = pct * 2 * Math.PI
-      const end   = angle + sweep
-      const large = sweep > Math.PI ? 1 : 0
-      const color = colors[i % colors.length]
-      const mid   = angle + sweep / 2
+            const value = data.datasets[0].data[index];
+            const pct = (value / totalVal * 100).toFixed(1) + '%';
+            const ticker = data.labels[index];
 
-      const x1 = cx + R    * Math.cos(angle), y1 = cy + R    * Math.sin(angle)
-      const x2 = cx + R    * Math.cos(end),   y2 = cy + R    * Math.sin(end)
-      const x3 = cx + hole * Math.cos(end),   y3 = cy + hole * Math.sin(end)
-      const x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
-
-      const d = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${large} 0 ${x4} ${y4}Z`
-      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2">
-        <title>${h.ticker}: ${(pct * 100).toFixed(1)}%</title></path>`)
-
-      if (pct >= MIN_LABEL) {
-        const lx = cx + midR * Math.cos(mid)
-        const ly = cy + midR * Math.sin(mid)
-        labels.push(label(lx, ly, h.ticker, `${(pct * 100).toFixed(0)}%`))
+            if (endAngle - startAngle > 0.3) {
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = 'white';
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+              ctx.shadowBlur = 4;
+              
+              ctx.font = 'bold 12px sans-serif';
+              ctx.fillText(ticker, labelX, labelY - 6);
+              
+              ctx.font = '10px sans-serif';
+              ctx.shadowBlur = 2;
+              ctx.fillText(pct, labelX, labelY + 8);
+            }
+          });
+          ctx.restore();
+        }
+      }],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            titleColor: '#1f2937',
+            bodyColor: '#1f2937',
+            borderColor: '#e5e7eb',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.raw
+                const pct = (val / total * 100).toFixed(1)
+                return ` ${ctx.label}: $${val.toLocaleString('es-AR')} (${pct}%)`
+              }
+            }
+          }
+        }
       }
-      angle = end
     })
-
-    return `<svg viewBox="0 0 300 300" style="max-height: 280px; width: auto; display: block; margin: 0 auto;">
-      ${sectors.join('')}${labels.join('')}
-    </svg>`
   },
 
   _updatePriceCells(ticker, price) {

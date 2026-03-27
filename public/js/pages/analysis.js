@@ -11,10 +11,18 @@ export const AnalysisPage = {
   _rcChart: null,
   _ddChart: null,
   _treemapChart: null,
+  _assetChart: null,
+  _typeChart: null,
   _resolvedPrices: {},
+  _activeAlycName: null,
+  _activeAlycId: null,
 
   cleanup() {
-    const charts = [this._chart, this._mcChart, this._btChart, this._rcChart, this._ddChart, this._treemapChart]
+    const charts = [
+      this._chart, this._mcChart, this._btChart, 
+      this._rcChart, this._ddChart, this._treemapChart,
+      this._assetChart, this._typeChart
+    ]
     charts.forEach(chart => {
       if (chart) {
         chart.destroy()
@@ -26,6 +34,8 @@ export const AnalysisPage = {
     this._rcChart = null
     this._ddChart = null
     this._treemapChart = null
+    this._assetChart = null
+    this._typeChart = null
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -38,23 +48,38 @@ export const AnalysisPage = {
       </div>
 
       <div class="card" style="margin-bottom: 2rem">
-        <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap">
-          <div class="form-group" style="margin:0; flex: 1; min-width: 200px">
-            <label>Seleccionar ALyC</label>
-            <select id="analysis-alyc-select" class="form-input">
-              <option value="">Cargando ALyCs...</option>
-            </select>
+        <div style="display: flex; gap: 1.5rem; align-items: stretch; flex-wrap: wrap; justify-content: space-between">
+          
+          <!-- Sector ALyCs (Alineado a la izquierda, altura estirada) -->
+          <div style="flex: 1; min-width: 300px; background: var(--bg-main); padding: 1rem 1.25rem; border-radius: var(--radius); border: 1px solid var(--border); display: flex; flex-direction: column">
+            <label style="display: block; margin-bottom: 1rem; font-weight: 700; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: left">Analizar Cartera por ALyC</label>
+            <div id="analysis-alyc-buttons" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; flex: 1; align-items: center">
+              <span style="color: var(--text-muted); font-size: 0.85rem">Cargando ALyCs...</span>
+            </div>
           </div>
-          <div class="form-group" style="margin:0; width: 150px">
-            <label>Benchmark</label>
-            <input type="text" id="analysis-benchmark" class="form-input" value="SPY" placeholder="Ej: SPY, GGAL.BA">
+
+          <!-- Sector Benchmark (Tarjeta Independiente y Centrada) -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-main); padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); min-width: 250px">
+            <div class="form-group" style="margin:0; width: 160px; text-align: center">
+              <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Benchmark Base</label>
+              <div style="display: flex; gap: 0.25rem; margin-bottom: 0.5rem; justify-content: center">
+                <button class="btn-benchmark-quick" data-ticker="SPY" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">SPY</button>
+                <button class="btn-benchmark-quick" data-ticker="QQQ" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">QQQ</button>
+                <button class="btn-benchmark-quick" data-ticker="DIA" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">DIA</button>
+                <button class="btn-benchmark-quick" data-ticker="IWM" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">IWM</button>
+              </div>
+              <input type="text" id="analysis-benchmark" class="form-input" value="SPY" placeholder="Ej: SPY" style="font-weight: 700; height: 32px; text-align: center">
+            </div>
           </div>
-          <button id="btn-run-analysis" class="btn btn-primary" style="height: 38px">
-            Ejecutar Análisis
-          </button>
-          <button id="btn-generate-pdf" class="btn btn-ghost" style="height: 38px; display: none">
-            📥 Generar Reporte PDF
-          </button>
+
+          <!-- Contenedor fijo para el botón PDF (Altura igualada a las tarjetas, siempre visible) -->
+          <div style="width: 180px; display: flex; align-items: stretch; justify-content: center">
+            <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; font-size: 0.85rem; font-weight: 700; flex-direction: column; gap: 0.4rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              <span>Generar Reporte PDF</span>
+            </button>
+          </div>
+
         </div>
       </div>
 
@@ -198,7 +223,7 @@ export const AnalysisPage = {
   },
 
   async _loadAlycs() {
-    const select = document.getElementById('analysis-alyc-select')
+    const container = document.getElementById('analysis-alyc-buttons')
     try {
       let data = cacheGet('user_holdings')
       if (!data) {
@@ -209,34 +234,86 @@ export const AnalysisPage = {
       }
       const alycs = [...new Set(data.map(h => JSON.stringify({ id: h.alyc_id, name: h.alyc_name })))]
         .map(s => JSON.parse(s))
+      
       if (alycs.length === 0) {
-        select.innerHTML = '<option value="">No tenés tenencias registradas</option>'
+        container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem">No tenés tenencias registradas</span>'
         return
       }
-      select.innerHTML = alycs.map(a => `<option value="${a.id}">${a.name}</option>`).join('')
+
+      container.innerHTML = ''
+      alycs.forEach(alyc => {
+        const btn = document.createElement('button')
+        btn.className = 'btn btn-ghost'
+        btn.style.padding = '0.75rem 1.25rem'
+        btn.style.minWidth = '160px'
+        btn.style.height = '54px'
+        btn.style.textAlign = 'center'
+        btn.style.fontSize = '0.95rem'
+        btn.style.fontWeight = '700'
+        btn.style.border = '1px solid var(--border)'
+        btn.textContent = alyc.name
+        btn.onclick = () => {
+          this._activeAlycName = alyc.name
+          this._runAnalysis(alyc.id, btn)
+        }
+        container.appendChild(btn)
+      })
     } catch (e) {
       console.error(e)
-      select.innerHTML = '<option value="">Error al cargar ALyCs</option>'
+      container.innerHTML = '<span style="color: #ef4444; font-size: 0.85rem">Error al cargar ALyCs</span>'
     }
   },
 
   _setupEvents() {
-    document.getElementById('btn-run-analysis').addEventListener('click', () => this._runAnalysis())
     document.getElementById('btn-generate-pdf').addEventListener('click', () => this._generatePDF())
+    
+    // Quick Benchmarks
+    document.querySelectorAll('.btn-benchmark-quick').forEach(btn => {
+      btn.onclick = () => {
+        document.getElementById('analysis-benchmark').value = btn.dataset.ticker
+        document.querySelectorAll('.btn-benchmark-quick').forEach(b => {
+          b.style.background = 'var(--bg-main)'
+          b.style.color = 'var(--text-muted)'
+          b.style.borderColor = 'var(--border)'
+        })
+        btn.style.background = 'var(--color-primary)'
+        btn.style.color = 'white'
+        btn.style.borderColor = 'var(--color-primary)'
+        
+        if (this._activeAlycId) {
+          const activeBtn = Array.from(document.querySelectorAll('#analysis-alyc-buttons button'))
+            .find(b => b.textContent === this._activeAlycName)
+          this._runAnalysis(this._activeAlycId, activeBtn)
+        }
+      }
+    })
   },
 
-  async _runAnalysis() {
-    const alycId = document.getElementById('analysis-alyc-select').value
+  async _runAnalysis(alycId, activeBtn) {
     if (!alycId) return
+    this._activeAlycId = alycId
+
+    // Update active button state
+    document.querySelectorAll('#analysis-alyc-buttons button').forEach(b => {
+      b.classList.remove('btn-primary')
+      b.classList.add('btn-ghost')
+      b.style.borderColor = 'var(--border)'
+    })
+    if (activeBtn) {
+      activeBtn.classList.remove('btn-ghost')
+      activeBtn.classList.add('btn-primary')
+      activeBtn.style.borderColor = 'var(--color-primary)'
+    }
 
     const resultsDiv = document.getElementById('analysis-results')
     const loadingDiv = document.getElementById('analysis-loading')
     const pdfBtn = document.getElementById('btn-generate-pdf')
-    
-    resultsDiv.style.display = 'none'
-    pdfBtn.style.display = 'none'
-    loadingDiv.style.display = 'block'
 
+    resultsDiv.style.display = 'none'
+    pdfBtn.disabled = true
+    pdfBtn.style.opacity = '0.5'
+    pdfBtn.style.cursor = 'not-allowed'
+    loadingDiv.style.display = 'block'
     try {
       let holdings = cacheGet('user_holdings')
       if (!holdings) {
@@ -317,11 +394,16 @@ export const AnalysisPage = {
       
       loadingDiv.style.display = 'none'
       resultsDiv.style.display = 'block'
-      pdfBtn.style.display = 'inline-flex'
+      pdfBtn.disabled = false
+      pdfBtn.style.opacity = '1'
+      pdfBtn.style.cursor = 'pointer'
     } catch (e) {
       console.error(e)
       showToast(e.message, 'error')
       loadingDiv.style.display = 'none'
+      pdfBtn.disabled = true
+      pdfBtn.style.opacity = '0.5'
+      pdfBtn.style.cursor = 'not-allowed'
     }
   },
 
@@ -426,7 +508,7 @@ export const AnalysisPage = {
       if (numAssets > 1 || numTypes > 1) {
         assetCard.style.display = 'flex'
         const sortedAssets = assetData.sort((a, b) => b.currentValue - a.currentValue)
-        assetChartContainer.innerHTML = this._renderDonutChart(sortedAssets, totalMarketValueAll)
+        this._renderDonutChart(assetChartContainer, sortedAssets, totalMarketValueAll, '_assetChart')
       } else {
         // Si solo hay 1 activo y 1 tipo, ocultamos ambos gráficos y dejamos la tabla sola
         assetCard.style.display = 'none'
@@ -438,7 +520,7 @@ export const AnalysisPage = {
         const typeItems = Object.entries(typeGroups)
           .map(([ticker, currentValue]) => ({ ticker, currentValue }))
           .sort((a, b) => b.currentValue - a.currentValue)
-        typeChartContainer.innerHTML = this._renderDonutChart(typeItems, totalMarketValueAll)
+        this._renderDonutChart(typeChartContainer, typeItems, totalMarketValueAll, '_typeChart')
       }
 
       // Renderizar Treemap en Mapa de Calor
@@ -579,24 +661,90 @@ export const AnalysisPage = {
     })
   },
 
-  _renderDonutChart(items, total) {
-    const colors = ['#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1']
-    const cx = 100, cy = 100, R = 85, hole = 55, midR = (R + hole) / 2
-    let angle = -Math.PI / 2; const sectors = [], labels = []
-    items.forEach((h, i) => {
-      const pct = h.currentValue / total, sweep = pct * 2 * Math.PI, end = angle + sweep, color = colors[i % colors.length], mid = angle + sweep / 2, x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle), x2 = cx + R * Math.cos(end), y2 = cy + R * Math.sin(end), x3 = cx + hole * Math.cos(end), y3 = cy + hole * Math.sin(end), x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
-      sectors.push(`<path d="M${x1} ${y1} A${R} ${R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${sweep > Math.PI ? 1 : 0} 0 ${x4} ${y4}Z" fill="${color}" stroke="var(--bg-card)" stroke-width="1"></path>`)
-      if (pct > 0.05) {
-        const lx = cx + midR * Math.cos(mid)
-        const ly = cy + midR * Math.sin(mid)
-        labels.push(`
-          <text x="${lx}" y="${ly - 1}" text-anchor="middle" font-size="8" font-weight="bold" fill="white" stroke="rgba(0,0,0,0.3)" stroke-width="2" paint-order="stroke">${h.ticker}</text>
-          <text x="${lx}" y="${ly + 8}" text-anchor="middle" font-size="7" font-weight="normal" fill="white" stroke="rgba(0,0,0,0.3)" stroke-width="1.5" paint-order="stroke">${(pct * 100).toFixed(1)}%</text>
-        `)
+  _renderDonutChart(container, items, total, chartKey) {
+    if (!container || !items || items.length === 0) return
+    if (this[chartKey]) { this[chartKey].destroy(); this[chartKey] = null }
+    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    const canvas = container.querySelector('canvas')
+
+    const data = {
+      labels: items.map(item => item.ticker),
+      datasets: [{
+        data: items.map(item => item.currentValue),
+        backgroundColor: ['#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'],
+        borderWidth: 0,
+        hoverOffset: 10
+      }]
+    }
+
+    this[chartKey] = new window.Chart(canvas, {
+      type: 'doughnut',
+      data: data,
+      plugins: [{
+        id: 'labelsInside',
+        afterDatasetsDraw(chart) {
+          const { ctx, data } = chart;
+          ctx.save();
+          const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+          
+          chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
+            const { x, y, startAngle, endAngle, innerRadius, outerRadius } = datapoint;
+            const midAngle = (startAngle + endAngle) / 2;
+            const avgRadius = (innerRadius + outerRadius) / 2;
+            
+            // Punto central del sector
+            const labelX = x + Math.cos(midAngle) * avgRadius;
+            const labelY = y + Math.sin(midAngle) * avgRadius;
+
+            const value = data.datasets[0].data[index];
+            const pct = (value / total * 100).toFixed(1) + '%';
+            const ticker = data.labels[index];
+
+            // Solo dibujamos si el sector es lo suficientemente ancho (aprox > 5%)
+            if (endAngle - startAngle > 0.25) {
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = 'white';
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+              ctx.shadowBlur = 4;
+              
+              // Ticker
+              ctx.font = 'bold 11px sans-serif';
+              ctx.fillText(ticker, labelX, labelY - 6);
+              
+              // Porcentaje
+              ctx.font = '9px sans-serif';
+              ctx.shadowBlur = 2;
+              ctx.fillText(pct, labelX, labelY + 7);
+            }
+          });
+          ctx.restore();
+        }
+      }],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            titleColor: '#1f2937',
+            bodyColor: '#1f2937',
+            borderColor: '#e5e7eb',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.raw
+                const pct = (val / total * 100).toFixed(1)
+                return ` ${ctx.label}: $${val.toLocaleString('es-AR')} (${pct}%)`
+              }
+            }
+          }
+        }
       }
-      angle = end
     })
-    return `<svg viewBox="0 0 200 200" style="width: 100%; max-width: 300px; height: auto">${sectors.join('')}${labels.join('')}</svg>`
   },
 
   async _loadPdfLibraries() {
@@ -627,8 +775,7 @@ export const AnalysisPage = {
   async _generatePDF() {
     const resultsEl = document.getElementById('analysis-results')
     if (!resultsEl) return
-    const alycSelect = document.getElementById('analysis-alyc-select')
-    const alycName = alycSelect.options[alycSelect.selectedIndex]?.text || 'Cartera'
+    const alycName = this._activeAlycName || 'Cartera'
     const pdfBtn = document.getElementById('btn-generate-pdf'), originalText = pdfBtn.textContent
     pdfBtn.textContent = 'Generando...'; pdfBtn.disabled = true
     
@@ -716,7 +863,10 @@ export const AnalysisPage = {
       portfolios.push({ weights: w, return: pR, std: pS, sharpe: sh }); if (sh > maxSharpe) { maxSharpe = sh; maxSharpeIdx = i }
     }
     const totalV = holdings.reduce((a, h) => a + (h.total_quantity * h.avg_buy_price), 0), currW = holdings.map(h => (h.total_quantity * h.avg_buy_price) / totalV)
-    return { portfolios, tickers, optimal: portfolios[maxSharpeIdx], current: { weights: currW, return: currW.reduce((a, v, i) => a + v * avgR[i], 0), std: currW.reduce((a, v, i) => a + v * stdR[i], 0) } }
+    const optimalW = portfolios[maxSharpeIdx].weights
+    const weightsObj = tickers.reduce((acc, t, i) => { acc[t] = optimalW[i]; return acc }, {})
+    const currentWeightsObj = tickers.reduce((acc, t, i) => { acc[t] = currW[i]; return acc }, {})
+    return { portfolios, tickers, optimal: { weights: weightsObj, return: portfolios[maxSharpeIdx].return, std: portfolios[maxSharpeIdx].std }, current: { weights: currentWeightsObj, return: currW.reduce((a, v, i) => a + v * avgR[i], 0), std: currW.reduce((a, v, i) => a + v * stdR[i], 0) } }
   },
 
   async _renderChart(analysis) {
@@ -728,13 +878,30 @@ export const AnalysisPage = {
   _renderRedistribution(analysis, holdings) {
     const container = document.getElementById('redistribution-table')
     const tickers = analysis.tickers || []
+    
+    const currentWeights = Array.isArray(analysis.current.weights) 
+      ? tickers.reduce((acc, t, i) => { acc[t] = analysis.current.weights[i] || 0; return acc }, {})
+      : analysis.current.weights || {}
+    
+    const optimalWeights = Array.isArray(analysis.optimal?.weights)
+      ? tickers.reduce((acc, t, i) => { acc[t] = analysis.optimal.weights[i] || 0; return acc }, {})
+      : analysis.optimal?.weights || {}
+    
+    const michaudWeights = Array.isArray(analysis.michaud?.weights)
+      ? tickers.reduce((acc, t, i) => { acc[t] = analysis.michaud.weights[i] || 0; return acc }, {})
+      : analysis.michaud?.weights || {}
+    
+    const hrpWeights = Array.isArray(analysis.hrp?.weights)
+      ? tickers.reduce((acc, t, i) => { acc[t] = analysis.hrp.weights[i] || 0; return acc }, {})
+      : analysis.hrp?.weights || {}
+    
     let html = `<table class="table"><thead><tr><th>Activo</th><th>Actual</th><th>Sharpe</th><th style="color: var(--text-muted)">Dif S</th><th>Michaud</th><th style="color: #10b981">Dif M</th><th>HRP</th><th style="color: #4f46e6">Dif HRP</th></tr></thead><tbody>`
     
     tickers.forEach(ticker => {
-      const currentW = analysis.current.weights[ticker] || 0
-      const sharpeW = (analysis.optimal?.weights?.[ticker] ?? 0)
-      const michW = (analysis.michaud?.weights?.[ticker] ?? 0)
-      const hrpW = (analysis.hrp?.weights?.[ticker] ?? 0)
+      const currentW = currentWeights[ticker] || 0
+      const sharpeW = optimalWeights[ticker] || 0
+      const michW = michaudWeights[ticker] || 0
+      const hrpW = hrpWeights[ticker] || 0
       
       const sharpeDiff = (sharpeW - currentW) * 100
       const michaudDiff = (michW - currentW) * 100
@@ -784,10 +951,14 @@ export const AnalysisPage = {
 
   _renderRiskContribution(analysis, returnsMatrix) {
     const ctx = document.getElementById('risk-contribution-chart').getContext('2d')
+    const tickers = analysis.tickers || []
+    const currentWeights = Array.isArray(analysis.current.weights) 
+      ? analysis.current.weights 
+      : Object.values(analysis.current.weights || {})
     const stdDevs = returnsMatrix.map(r => { const avg = r.reduce((a, b) => a + b, 0) / r.length; return Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) })
-    const raw = analysis.current.weights.map((w, i) => w * stdDevs[i]), total = raw.reduce((a, b) => a + b, 0)
+    const raw = currentWeights.map((w, i) => w * stdDevs[i]), total = raw.reduce((a, b) => a + b, 0)
     if (this._rcChart) this._rcChart.destroy()
-    this._rcChart = new window.Chart(ctx, { type: 'bar', data: { labels: analysis.tickers, datasets: [{ label: '% Riesgo', data: raw.map(c => (c / total) * 100), backgroundColor: '#4f46e6', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { max: 100, ticks: { callback: v => v + '%' } } } }, plugins: { legend: { display: false } } })
+    this._rcChart = new window.Chart(ctx, { type: 'bar', data: { labels: tickers, datasets: [{ label: '% Riesgo', data: raw.map(c => (c / total) * 100), backgroundColor: '#4f46e6', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { max: 100, ticks: { callback: v => v + '%' } } } }, plugins: { legend: { display: false } } })
   },
 
   _performCAPM(analysis, returnsMatrix, benchmarkReturns) {

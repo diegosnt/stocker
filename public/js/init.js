@@ -51,11 +51,11 @@ function renderShell(userEmail) {
           <div class="sidebar-section">
             <div class="sidebar-section-title">Cartera</div>
             <a href="#dashboard" class="sidebar-link" data-path="dashboard">Dashboard</a>
-            <a href="#operations" class="sidebar-link" data-path="operations">Operaciones</a>
             <a href="#analysis" class="sidebar-link" data-path="analysis">Análisis Pro</a>
           </div>
           <div class="sidebar-section">
             <div class="sidebar-section-title">Maestros</div>
+            <a href="#operations" class="sidebar-link" data-path="operations">Operaciones</a>
             <a href="#instruments" class="sidebar-link" data-path="instruments">Instrumentos</a>
             <a href="#instrument-types" class="sidebar-link" data-path="instrument-types">Tipos</a>
             <a href="#alycs" class="sidebar-link" data-path="alycs">ALyCs / Brokers</a>
