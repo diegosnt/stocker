@@ -3,6 +3,7 @@ import { apiRequest } from '../api-client.js'
 import { showToast } from '../init.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
+import { ChartManager } from '../chart-manager.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -165,10 +166,10 @@ export const AnalysisPage = {
               <div id="backtesting-result" style="text-align: right; font-weight: 700; font-size: 0.85rem"></div>
             </div>
             <div style="height: 220px; position: relative"><canvas id="backtesting-chart"></canvas></div>
-          </div>
-        </div>
+           </div>
+         </div>
 
-        <!-- SECCIÓN 3: Composición y Riesgo -->
+         <!-- SECCIÓN 3: Riesgo y Correlación -->
         <div style="display: grid; grid-template-columns: 5fr 2.5fr 2.5fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Optimización: Sharpe vs Michaud vs HRP</h3>
@@ -601,10 +602,12 @@ export const AnalysisPage = {
 
   _renderTreemap(container, items) {
     if (!container || !items || items.length === 0) return
-    if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
-    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    
+    if (!container.querySelector('canvas')) {
+      container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    }
     const canvas = container.querySelector('canvas')
-
+    
     const getColor = (p) => {
       if (p > 0) return p > 10 ? '#065f46' : '#10b981'
       if (p < 0) return p < -10 ? '#991b1b' : '#ef4444'
@@ -619,34 +622,15 @@ export const AnalysisPage = {
       color: getColor(item.pnlPct ?? 0)
     })).filter(d => d.value > 0)
 
-    this._treemapChart = new window.Chart(canvas, {
-      type: 'treemap',
-      data: {
-        datasets: [{
-          tree: data,
-          key: 'value',
-          spacing: 1,
-          borderWidth: 0,
-          borderRadius: 4,
-          backgroundColor: (ctx) => ctx.raw?._data?.color ?? '#64748b',
-          labels: {
-            display: true,
-            formatter: (ctx) => {
-              const d = ctx.raw?._data
-              if (!d) return []
-              return [d.ticker, fmt(d.pct) + '%']
-            },
-            font: { size: 13, weight: 'bold' },
-            color: '#ffffff',
-            overflow: 'fit'
-          }
-        }]
+    this._treemapChart = ChartManager.renderTreemapChart(canvas, data, {
+      instance: this._treemapChart,
+      formatter: (ctx) => {
+        const d = ctx.raw?._data
+        if (!d) return []
+        return [d.ticker, fmt(d.pct) + '%']
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
+      chartOptions: {
         plugins: {
-          legend: { display: false },
           tooltip: {
             callbacks: {
               label: (ctx) => {
@@ -663,92 +647,15 @@ export const AnalysisPage = {
 
   _renderDonutChart(container, items, total, chartKey) {
     if (!container || !items || items.length === 0) return
-    if (this[chartKey]) { this[chartKey].destroy(); this[chartKey] = null }
+    this[chartKey] = ChartManager.destroy(this[chartKey])
+
     container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
     const canvas = container.querySelector('canvas')
 
-    const data = {
-      labels: items.map(item => item.ticker),
-      datasets: [{
-        data: items.map(item => item.currentValue),
-        backgroundColor: ['#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'],
-        borderWidth: 0,
-        hoverOffset: 10
-      }]
-    }
-
-    this[chartKey] = new window.Chart(canvas, {
-      type: 'doughnut',
-      data: data,
-      plugins: [{
-        id: 'labelsInside',
-        afterDatasetsDraw(chart) {
-          const { ctx, data } = chart;
-          ctx.save();
-          const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
-          
-          chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
-            const { x, y, startAngle, endAngle, innerRadius, outerRadius } = datapoint;
-            const midAngle = (startAngle + endAngle) / 2;
-            const avgRadius = (innerRadius + outerRadius) / 2;
-            
-            // Punto central del sector
-            const labelX = x + Math.cos(midAngle) * avgRadius;
-            const labelY = y + Math.sin(midAngle) * avgRadius;
-
-            const value = data.datasets[0].data[index];
-            const pct = (value / total * 100).toFixed(1) + '%';
-            const ticker = data.labels[index];
-
-            // Solo dibujamos si el sector es lo suficientemente ancho (aprox > 5%)
-            if (endAngle - startAngle > 0.25) {
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillStyle = 'white';
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-              ctx.shadowBlur = 4;
-              
-              // Ticker
-              ctx.font = 'bold 11px sans-serif';
-              ctx.fillText(ticker, labelX, labelY - 6);
-              
-              // Porcentaje
-              ctx.font = '9px sans-serif';
-              ctx.shadowBlur = 2;
-              ctx.fillText(pct, labelX, labelY + 7);
-            }
-          });
-          ctx.restore();
-        }
-      }],
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            titleColor: '#1f2937',
-            bodyColor: '#1f2937',
-            borderColor: '#e5e7eb',
-            borderWidth: 1,
-            padding: 10,
-            callbacks: {
-              label: (ctx) => {
-                const val = ctx.raw
-                const pct = (val / total * 100).toFixed(1)
-                return ` ${ctx.label}: $${val.toLocaleString('es-AR')} (${pct}%)`
-              }
-            }
-          }
-        }
-      }
-    })
+    this[chartKey] = ChartManager.renderPieChart(canvas, items)
   },
 
-  async _loadPdfLibraries() {
-    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
+  async _loadPdfLibraries() {    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
     await new Promise((resolve, reject) => {
       const s = document.createElement('script')
       s.src = '/js/vendor/jspdf.js'
@@ -870,9 +777,11 @@ export const AnalysisPage = {
   },
 
   async _renderChart(analysis) {
-    const ctx = document.getElementById('markowitz-chart').getContext('2d')
-    if (this._chart) this._chart.destroy()
-    this._chart = new window.Chart(ctx, { type: 'scatter', data: { datasets: [{ label: 'Aleatorias', data: analysis.portfolios.map(p => ({ x: p.std, y: p.return })), backgroundColor: 'rgba(150, 150, 150, 0.4)', pointRadius: 2 }, { label: 'Sharpe', data: [{ x: analysis.optimal.std, y: analysis.optimal.return }], backgroundColor: '#10b981', pointRadius: 8, borderColor: '#fff', borderWidth: 2 }, { label: 'Actual', data: [{ x: analysis.current.std, y: analysis.current.return }], backgroundColor: '#3b82f6', pointRadius: 8, pointStyle: 'rectRot', borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Riesgo (Vol %)' }, ticks: { callback: v => (v * 100).toFixed(0) + '%' } }, y: { title: { display: true, text: 'Retorno (%)' }, ticks: { callback: v => (v * 100).toFixed(0) + '%' } } } } })
+    const canvas = document.getElementById('markowitz-chart')
+    if (!canvas) return
+    this._chart = ChartManager.renderMarkowitzChart(canvas, analysis, {
+      instance: this._chart
+    })
   },
 
   _renderRedistribution(analysis, holdings) {
@@ -922,43 +831,97 @@ export const AnalysisPage = {
   },
 
   _renderMonteCarlo(analysis) {
-    const ctx = document.getElementById('montecarlo-chart').getContext('2d')
-    const dailyReturn = (analysis.optimal.return / 252), dailyVol = (analysis.optimal.std / Math.sqrt(252)), datasets = []
-    const randn_bm = () => { let u = 0, v = 0; while(u === 0) u = Math.random(); while(v === 0) v = Math.random(); return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v); }
-    for (let s = 0; s < 50; s++) {
-      const data = [100]; let current = 100
-      for (let d = 1; d <= 252; d++) { current *= (1 + (dailyReturn + dailyVol * randn_bm())); data.push(current) }
-      datasets.push({ data, borderColor: s === 0 ? '#10b981' : 'rgba(150, 150, 150, 0.2)', borderWidth: s === 0 ? 3 : 1, pointRadius: 0, fill: false })
+    const canvas = document.getElementById('montecarlo-chart')
+    if (!canvas) return
+    
+    const dailyReturn = (analysis.optimal.return / 252)
+    const dailyVol = (analysis.optimal.std / Math.sqrt(252))
+    const datasets = []
+    const randn_bm = () => { 
+      let u = 0, v = 0; 
+      while(u === 0) u = Math.random(); 
+      while(v === 0) v = Math.random(); 
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v); 
     }
-    if (this._mcChart) this._mcChart.destroy()
-    this._mcChart = new window.Chart(ctx, { type: 'line', data: { labels: Array.from({ length: 253 }, (_, i) => `D${i}`), datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { title: { display: true, text: 'Valor' } } }, plugins: { legend: { display: false } } } })
+
+    for (let s = 0; s < 50; s++) {
+      const data = [100]; 
+      let current = 100
+      for (let d = 1; d <= 252; d++) { 
+        current *= (1 + (dailyReturn + dailyVol * randn_bm())); 
+        data.push(current) 
+      }
+      datasets.push({ 
+        label: s === 0 ? 'Mediana' : `Sim ${s}`, 
+        data 
+      })
+    }
+
+    this._mcChart = ChartManager.renderMonteCarloChart(canvas, datasets, {
+      instance: this._mcChart
+    })
   },
 
   _renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker) {
-    const ctx = document.getElementById('backtesting-chart').getContext('2d')
+    const canvas = document.getElementById('backtesting-chart')
+    if (!canvas) return
+    
     const numDays = Math.min(returnsMatrix[0].length, benchmarkReturns.length)
     const currentWeights = Array.isArray(analysis.current.weights) ? analysis.current.weights : Object.values(analysis.current.weights)
-    let pE = 100, bE = 100; const pS = [100], bS = [100]
+    
+    let pE = 1, bE = 1
+    const pS = [0], bS = [0] // Empezamos en 0% de rendimiento acumulado
+
     for (let d = 0; d < numDays; d++) {
-      let dR = 0; currentWeights.forEach((w, i) => dR += w * returnsMatrix[i][d])
-      pE *= (1 + dR); bE *= (1 + benchmarkReturns[d]); pS.push(pE); bS.push(bE)
+      let dR = 0
+      currentWeights.forEach((w, i) => dR += w * returnsMatrix[i][d])
+      pE *= (1 + dR)
+      bE *= (1 + benchmarkReturns[d])
+      pS.push((pE - 1) * 100)
+      bS.push((bE - 1) * 100)
     }
-    const diff = (pE - bE).toFixed(1)
-    document.getElementById('backtesting-result').innerHTML = `<span style="color:#4f46e6">Mio: ${(pE-100).toFixed(1)}%</span> | <span style="color:#94a3b8">${benchmarkTicker}: ${(bE-100).toFixed(1)}%</span> <div style="font-size:0.75rem;color:${diff >= 0 ? '#10b981' : '#ef4444'}">${diff >= 0 ? '+' : ''}${diff}%</div>`
-    if (this._btChart) this._btChart.destroy()
-    this._btChart = new window.Chart(ctx, { type: 'line', data: { labels: Array.from({ length: pS.length }, (_, i) => i), datasets: [{ label: 'Portfolio', data: pS, borderColor: '#4f46e6', backgroundColor: 'rgba(79, 70, 230, 0.1)', fill: true, pointRadius: 0, borderWidth: 3 }, { label: benchmarkTicker, data: bS, borderColor: '#94a3b8', borderDash: [5, 5], pointRadius: 0, borderWidth: 2, fill: false }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false } }, plugins: { legend: { position: 'top' } } } })
+
+    const diff = ((pE - bE) * 100).toFixed(1)
+    const resEl = document.getElementById('backtesting-result')
+    if (resEl) {
+      resEl.innerHTML = `
+        <span style="color:#4f46e6">Mío: ${((pE-1)*100).toFixed(1)}%</span> | 
+        <span style="color:var(--text-muted)">${benchmarkTicker}: ${((bE-1)*100).toFixed(1)}%</span> 
+        <div style="font-size:0.75rem; color:${diff >= 0 ? '#10b981' : '#ef4444'}; font-weight:800">
+          ${diff >= 0 ? '+' : ''}${diff}%
+        </div>`
+    }
+
+    this._btChart = ChartManager.renderBacktestingChart(canvas, pS, bS, benchmarkTicker, {
+      instance: this._btChart
+    })
   },
 
   _renderRiskContribution(analysis, returnsMatrix) {
-    const ctx = document.getElementById('risk-contribution-chart').getContext('2d')
+    const canvas = document.getElementById('risk-contribution-chart')
+    if (!canvas) return
+
     const tickers = analysis.tickers || []
     const currentWeights = Array.isArray(analysis.current.weights) 
       ? analysis.current.weights 
       : Object.values(analysis.current.weights || {})
-    const stdDevs = returnsMatrix.map(r => { const avg = r.reduce((a, b) => a + b, 0) / r.length; return Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) })
-    const raw = currentWeights.map((w, i) => w * stdDevs[i]), total = raw.reduce((a, b) => a + b, 0)
-    if (this._rcChart) this._rcChart.destroy()
-    this._rcChart = new window.Chart(ctx, { type: 'bar', data: { labels: tickers, datasets: [{ label: '% Riesgo', data: raw.map(c => (c / total) * 100), backgroundColor: '#4f46e6', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { max: 100, ticks: { callback: v => v + '%' } } } }, plugins: { legend: { display: false } } })
+    
+    const stdDevs = returnsMatrix.map(r => { 
+      const avg = r.reduce((a, b) => a + b, 0) / r.length
+      return Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) 
+    })
+    
+    const raw = currentWeights.map((w, i) => w * stdDevs[i])
+    const total = raw.reduce((a, b) => a + b, 0)
+    
+    const items = tickers.map((ticker, i) => ({
+      ticker,
+      value: total > 0 ? (raw[i] / total) * 100 : 0
+    })).sort((a, b) => b.value - a.value) // Ordenar por mayor riesgo
+
+    this._rcChart = ChartManager.renderRiskChart(canvas, items, {
+      instance: this._rcChart
+    })
   },
 
   _performCAPM(analysis, returnsMatrix, benchmarkReturns) {
@@ -1016,7 +979,9 @@ export const AnalysisPage = {
   },
 
   _renderComparisonChart(holdings) {
-    const ctx = document.getElementById('comparison-chart').getContext('2d')
+    const canvas = document.getElementById('comparison-chart')
+    if (!canvas) return
+
     const grouped = {}
     holdings.forEach(h => {
       const price = this._resolvedPrices?.[h.ticker] || h.avg_buy_price
@@ -1038,57 +1003,14 @@ export const AnalysisPage = {
     const investedData = labels.map(l => grouped[l].invested)
     const currentData = labels.map(l => grouped[l].current)
 
-    if (this._compChart) this._compChart.destroy()
-    this._compChart = new window.Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Capital Invertido', data: investedData, backgroundColor: 'rgba(79, 70, 230, 0.6)', borderRadius: 4 },
-          { label: 'Valor de Mercado', data: currentData, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 4 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10, weight: 'bold' } } },
-          tooltip: {
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            titleColor: '#1f2937',
-            bodyColor: '#1f2937',
-            borderColor: '#e5e7eb',
-            borderWidth: 1,
-            padding: 10,
-            callbacks: {
-              label: (ctx) => {
-                const label = ctx.dataset.label
-                const val = ctx.raw
-                const currency = grouped[ctx.label]?.currency || ''
-                const prefix = currency === 'USD' ? 'u$s ' : '$'
-                return `${label}: ${prefix}${val.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-              }
-            }
-          }
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' } } },
-          y: { 
-            beginAtZero: true, 
-            ticks: { 
-              font: { size: 9 },
-              callback: (v, idx, values) => {
-                return v.toLocaleString('es-AR', { notation: 'compact' })
-              }
-            } 
-          }
-        }
-      }
+    this._compChart = ChartManager.renderComparisonChart(canvas, labels, investedData, currentData, {
+      instance: this._compChart
     })
   },
 
   _renderCorrelationHeatmap(tickers, returnsMatrix) {
     const container = document.getElementById('correlation-matrix')
+    if (!container) return
     const n = tickers.length, numDays = returnsMatrix[0].length
     const stats = returnsMatrix.map(r => { const avg = r.reduce((a, b) => a + b, 0) / r.length; return { avg, std: Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) } })
     let html = `<table style="width:100%; font-size: 0.75rem; border-collapse: collapse"><tr><th></th>`

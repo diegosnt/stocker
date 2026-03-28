@@ -1,19 +1,16 @@
 import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
+import { ChartManager } from '../chart-manager.js'
 
 export const DashboardPage = {
   _typeChart: null,
+  _heatmapChart: null,
 
   cleanup() {
-    if (this._heatmapChart) {
-      this._heatmapChart.destroy()
-      this._heatmapChart = null
-    }
-    if (this._typeChart) {
-      this._typeChart.destroy()
-      this._typeChart = null
-    }
+    this._heatmapChart = ChartManager.destroy(this._heatmapChart)
+    this._typeChart = ChartManager.destroy(this._typeChart)
+    
     if (this._marketInterval) {
       clearInterval(this._marketInterval)
       this._marketInterval = null
@@ -279,83 +276,14 @@ export const DashboardPage = {
 
   _renderPieChart(container, items, total) {
     if (!container || !items || items.length === 0) return
-    if (this._typeChart) { this._typeChart.destroy(); this._typeChart = null }
-    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
-    const canvas = container.querySelector('canvas')
-
-    const data = {
-      labels: items.map(item => item.ticker),
-      datasets: [{
-        data: items.map(item => item.currentValue),
-        backgroundColor: ['#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'],
-        borderWidth: 0,
-        hoverOffset: 10
-      }]
+    
+    if (!container.querySelector('canvas')) {
+      container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
     }
-
-    this._typeChart = new window.Chart(canvas, {
-      type: 'doughnut',
-      data: data,
-      plugins: [{
-        id: 'labelsInside',
-        afterDatasetsDraw(chart) {
-          const { ctx, data } = chart;
-          ctx.save();
-          const totalVal = data.datasets[0].data.reduce((a, b) => a + b, 0);
-          
-          chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
-            const { x, y, startAngle, endAngle, innerRadius, outerRadius } = datapoint;
-            const midAngle = (startAngle + endAngle) / 2;
-            const avgRadius = (innerRadius + outerRadius) / 2;
-            
-            const labelX = x + Math.cos(midAngle) * avgRadius;
-            const labelY = y + Math.sin(midAngle) * avgRadius;
-
-            const value = data.datasets[0].data[index];
-            const pct = (value / totalVal * 100).toFixed(1) + '%';
-            const ticker = data.labels[index];
-
-            if (endAngle - startAngle > 0.3) {
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillStyle = 'white';
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-              ctx.shadowBlur = 4;
-              
-              ctx.font = 'bold 12px sans-serif';
-              ctx.fillText(ticker, labelX, labelY - 6);
-              
-              ctx.font = '10px sans-serif';
-              ctx.shadowBlur = 2;
-              ctx.fillText(pct, labelX, labelY + 8);
-            }
-          });
-          ctx.restore();
-        }
-      }],
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            titleColor: '#1f2937',
-            bodyColor: '#1f2937',
-            borderColor: '#e5e7eb',
-            borderWidth: 1,
-            padding: 10,
-            callbacks: {
-              label: (ctx) => {
-                const val = ctx.raw
-                const pct = (val / total * 100).toFixed(1)
-                return ` ${ctx.label}: $${val.toLocaleString('es-AR')} (${pct}%)`
-              }
-            }
-          }
-        }
-      }
+    const canvas = container.querySelector('canvas')
+    
+    this._typeChart = ChartManager.renderPieChart(canvas, items, {
+      instance: this._typeChart
     })
   },
 
@@ -455,38 +383,20 @@ export const DashboardPage = {
 
     if (!data.length) return
 
-    if (this._heatmapChart) { this._heatmapChart.destroy(); this._heatmapChart = null }
-    el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    if (!el.querySelector('canvas')) {
+      el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    }
     const canvas = el.querySelector('canvas')
 
-    this._heatmapChart = new window.Chart(canvas, {
-      type: 'treemap',
-      data: {
-        datasets: [{
-          tree: data,
-          key: 'value',
-          spacing: 1,
-          borderWidth: 0,
-          borderRadius: 4,
-          backgroundColor: (ctx) => ctx.raw?._data?.color ?? '#64748b',
-          labels: {
-            display: true,
-            formatter: (ctx) => {
-              const d = ctx.raw?._data
-              if (!d) return []
-              return [d.ticker, fmt(d.pct) + '%']
-            },
-            font: { size: 13, weight: 'bold' },
-            color: '#ffffff',
-            overflow: 'fit'
-          }
-        }]
+    this._heatmapChart = ChartManager.renderTreemapChart(canvas, data, {
+      instance: this._heatmapChart,
+      formatter: (ctx) => {
+        const d = ctx.raw?._data
+        if (!d) return []
+        return [d.ticker, fmt(d.pct) + '%']
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
+      chartOptions: {
         plugins: {
-          legend: { display: false },
           tooltip: {
             callbacks: {
               label: (ctx) => {

@@ -1,11 +1,17 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
+import { ChartManager } from '../chart-manager.js'
 
 export const HoldingsAnalysisPage = {
   _marketInterval: null,
+  _charts: {}, // Almacén para instancias de Chart.js
 
   cleanup() {
+    // Destruir todos los gráficos antes de limpiar
+    Object.values(this._charts).forEach(c => ChartManager.destroy(c))
+    this._charts = {}
+
     if (this._marketInterval) {
       clearInterval(this._marketInterval)
       this._marketInterval = null
@@ -137,11 +143,11 @@ export const HoldingsAnalysisPage = {
           <div class="charts-row">
             <div class="chart-panel">
               <div class="chart-panel-title">Distribución de Tenencia</div>
-              ${this._renderPieChart(items, totalVal)}
+              <div style="height:280px; position:relative"><canvas id="chart-pie-${alycIdx}-${curr}"></canvas></div>
             </div>
             <div class="chart-panel">
               <div class="chart-panel-title">Por Tipo de Instrumento</div>
-              ${this._renderTypeChart(items)}
+              <div style="height:280px; position:relative"><canvas id="chart-type-${alycIdx}-${curr}"></canvas></div>
             </div>
           </div>
 
@@ -356,9 +362,8 @@ export const HoldingsAnalysisPage = {
   },
 
   _renderPnlChartInto(el, items) {
-    const fmt  = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
-    const sign = v => v > 0 ? '+' : ''
-
+    const chartId = el.id
+    
     const itemsWithPnl = items
       .map(h => {
         const price = this._resolvedPrices?.[h.ticker] ?? null
@@ -371,28 +376,27 @@ export const HoldingsAnalysisPage = {
     if (!itemsWithPnl.length) return
 
     itemsWithPnl.sort((a, b) => b.pnl - a.pnl)
-    const maxAbs = Math.max(...itemsWithPnl.map(h => Math.abs(h.pnl)), 1)
 
-    el.innerHTML = `
-      <div class="pnl-bar-chart">
-        ${itemsWithPnl.map(h => {
-          const pct   = (Math.abs(h.pnl) / maxAbs) * 47
-          const isPos = h.pnl >= 0
-          const color = isPos ? '#10b981' : '#ef4444'
-          const barStyle = isPos
-            ? `left:50%; width:${pct}%;`
-            : `left:calc(50% - ${pct}%); width:${pct}%;`
-          return `
-            <div class="pnl-bar-row">
-              <span class="pnl-bar-label">${h.ticker}</span>
-              <div class="pnl-bar-track">
-                <div class="pnl-bar-axis"></div>
-                <div class="pnl-bar-fill" style="background:${color}; ${barStyle}"></div>
-              </div>
-              <span class="pnl-bar-value" style="color:${color}">${sign(h.pnl)}${fmt(h.pnl)}</span>
-            </div>`
-        }).join('')}
-      </div>`
+    // Solo creamos el contenedor y canvas la primera vez
+    if (!el.querySelector('canvas')) {
+      el.innerHTML = `<div style="height:${itemsWithPnl.length * 32 + 20}px; position:relative"><canvas></canvas></div>`
+    }
+    
+    const canvas = el.querySelector('canvas')
+    this._charts[chartId] = ChartManager.renderBarChart(canvas, itemsWithPnl, {
+      instance: this._charts[chartId],
+      isCurrency: true,
+      barThickness: 18,
+      chartOptions: {
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ctx.raw.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+            }
+          }
+        }
+      }
+    })
   },
 
   async _calculateHoldingsByAlyc() {
@@ -509,6 +513,9 @@ export const HoldingsAnalysisPage = {
 
     contentContainer.innerHTML = html
 
+    // Inicializar gráficos de la primera ALyC (que ya está expandida)
+    this._initChartsForAlyc(0)
+
     // Bind sort en la primera ALyC (ya renderizada)
     this._bindHoldingsSortHeaders(contentContainer)
 
@@ -521,6 +528,8 @@ export const HoldingsAnalysisPage = {
         if (inner.innerHTML === '' && this._pendingAlycs[idx]) {
           inner.innerHTML = this._renderAlycBody(this._pendingAlycs[idx], idx)
           delete this._pendingAlycs[idx]
+          // Inicializar gráficos para esta ALyC
+          this._initChartsForAlyc(idx)
           // bind sort en la nueva sección
           this._bindHoldingsSortHeaders(inner)
           // aplicar precios ya disponibles
@@ -613,135 +622,46 @@ export const HoldingsAnalysisPage = {
     rows.forEach(row => tbody.appendChild(row))
   },
 
-  _renderTypeChart(items) {
-    // Agrupa el valor invertido por tipo de instrumento
-    const byType = {}
-    for (const h of items) {
-      const type = h.instrumentType || 'Sin tipo'
-      byType[type] = (byType[type] || 0) + h.currentValue
-    }
-    const typeItems = Object.entries(byType)
-      .map(([ticker, currentValue]) => ({ ticker, currentValue }))
-      .sort((a, b) => b.currentValue - a.currentValue)
-    const total = typeItems.reduce((acc, t) => acc + t.currentValue, 0)
-    return this._renderSolidPieChart(typeItems, total)
-  },
+  _initChartsForAlyc(alycIdx) {
+    const alyc = this._currentAlycData[alycIdx]
+    if (!alyc) return
 
-  _renderSolidPieChart(items, total) {
-    const colors = [
-      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-      '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
-    ]
-    const cx = 150, cy = 150, R = 120
-    const MIN_LABEL = 0.06
-
-    const label = (x, y, line1, line2) => `
-      <text x="${x.toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle"
-            font-size="13" font-weight="800" fill="white"
-            stroke="rgba(0,0,0,0.5)" stroke-width="3" paint-order="stroke">${line1}</text>
-      <text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" text-anchor="middle"
-            font-size="12" fill="rgba(255,255,255,0.95)"
-            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${line2}</text>`
-
-    if (items.length === 1) {
-      return `<svg viewBox="0 0 300 300" class="pie-svg">
-        <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
-        ${label(cx, cy, items[0].ticker, '100%')}
-      </svg>`
-    }
-
-    let angle = -Math.PI / 2
-    const sectors = []
-    const labels  = []
-
-    items.forEach((h, i) => {
-      const pct   = h.currentValue / total
-      const sweep = pct * 2 * Math.PI
-      const end   = angle + sweep
-      const large = sweep > Math.PI ? 1 : 0
-      const color = colors[i % colors.length]
-      const mid   = angle + sweep / 2
-
-      const x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle)
-      const x2 = cx + R * Math.cos(end),   y2 = cy + R * Math.sin(end)
-
-      const d = `M${cx} ${cy} L${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2}Z`
-      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2" class="pie-sector">
-        <title>${h.ticker}: ${(pct * 100).toFixed(1)}%</title></path>`)
-
-      if (pct >= MIN_LABEL) {
-        const lx = cx + (R * 0.65) * Math.cos(mid)
-        const ly = cy + (R * 0.65) * Math.sin(mid)
-        labels.push(label(lx, ly, h.ticker, `${(pct * 100).toFixed(0)}%`))
+    for (const curr in alyc.currencies) {
+      const items = alyc.currencies[curr]
+      
+      const pieCanvas = document.getElementById(`chart-pie-${alycIdx}-${curr}`)
+      if (pieCanvas) {
+        const chartKey = `pie-${alycIdx}-${curr}`
+        this._charts[chartKey] = ChartManager.renderPieChart(pieCanvas, items, {
+          instance: this._charts[chartKey]
+        })
       }
 
-      angle = end
-    })
+      const typeCanvas = document.getElementById(`chart-type-${alycIdx}-${curr}`)
+      if (typeCanvas) {
+        // Agrupa el valor invertido por tipo de instrumento
+        const byType = {}
+        for (const h of items) {
+          const type = h.instrumentType || 'Sin tipo'
+          byType[type] = (byType[type] || 0) + h.currentValue
+        }
+        const typeItems = Object.entries(byType)
+          .map(([ticker, currentValue]) => ({ ticker, currentValue }))
+          .sort((a, b) => b.currentValue - a.currentValue)
 
-    return `<svg viewBox="0 0 300 300" class="pie-svg">
-      ${sectors.join('')}${labels.join('')}
-    </svg>`
-  },
-
-  _renderPieChart(items, total) {
-    const colors = [
-      '#4f46e6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-      '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
-    ]
-    const cx = 150, cy = 150, R = 120, hole = 68
-    const midR = (R + hole) / 2   // radio medio donde van las etiquetas
-    const MIN_LABEL = 0.06         // sectores < 6% no tienen etiqueta interior
-
-    // texto con contorno para legibilidad sobre cualquier color
-    const label = (x, y, line1, line2, color) => `
-      <text x="${x.toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle"
-            font-size="13" font-weight="800" fill="white"
-            stroke="rgba(0,0,0,0.45)" stroke-width="3" paint-order="stroke">${line1}</text>
-      <text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" text-anchor="middle"
-            font-size="12" fill="rgba(255,255,255,0.95)"
-            stroke="rgba(0,0,0,0.45)" stroke-width="2.5" paint-order="stroke">${line2}</text>`
-
-    // Caso especial: único instrumento → círculo completo
-    if (items.length === 1) {
-      return `<svg viewBox="0 0 300 300" class="pie-svg">
-        <circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}" stroke="var(--bg-card)" stroke-width="2"/>
-        <circle cx="${cx}" cy="${cy}" r="${hole}" fill="var(--bg-card)"/>
-        ${label(cx, cy, items[0].ticker, '100%', colors[0])}
-      </svg>`
-    }
-
-    let angle = -Math.PI / 2
-    const sectors = []
-    const labels  = []
-
-    items.forEach((h, i) => {
-      const pct   = h.currentValue / total
-      const sweep = pct * 2 * Math.PI
-      const end   = angle + sweep
-      const large = sweep > Math.PI ? 1 : 0
-      const color = colors[i % colors.length]
-      const mid   = angle + sweep / 2
-
-      const x1 = cx + R    * Math.cos(angle), y1 = cy + R    * Math.sin(angle)
-      const x2 = cx + R    * Math.cos(end),   y2 = cy + R    * Math.sin(end)
-      const x3 = cx + hole * Math.cos(end),   y3 = cy + hole * Math.sin(end)
-      const x4 = cx + hole * Math.cos(angle), y4 = cy + hole * Math.sin(angle)
-
-      const d = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${hole} ${hole} 0 ${large} 0 ${x4} ${y4}Z`
-      sectors.push(`<path d="${d}" fill="${color}" stroke="var(--bg-card)" stroke-width="2" class="pie-sector">
-        <title>${h.ticker}: ${(pct * 100).toFixed(1)}%</title></path>`)
-
-      if (pct >= MIN_LABEL) {
-        const lx = cx + midR * Math.cos(mid)
-        const ly = cy + midR * Math.sin(mid)
-        labels.push(label(lx, ly, h.ticker, `${(pct * 100).toFixed(0)}%`, color))
+        const chartKey = `type-${alycIdx}-${curr}`
+        this._charts[chartKey] = ChartManager.renderPieChart(typeCanvas, typeItems, { 
+          type: 'pie',
+          instance: this._charts[chartKey] 
+        })
       }
 
-      angle = end
-    })
-
-    return `<svg viewBox="0 0 300 300" class="pie-svg">
-      ${sectors.join('')}${labels.join('')}
-    </svg>`
+      // También inicializar el gráfico de P&L si ya hay precios
+      const pnlEl = document.getElementById(`pnl-chart-${alycIdx}-${curr}`)
+      if (pnlEl) {
+        const pnlItems = this._pnlChartItems[`pnl-chart-${alycIdx}-${curr}`]
+        if (pnlItems) this._renderPnlChartInto(pnlEl, pnlItems)
+      }
+    }
   }
 }
