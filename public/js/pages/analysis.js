@@ -102,6 +102,28 @@ export const AnalysisPage = {
           </div>
         </div>
 
+        <!-- SECCIÓN 0.5: Comparativa y Mapa de Calor -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Comparativa: Inversión vs Valor Actual ($)</h3>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+              Capital invertido frente a valoración de mercado actual por activo.
+            </p>
+            <div style="flex: 1; min-height: 220px; position: relative">
+              <canvas id="comparison-chart"></canvas>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Mapa de Calor (Peso vs P&L %)</h3>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+              El tamaño representa el peso en cartera y el color el rendimiento.
+            </p>
+            <div id="analysis-heatmap" style="flex: 1; min-height: 220px; position: relative">
+              <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; width: 100%">Calculando mapa...</div>
+            </div>
+          </div>
+        </div>
+
         <!-- SECCIÓN 1: KPIs y Eficiencia -->
         <div style="display: grid; grid-template-columns: 300px 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0">
@@ -185,28 +207,6 @@ export const AnalysisPage = {
           <div class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Matriz de Correlación</h3>
             <div id="correlation-matrix" style="overflow-x: auto; font-size: 0.75rem"></div>
-          </div>
-        </div>
-
-        <!-- SECCIÓN 4: Comparativa y Mapa de Calor -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
-          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Comparativa: Inversión vs Valor Actual ($)</h3>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
-              Capital invertido frente a valoración de mercado actual por activo.
-            </p>
-            <div style="flex: 1; min-height: 220px; position: relative">
-              <canvas id="comparison-chart"></canvas>
-            </div>
-          </div>
-          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Mapa de Calor (Peso vs P&L %)</h3>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
-              El tamaño representa el peso en cartera y el color el rendimiento.
-            </p>
-            <div id="analysis-heatmap" style="flex: 1; min-height: 220px; position: relative">
-              <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; width: 100%">Calculando mapa...</div>
-            </div>
           </div>
         </div>
 
@@ -805,7 +805,7 @@ export const AnalysisPage = {
       ? tickers.reduce((acc, t, i) => { acc[t] = analysis.hrp.weights[i] || 0; return acc }, {})
       : analysis.hrp?.weights || {}
     
-    let html = `<table class="table"><thead><tr><th>Activo</th><th>Actual</th><th>Sharpe</th><th style="color: var(--text-muted)">Dif S</th><th>Michaud</th><th style="color: #10b981">Dif M</th><th>HRP</th><th style="color: #4f46e6">Dif HRP</th></tr></thead><tbody>`
+    let html = `<table class="table"><thead><tr><th>Activo</th><th>Actual</th><th>Sharpe</th><th style="color: var(--text-muted)">Dif S</th><th>Michaud</th><th style="color: #10b981">Dif M</th><th>HRP</th><th style="color: #4f46e6">Dif HRP</th><th style="background: var(--bg-main)">Promedio</th><th style="background: var(--bg-main)">Diff</th></tr></thead><tbody>`
     
     tickers.forEach(ticker => {
       const currentW = currentWeights[ticker] || 0
@@ -816,6 +816,9 @@ export const AnalysisPage = {
       const sharpeDiff = (sharpeW - currentW) * 100
       const michaudDiff = (michW - currentW) * 100
       const hrpDiff = (hrpW - currentW) * 100
+
+      const avgW = (sharpeW + michW + hrpW) / 3
+      const avgDiff = (avgW - currentW) * 100
       
       html += `<tr>
         <td><strong>${ticker}</strong></td>
@@ -826,6 +829,8 @@ export const AnalysisPage = {
         <td style="color: #10b981; font-weight: 800">${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%</td>
         <td style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}%</td>
         <td style="color: #4f46e6; font-weight: 800">${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%</td>
+        <td style="background: var(--bg-main); font-weight: 700">${(avgW * 100).toFixed(1)}%</td>
+        <td style="background: var(--bg-main); color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900">${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%</td>
       </tr>`
     })
     container.innerHTML = html + `</tbody></table>`
