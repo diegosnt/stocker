@@ -2,9 +2,15 @@ import { supabase } from './supabase-client.js'
 
 let csrfToken = null
 
-export async function fetchCsrfToken() {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) return null
+async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken
+  
+  let session = (await supabase.auth.getSession())?.data?.session
+  if (!session?.access_token) {
+    const { data, error } = await supabase.auth.refreshSession()
+    if (error || !data?.session) return null
+    session = data.session
+  }
   
   try {
     const res = await fetch('/api/csrf-token', {
@@ -18,6 +24,10 @@ export async function fetchCsrfToken() {
     console.warn('Error fetching CSRF token:', e)
   }
   return csrfToken
+}
+
+export async function fetchCsrfToken() {
+  return ensureCsrfToken()
 }
 
 export function getCsrfToken() {
@@ -43,8 +53,11 @@ export async function apiRequest(method, path, body = undefined) {
   const headers = { 'Authorization': `Bearer ${session?.access_token ?? ''}` }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   
-  if (MUTATION_METHODS.has(method) && csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken
+  if (MUTATION_METHODS.has(method)) {
+    const token = await ensureCsrfToken()
+    if (token) {
+      headers['X-CSRF-Token'] = token
+    }
   }
 
   const res = await fetch(path, {
@@ -58,9 +71,34 @@ export async function apiRequest(method, path, body = undefined) {
     throw Object.assign(new Error('Sesión expirada'), { code: 'session_expired' })
   }
   
-  if (res.status === 403 && csrfToken) {
+  if (res.status === 403) {
     csrfToken = null
-    throw Object.assign(new Error('Token de seguridad expirado'), { code: 'csrf_invalid' })
+    const newToken = await ensureCsrfToken()
+    if (newToken && !res.headers.get('x-csrf-retry')) {
+      headers['X-CSRF-Token'] = newToken
+      headers['X-CSRF-Retry'] = 'true'
+      const retryRes = await fetch(path, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined
+      })
+      if (retryRes.status === 401) {
+        window.dispatchEvent(new CustomEvent('session-expired'))
+        throw Object.assign(new Error('Sesión expirada'), { code: 'session_expired' })
+      }
+      if (retryRes.ok && retryRes.status !== 204) {
+        const json = await retryRes.json()
+        return json.data ?? json
+      }
+      if (retryRes.status === 204) return null
+      const json = await retryRes.json()
+      const err = new Error('Error en la solicitud')
+      err.code = json.error?.[0]?.code
+      err.status = retryRes.status
+      err.response = json
+      throw err
+    }
+    throw Object.assign(new Error('Token de seguridad inválido'), { code: 'csrf_invalid' })
   }
 
   if (res.status === 204) return null
