@@ -35,6 +35,9 @@ function renderShell(userEmail) {
   app.innerHTML = `
     <div class="app-shell">
       <nav class="navbar">
+        <button class="navbar-hamburger" id="sidebar-toggle" style="display: none" aria-label="Menu">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
         <div class="navbar-brand">
           <img src="/img/logo.svg" alt="Logo" class="navbar-logo">
           <span>Stocker</span>
@@ -47,7 +50,8 @@ function renderShell(userEmail) {
         <button class="navbar-logout" id="logout-btn">Salir</button>
       </nav>
       <div class="app-body">
-        <aside class="sidebar">
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+        <aside class="sidebar" id="sidebar">
           <div class="sidebar-section">
             <div class="sidebar-section-title">Cartera</div>
             <a href="#dashboard" class="sidebar-link" data-path="dashboard">Dashboard</a>
@@ -67,6 +71,28 @@ function renderShell(userEmail) {
         <main class="main-content" id="page-content"></main>
       </div>
     </div>`
+
+  const sidebar = document.getElementById('sidebar')
+  const overlay = document.getElementById('sidebar-overlay')
+  const toggle  = document.getElementById('sidebar-toggle')
+
+  const toggleSidebar = () => {
+    sidebar.classList.toggle('open')
+    overlay.classList.toggle('open')
+  }
+
+  toggle.addEventListener('click', toggleSidebar)
+  overlay.addEventListener('click', toggleSidebar)
+
+  // Cerrar sidebar al navegar en mobile
+  document.querySelectorAll('.sidebar-link').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        sidebar.classList.remove('open')
+        overlay.classList.remove('open')
+      }
+    })
+  })
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
     try { await signOut() } catch (err) { console.error(err) }

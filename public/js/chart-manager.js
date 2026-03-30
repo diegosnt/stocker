@@ -68,9 +68,6 @@ const outlinedTextPlugin = {
 
 // Configuración global dinámica según el tema
 const getBaseOptions = () => {
-  const textColor = getCSSVar('--text-muted') || '#64748b'
-  const gridColor = 'rgba(255, 255, 255, 0.05)'
-  
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -87,16 +84,21 @@ const getBaseOptions = () => {
         titleFont: { size: 14, weight: 'bold' },
         bodyFont: { size: 13 }
       }
+    }
+  }
+}
+
+const getScaleOptions = () => {
+  const textColor = getCSSVar('--text-muted') || '#64748b'
+  const gridColor = 'rgba(255, 255, 255, 0.05)'
+  return {
+    x: {
+      ticks: { color: textColor },
+      grid: { color: gridColor }
     },
-    scales: {
-      x: {
-        ticks: { color: textColor },
-        grid: { color: gridColor }
-      },
-      y: {
-        ticks: { color: textColor },
-        grid: { color: gridColor }
-      }
+    y: {
+      ticks: { color: textColor },
+      grid: { color: gridColor }
     }
   }
 }
@@ -160,6 +162,8 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
+
     return new window.Chart(canvas, {
       type: 'bar',
       data: {
@@ -176,16 +180,16 @@ export const ChartManager = {
         indexAxis: options.indexAxis || 'y',
         scales: {
           x: {
-            ...baseOptions.scales.x,
+            ...scales.x,
             display: options.showScales !== false,
             grid: { display: false },
             ticks: {
-              ...baseOptions.scales.x.ticks,
+              ...scales.x.ticks,
               callback: v => options.isCurrency ? v.toLocaleString('es-AR', { minimumFractionDigits: 0 }) : v
             }
           },
           y: {
-            ...baseOptions.scales.y,
+            ...scales.y,
             display: options.showScales !== false,
             grid: { display: false }
           }
@@ -211,8 +215,9 @@ export const ChartManager = {
         datasets: [{
           tree: data,
           key: options.key || 'value',
-          spacing: options.spacing || 1,
-          borderWidth: 0,
+          spacing: 1, // Espacio entre rectángulos para que se distingan
+          borderWidth: 1, // Un borde sutil
+          borderColor: getCSSVar('--bg-card') || '#ffffff',
           borderRadius: 4,
           backgroundColor: (ctx) => ctx.raw?._data?.color || '#64748b',
           labels: {
@@ -248,6 +253,7 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     const gridColor = getCSSVar('--border') ? getCSSVar('--border') + '44' : 'rgba(255, 255, 255, 0.05)'
     
@@ -290,16 +296,16 @@ export const ChartManager = {
         ...baseOptions,
         scales: {
           x: {
-            ...baseOptions.scales.x,
+            ...scales.x,
             title: { display: true, text: 'Riesgo (Volatilidad %)', color: textColor, font: { weight: '600' } },
             grid: { color: gridColor, borderDash: [4, 4] },
-            ticks: { ...baseOptions.scales.x.ticks, callback: v => (v * 100).toFixed(0) + '%' }
+            ticks: { ...scales.x.ticks, callback: v => (v * 100).toFixed(0) + '%' }
           },
           y: {
-            ...baseOptions.scales.y,
+            ...scales.y,
             title: { display: true, text: 'Retorno Esperado (%)', color: textColor, font: { weight: '600' } },
             grid: { color: gridColor, borderDash: [4, 4] },
-            ticks: { ...baseOptions.scales.y.ticks, callback: v => (v * 100).toFixed(0) + '%' }
+            ticks: { ...scales.y.ticks, callback: v => (v * 100).toFixed(0) + '%' }
           }
         },
         plugins: {
@@ -334,6 +340,7 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     
     const processedDatasets = datasets.map((ds, i) => {
@@ -361,15 +368,15 @@ export const ChartManager = {
         ...baseOptions,
         scales: {
           x: {
-            ...baseOptions.scales.x,
+            ...scales.x,
             title: { display: true, text: 'Días de Proyección', color: textColor },
             grid: { display: false }
           },
           y: {
-            ...baseOptions.scales.y,
+            ...scales.y,
             title: { display: true, text: 'Valor Estimado ($)', color: textColor },
             ticks: {
-              ...baseOptions.scales.y.ticks,
+              ...scales.y.ticks,
               callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 })
             }
           }
@@ -402,6 +409,7 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     
     return new window.Chart(canvas, {
@@ -437,15 +445,15 @@ export const ChartManager = {
         ...baseOptions,
         scales: {
           x: {
-            ...baseOptions.scales.x,
+            ...scales.x,
             title: { display: true, text: 'Días Transcurridos', color: textColor },
             grid: { display: false }
           },
           y: {
-            ...baseOptions.scales.y,
+            ...scales.y,
             title: { display: true, text: 'Rendimiento Acumulado (%)', color: textColor },
             ticks: {
-              ...baseOptions.scales.y.ticks,
+              ...scales.y.ticks,
               callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%'
             }
           }
@@ -492,6 +500,7 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     
     return new window.Chart(canvas, {
@@ -511,13 +520,13 @@ export const ChartManager = {
         indexAxis: 'y',
         scales: {
           x: {
-            ...baseOptions.scales.x,
+            ...scales.x,
             max: 100,
             title: { display: true, text: '% de Contribución al Riesgo', color: textColor },
-            ticks: { ...baseOptions.scales.x.ticks, callback: v => v + '%' }
+            ticks: { ...scales.x.ticks, callback: v => v + '%' }
           },
           y: {
-            ...baseOptions.scales.y,
+            ...scales.y,
             grid: { display: false }
           }
         },
@@ -549,6 +558,7 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     
     return new window.Chart(canvas, {
@@ -578,13 +588,13 @@ export const ChartManager = {
         ...baseOptions,
         scales: {
           x: {
-            ...baseOptions.scales.x,
+            ...scales.x,
             grid: { display: false }
           },
           y: {
-            ...baseOptions.scales.y,
+            ...scales.y,
             ticks: {
-              ...baseOptions.scales.y.ticks,
+              ...scales.y.ticks,
               callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 })
             }
           }

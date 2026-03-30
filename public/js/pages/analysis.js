@@ -178,7 +178,7 @@ export const AnalysisPage = {
         </div>
 
         <!-- SECCIÓN 2: Monte Carlo y Backtesting -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div class="analysis-grid-two">
           <div class="card" style="margin-bottom: 0">
             <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Simulación Monte Carlo (1 año)</h3>
             <div style="height: 250px; position: relative"><canvas id="montecarlo-chart"></canvas></div>
@@ -193,7 +193,7 @@ export const AnalysisPage = {
          </div>
 
          <!-- SECCIÓN 3: Riesgo y Correlación -->
-        <div style="display: grid; grid-template-columns: 5fr 2.5fr 2.5fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div class="analysis-grid-bottom">
           <div class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Optimización: Sharpe vs Michaud vs HRP</h3>
             <div id="redistribution-table" style="font-size: 0.8rem"></div>
