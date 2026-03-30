@@ -18,6 +18,7 @@ La aplicación implementa múltiples capas de protección:
 | **JWT Validation** | Tokens verificados localmente en cada request al backend |
 | **Input Sanitization** | Backend sanitiza todos los inputs antes de procesarlos |
 | **Helmet CSP** | Content Security Policy configurada |
+| **Rate Limiting** | Límites de requests por IP: auth (10/15min), mutaciones (60/15min), general (200/15min) |
 
 ### Arquitectura de Autenticación
 

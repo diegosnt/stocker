@@ -78,6 +78,33 @@ const financeLimiter = rateLimit({
   message: { error: 'Demasiadas consultas. Intentá de nuevo en unos minutos.' }
 })
 
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  keyGenerator: ipKeyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Intentá de nuevo en unos minutos.' }
+})
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: ipKeyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Probá en 15 minutos.' }
+})
+
+const mutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: ipKeyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas operaciones. Intentá de nuevo en unos minutos.' }
+})
+
 app.get('/', (req, res) => {
   res.send(renderPage({
     supabaseUrl:     process.env.SUPABASE_URL     || '',
@@ -172,7 +199,7 @@ app.get('/api/csrf-token', requireAuth, (req, res) => {
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body
   if (!email || !password) {
     return res.status(400).json({ error: 'Email y password requeridos' })
@@ -226,7 +253,7 @@ app.post('/api/auth/logout', async (req, res) => {
   res.json({ success: true })
 })
 
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', authLimiter, async (req, res) => {
   const { email, password } = req.body
   if (!email || !password) {
     return res.status(400).json({ error: 'Email y password requeridos' })
@@ -323,7 +350,7 @@ function validate(body, rules) {
 // ── POST /api/instrument-types ─────────────────────────────
 // Recibe el payload, lo loguea con Pino y lo reenvía a Supabase
 // manteniendo el token del usuario para que RLS siga activo.
-app.post('/api/instrument-types', requireAuth, requireCsrf, async (req, res) => {
+app.post('/api/instrument-types', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { name, description } = req.body
   const userId = req.userId
 
@@ -348,7 +375,7 @@ app.post('/api/instrument-types', requireAuth, requireCsrf, async (req, res) => 
 })
 
 // ── POST /api/instruments ──────────────────────────────────
-app.post('/api/instruments', requireAuth, requireCsrf, async (req, res) => {
+app.post('/api/instruments', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { ticker, name, instrument_type_id } = req.body
   const userId = req.userId
 
@@ -375,7 +402,7 @@ app.post('/api/instruments', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── POST /api/alycs ────────────────────────────────────────
-app.post('/api/alycs', requireAuth, requireCsrf, async (req, res) => {
+app.post('/api/alycs', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { name, cuit, website } = req.body
   const userId = req.userId
 
@@ -401,7 +428,7 @@ app.post('/api/alycs', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── POST /api/operations ───────────────────────────────────
-app.post('/api/operations', requireAuth, requireCsrf, async (req, res) => {
+app.post('/api/operations', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
   const userId = req.userId
 
@@ -436,7 +463,7 @@ app.post('/api/operations', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── POST /api/operations/bulk ──────────────────────────────
-app.post('/api/operations/bulk', requireAuth, requireCsrf, async (req, res) => {
+app.post('/api/operations/bulk', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { operations, skip_duplicate_check = false } = req.body
   const userId = req.userId
 
@@ -570,7 +597,7 @@ app.post('/api/operations/bulk', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── PATCH /api/instrument-types/:id ───────────────────────
-app.patch('/api/instrument-types/:id', requireAuth, requireCsrf, async (req, res) => {
+app.patch('/api/instrument-types/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { name, description } = req.body
   const userId = req.userId
@@ -597,7 +624,7 @@ app.patch('/api/instrument-types/:id', requireAuth, requireCsrf, async (req, res
 })
 
 // ── PATCH /api/instruments/:id ─────────────────────────────
-app.patch('/api/instruments/:id', requireAuth, requireCsrf, async (req, res) => {
+app.patch('/api/instruments/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { ticker, name, instrument_type_id } = req.body
   const userId = req.userId
@@ -626,7 +653,7 @@ app.patch('/api/instruments/:id', requireAuth, requireCsrf, async (req, res) => 
 })
 
 // ── PATCH /api/alycs/:id ───────────────────────────────────
-app.patch('/api/alycs/:id', requireAuth, requireCsrf, async (req, res) => {
+app.patch('/api/alycs/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { name, cuit, website } = req.body
   const userId = req.userId
@@ -654,7 +681,7 @@ app.patch('/api/alycs/:id', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── PATCH /api/operations/:id ──────────────────────────────
-app.patch('/api/operations/:id', requireAuth, requireCsrf, async (req, res) => {
+app.patch('/api/operations/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
   const userId = req.userId
@@ -691,7 +718,7 @@ app.patch('/api/operations/:id', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── DELETE /api/instrument-types/:id ──────────────────────
-app.delete('/api/instrument-types/:id', requireAuth, requireCsrf, async (req, res) => {
+app.delete('/api/instrument-types/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -710,7 +737,7 @@ app.delete('/api/instrument-types/:id', requireAuth, requireCsrf, async (req, re
 })
 
 // ── DELETE /api/instruments/:id ────────────────────────────
-app.delete('/api/instruments/:id', requireAuth, requireCsrf, async (req, res) => {
+app.delete('/api/instruments/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -729,7 +756,7 @@ app.delete('/api/instruments/:id', requireAuth, requireCsrf, async (req, res) =>
 })
 
 // ── DELETE /api/alycs/:id ──────────────────────────────────
-app.delete('/api/alycs/:id', requireAuth, requireCsrf, async (req, res) => {
+app.delete('/api/alycs/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -748,7 +775,7 @@ app.delete('/api/alycs/:id', requireAuth, requireCsrf, async (req, res) => {
 })
 
 // ── DELETE /api/operations/:id ─────────────────────────────
-app.delete('/api/operations/:id', requireAuth, requireCsrf, async (req, res) => {
+app.delete('/api/operations/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -769,7 +796,7 @@ app.delete('/api/operations/:id', requireAuth, requireCsrf, async (req, res) => 
 // ── PATCH /api/settings/:key ───────────────────────────────
 const ALLOWED_SETTINGS = new Set(['registration_enabled', 'market_badge_enabled'])
 
-app.patch('/api/settings/:key', requireAuth, requireAdmin, requireCsrf, async (req, res) => {
+app.patch('/api/settings/:key', mutationLimiter, requireAuth, requireAdmin, requireCsrf, async (req, res) => {
   const { key }                  = req.params
   const { value, updated_by }    = req.body
   const userId = req.userId
