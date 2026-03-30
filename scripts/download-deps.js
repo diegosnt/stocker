@@ -41,6 +41,10 @@ const deps = [
   {
     url:  'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-700-normal.woff2',
     dest: path.join(__dirname, '../public/fonts/inter-700.woff2')
+  },
+  {
+    url:  'https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js',
+    dest: path.join(__dirname, '../public/js/vendor/dompurify.js')
   }
 ]
 

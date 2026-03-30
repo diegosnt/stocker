@@ -170,11 +170,11 @@ CREATE POLICY "app_settings: lectura pública"
   ON app_settings FOR SELECT
   USING (true);
 
--- Solo usuarios autenticados pueden modificar la configuración
-CREATE POLICY "app_settings: solo autenticados modifican"
+-- Solo admins pueden modificar la configuración (verifica rol en JWT)
+CREATE POLICY "app_settings: solo admin modifica"
   ON app_settings FOR UPDATE
-  USING (auth.uid() IS NOT NULL)
-  WITH CHECK (auth.uid() IS NOT NULL);
+  USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
+  WITH CHECK ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
 -- Valor inicial: registro habilitado
 INSERT INTO app_settings (key, value, updated_by)

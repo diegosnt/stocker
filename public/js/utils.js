@@ -38,17 +38,25 @@ export function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+export function sanitize(str) {
+  return DOMPurify.sanitize(String(str), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+}
+
+export function sanitizeAttr(str) {
+  return DOMPurify.sanitize(String(str), { ALLOWED_TAGS: ['b', 'i', 'strong', 'em', 'br', 'span'], ALLOWED_ATTR: ['style', 'class'] })
+}
+
 export function confirmModal({ title, message, confirmLabel = 'Eliminar' }) {
   return new Promise(resolve => {
     const overlay = document.createElement('div')
     overlay.className = 'modal-overlay'
     overlay.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true">
-        <h3 class="modal-title">${title}</h3>
-        <p class="modal-message">${message}</p>
+        <h3 class="modal-title">${sanitizeAttr(title)}</h3>
+        <p class="modal-message">${sanitizeAttr(message)}</p>
         <div class="modal-actions">
           <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
-          <button class="btn btn-danger"    id="modal-confirm">${confirmLabel}</button>
+          <button class="btn btn-danger"    id="modal-confirm">${sanitize(confirmLabel)}</button>
         </div>
       </div>`
     document.body.appendChild(overlay)

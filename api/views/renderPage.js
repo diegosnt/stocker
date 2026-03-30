@@ -11,6 +11,7 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/vendor/dompurify.js"></script>
   <script src="/js/vendor/chart.js"></script>
   <script src="/js/vendor/chartjs-chart-treemap.js"></script>
 </head>

@@ -1,5 +1,6 @@
 require('dotenv').config()
 
+const crypto = require('crypto')
 const express        = require('express')
 const path           = require('path')
 const compression    = require('compression')
@@ -13,6 +14,32 @@ const app  = express()
 const PORT = process.env.PORT || 3000
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET
 const josePromise = import('jose')
+
+// ── CSRF Protection ────────────────────────────────────────
+const csrfTokens = new Map()
+
+function generateCsrfToken() {
+  return crypto.randomBytes(32).toString('hex')
+}
+
+function requireCsrf(req, res, next) {
+  const token = req.headers['x-csrf-token']
+  const validToken = csrfTokens.get(req.userId)
+  
+  if (!token || !validToken || token !== validToken) {
+    logger.warn({ 
+      userId: req.userId, 
+      ip: req.ip, 
+      method: req.method, 
+      path: req.path,
+      hasToken: !!token,
+      hasValidToken: !!validToken
+    }, 'Intento CSRF bloqueado')
+    return res.status(403).json({ error: 'Token de seguridad inválido' })
+  }
+  
+  next()
+}
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -111,6 +138,13 @@ function requireAdmin(req, res, next) {
   next()
 }
 
+// ── GET /api/csrf-token ─────────────────────────────────────
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  const token = csrfTokens.get(req.userId) || generateCsrfToken()
+  csrfTokens.set(req.userId, token)
+  res.json({ csrfToken: token })
+})
+
 // ── Validación ────────────────────────────────────────────
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -169,7 +203,7 @@ function validate(body, rules) {
 // ── POST /api/instrument-types ─────────────────────────────
 // Recibe el payload, lo loguea con Pino y lo reenvía a Supabase
 // manteniendo el token del usuario para que RLS siga activo.
-app.post('/api/instrument-types', requireAuth, async (req, res) => {
+app.post('/api/instrument-types', requireAuth, requireCsrf, async (req, res) => {
   const { name, description } = req.body
   const userId = req.userId
 
@@ -194,7 +228,7 @@ app.post('/api/instrument-types', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/instruments ──────────────────────────────────
-app.post('/api/instruments', requireAuth, async (req, res) => {
+app.post('/api/instruments', requireAuth, requireCsrf, async (req, res) => {
   const { ticker, name, instrument_type_id } = req.body
   const userId = req.userId
 
@@ -221,7 +255,7 @@ app.post('/api/instruments', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/alycs ────────────────────────────────────────
-app.post('/api/alycs', requireAuth, async (req, res) => {
+app.post('/api/alycs', requireAuth, requireCsrf, async (req, res) => {
   const { name, cuit, website } = req.body
   const userId = req.userId
 
@@ -247,7 +281,7 @@ app.post('/api/alycs', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/operations ───────────────────────────────────
-app.post('/api/operations', requireAuth, async (req, res) => {
+app.post('/api/operations', requireAuth, requireCsrf, async (req, res) => {
   const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
   const userId = req.userId
 
@@ -282,7 +316,7 @@ app.post('/api/operations', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/operations/bulk ──────────────────────────────
-app.post('/api/operations/bulk', requireAuth, async (req, res) => {
+app.post('/api/operations/bulk', requireAuth, requireCsrf, async (req, res) => {
   const { operations, skip_duplicate_check = false } = req.body
   const userId = req.userId
 
@@ -416,7 +450,7 @@ app.post('/api/operations/bulk', requireAuth, async (req, res) => {
 })
 
 // ── PATCH /api/instrument-types/:id ───────────────────────
-app.patch('/api/instrument-types/:id', requireAuth, async (req, res) => {
+app.patch('/api/instrument-types/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { name, description } = req.body
   const userId = req.userId
@@ -443,7 +477,7 @@ app.patch('/api/instrument-types/:id', requireAuth, async (req, res) => {
 })
 
 // ── PATCH /api/instruments/:id ─────────────────────────────
-app.patch('/api/instruments/:id', requireAuth, async (req, res) => {
+app.patch('/api/instruments/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { ticker, name, instrument_type_id } = req.body
   const userId = req.userId
@@ -472,7 +506,7 @@ app.patch('/api/instruments/:id', requireAuth, async (req, res) => {
 })
 
 // ── PATCH /api/alycs/:id ───────────────────────────────────
-app.patch('/api/alycs/:id', requireAuth, async (req, res) => {
+app.patch('/api/alycs/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { name, cuit, website } = req.body
   const userId = req.userId
@@ -500,7 +534,7 @@ app.patch('/api/alycs/:id', requireAuth, async (req, res) => {
 })
 
 // ── PATCH /api/operations/:id ──────────────────────────────
-app.patch('/api/operations/:id', requireAuth, async (req, res) => {
+app.patch('/api/operations/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
   const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
   const userId = req.userId
@@ -537,7 +571,7 @@ app.patch('/api/operations/:id', requireAuth, async (req, res) => {
 })
 
 // ── DELETE /api/instrument-types/:id ──────────────────────
-app.delete('/api/instrument-types/:id', requireAuth, async (req, res) => {
+app.delete('/api/instrument-types/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -556,7 +590,7 @@ app.delete('/api/instrument-types/:id', requireAuth, async (req, res) => {
 })
 
 // ── DELETE /api/instruments/:id ────────────────────────────
-app.delete('/api/instruments/:id', requireAuth, async (req, res) => {
+app.delete('/api/instruments/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -575,7 +609,7 @@ app.delete('/api/instruments/:id', requireAuth, async (req, res) => {
 })
 
 // ── DELETE /api/alycs/:id ──────────────────────────────────
-app.delete('/api/alycs/:id', requireAuth, async (req, res) => {
+app.delete('/api/alycs/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -594,7 +628,7 @@ app.delete('/api/alycs/:id', requireAuth, async (req, res) => {
 })
 
 // ── DELETE /api/operations/:id ─────────────────────────────
-app.delete('/api/operations/:id', requireAuth, async (req, res) => {
+app.delete('/api/operations/:id', requireAuth, requireCsrf, async (req, res) => {
   const { id }     = req.params
   const userId = req.userId
 
@@ -615,7 +649,7 @@ app.delete('/api/operations/:id', requireAuth, async (req, res) => {
 // ── PATCH /api/settings/:key ───────────────────────────────
 const ALLOWED_SETTINGS = new Set(['registration_enabled', 'market_badge_enabled'])
 
-app.patch('/api/settings/:key', requireAuth, requireAdmin, async (req, res) => {
+app.patch('/api/settings/:key', requireAuth, requireAdmin, requireCsrf, async (req, res) => {
   const { key }                  = req.params
   const { value, updated_by }    = req.body
   const userId = req.userId

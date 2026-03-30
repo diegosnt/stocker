@@ -1,14 +1,17 @@
 import { supabase } from './supabase-client.js'
+import { fetchCsrfToken } from './api-client.js'
 
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
+  await fetchCsrfToken()
   return data
 }
 
 export async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) throw error
+  await fetchCsrfToken()
   return data
 }
 
@@ -25,6 +28,7 @@ export async function getSession() {
 
 export function onAuthChange(callback) {
   return supabase.auth.onAuthStateChange((_event, session) => {
+    if (session) fetchCsrfToken()
     callback(session)
   })
 }

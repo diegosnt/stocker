@@ -2,6 +2,24 @@
 
 Aplicación web de grado profesional para el registro, seguimiento y análisis estratégico de operaciones bursátiles personales. Diseñada para inversores que buscan una visión profunda de su cartera con herramientas de optimización avanzada.
 
+## 🔒 Seguridad
+
+La aplicación implementa múltiples capas de protección:
+
+### Medidas Implementadas
+
+| Feature | Descripción |
+|---------|-------------|
+| **XSS Protection** | DOMPurify sanitiza todo el contenido dinámico en el frontend |
+| **CSRF Protection** | Tokens sincronizados en todas las mutaciones (POST/PATCH/DELETE) |
+| **Row Level Security** | PostgreSQL RLS asegura aislamiento de datos por usuario |
+| **Admin-only Settings** | Solo admins pueden modificar configuración global |
+| **JWT Validation** | Tokens verificados localmente en cada request |
+| **Input Sanitization** | Backend sanitiza todos los inputs antes de procesarlos |
+| **Helmet CSP** | Content Security Policy configurada |
+
+---
+
 ## 🌟 Características Principales
 
 ### 📈 Análisis Estratégico Pro

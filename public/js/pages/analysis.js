@@ -4,6 +4,7 @@ import { showToast } from '../init.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager } from '../chart-manager.js'
+import { sanitize, sanitizeAttr } from '../utils.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -387,7 +388,7 @@ export const AnalysisPage = {
       this._renderCurrentHoldings(validHoldings)
       this._renderComparisonChart(validHoldings)
 
-      document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${benchmarkTicker}.`
+      document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${sanitize(benchmarkTicker)}.`
       
       if (failedTickers.length > 0) {
         showToast(`Algunos datos no estarán completos: ${failedTickers.join(', ')}`, 'warning')
@@ -886,7 +887,7 @@ export const AnalysisPage = {
     if (resEl) {
       resEl.innerHTML = `
         <span style="color:#4f46e6">Mío: ${((pE-1)*100).toFixed(1)}%</span> | 
-        <span style="color:var(--text-muted)">${benchmarkTicker}: ${((bE-1)*100).toFixed(1)}%</span> 
+        <span style="color:var(--text-muted)">${sanitize(benchmarkTicker)}: ${((bE-1)*100).toFixed(1)}%</span> 
         <div style="font-size:0.75rem; color:${diff >= 0 ? '#10b981' : '#ef4444'}; font-weight:800">
           ${diff >= 0 ? '+' : ''}${diff}%
         </div>`
