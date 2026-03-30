@@ -7,6 +7,25 @@ node_modules/
 .env.local
 .env.*.local
 
+# ── Scripts SQL sensibles ──────────────────────────────────
+# Contienen estructura de DB y políticas de seguridad
+scripts/sql/
+
+# ── Scripts SQL de verificación/fix en supabase/ ─────────────
+# No subir al repositorio público
+supabase/check-*.sql
+supabase/fix-*.sql
+supabase/verify-*.sql
+supabase/revert-*.sql
+supabase/test-*.sql
+supabase/*-settings-policy.sql
+supabase/*-csrf-protection.sql
+supabase/check-app-settings-policy.sql
+supabase/fix-app-settings-policy.sql
+supabase/check-csrf-protection.sql
+supabase/fix-csrf-protection.sql
+supabase/migration_app_settings.sql
+
 # ── Dependencias descargadas por scripts/download-deps.js ─
 # water.css se descarga automáticamente con `pnpm run setup`
 public/css/water.min.css

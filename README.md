@@ -16,7 +16,7 @@ La aplicación implementa múltiples capas de protección:
 | **Row Level Security** | PostgreSQL RLS asegura aislamiento de datos por usuario |
 | **Admin-only Settings** | Solo admins pueden modificar configuración global (verificado via JWT) |
 | **JWT Validation** | Tokens verificados localmente en cada request al backend |
-| **Input Sanitization** | Backend sanitiza todos los inputs antes de procesarlos |
+| **Input Sanitization** | Backend sanitiza inputs con sanitize-html (library dedicada) |
 | **Helmet CSP** | Content Security Policy configurada |
 | **Rate Limiting** | Límites de requests por IP: auth (10/15min), mutaciones (60/15min), general (200/15min) |
 

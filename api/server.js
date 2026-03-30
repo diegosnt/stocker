@@ -7,6 +7,7 @@ const compression    = require('compression')
 const helmet         = require('helmet')
 const rateLimit      = require('express-rate-limit')
 const { ipKeyGenerator } = require('express-rate-limit')
+const sanitizeHtml   = require('sanitize-html')
 const logger         = require('./logger')
 const { renderPage } = require('./views/renderPage')
 
@@ -165,7 +166,25 @@ async function requireAuth(req, res, next) {
     })
     
     req.userId = payload.sub
-    req.userRole = payload.user_metadata?.role
+    
+    // Obtener rol desde la base de datos (verificable)
+    try {
+      const roleRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_role`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (roleRes.ok) {
+        const roleData = await roleRes.json()
+        req.userRole = roleData || 'user'
+      } else {
+        req.userRole = 'user'
+      }
+    } catch (e) {
+      req.userRole = 'user'
+    }
     
     if (!req.userId) {
       logger.warn({ payload }, 'Token válido pero sin campo "sub"')
@@ -175,7 +194,7 @@ async function requireAuth(req, res, next) {
     next()
   } catch (err) {
     logger.warn({ err: err.message }, 'Error en validación de token')
-    return res.status(401).json({ error: `Sesión inválida: ${err.message}` })
+    return res.status(401).json({ error: 'Sesión inválida' })
   }
 }
 
@@ -215,7 +234,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     if (!supabaseRes.ok) {
       logger.warn({ email }, 'Login fallido')
-      return res.status(401).json({ error: data.error_description || 'Credenciales inválidas' })
+      return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
     res.cookie('sb-session', data.access_token, {
@@ -269,7 +288,7 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
 
     if (!supabaseRes.ok) {
       logger.warn({ email }, 'Signup fallido')
-      return res.status(400).json({ error: data.error_description || data.msg || 'Error en registro' })
+      return res.status(400).json({ error: 'Error en el registro. Verificá tu email.' })
     }
 
     if (data.access_token) {
@@ -302,16 +321,13 @@ const isDate     = v => DATE_RE.test(v) && !isNaN(Date.parse(v))
 const isPositive = v => { const n = Number(v); return Number.isFinite(n) && n > 0 }
 const isUrl      = v => { try { new URL(v); return true } catch { return false } }
 
-// Limpieza básica contra XSS: remueve tags de HTML y event handlers.
+// Sanitización XSS usando library dedicada
 function sanitize(v) {
   if (typeof v !== 'string') return v
-  return v
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+\s*=\s*["']?[^"'>]+["']?/gi, '')
-    .replace(/\bjavascript\s*:/gi, '')
-    .replace(/\bdata\s*:/gi, '')
-    .replace(/<[^>]*>?/gm, '')
-    .trim()
+  return sanitizeHtml(v, {
+    allowedTags: [],
+    allowedAttributes: {}
+  }).trim()
 }
 
 // Wrapper de fetch a Supabase REST. Lanza un error con { status, payload } si la respuesta no es ok.
