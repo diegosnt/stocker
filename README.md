@@ -10,13 +10,32 @@ La aplicación implementa múltiples capas de protección:
 
 | Feature | Descripción |
 |---------|-------------|
-| **XSS Protection** | DOMPurify sanitiza todo el contenido dinámico en el frontend |
+| **HttpOnly Cookies** | Tokens de sesión almacenados en cookies con flags HttpOnly, Secure, SameSite |
 | **CSRF Protection** | Tokens sincronizados en todas las mutaciones (POST/PATCH/DELETE) |
+| **XSS Protection** | DOMPurify sanitiza todo el contenido dinámico en el frontend |
 | **Row Level Security** | PostgreSQL RLS asegura aislamiento de datos por usuario |
-| **Admin-only Settings** | Solo admins pueden modificar configuración global |
-| **JWT Validation** | Tokens verificados localmente en cada request |
+| **Admin-only Settings** | Solo admins pueden modificar configuración global (verificado via JWT) |
+| **JWT Validation** | Tokens verificados localmente en cada request al backend |
 | **Input Sanitization** | Backend sanitiza todos los inputs antes de procesarlos |
 | **Helmet CSP** | Content Security Policy configurada |
+
+### Arquitectura de Autenticación
+
+```
+Frontend (SPA)
+    │
+    ├─► /api/auth/login  ──► Backend Express ──► Supabase Auth
+    │                                              │
+    │◄──── Cookie HttpOnly ◄──────────────────────┘
+    │
+    └─► Supabase (directo) ──► Queries RLS
+              ▲
+              │
+       localStorage (token para RLS)
+```
+
+- **Sesión API**: Cookie HttpOnly con token de Supabase (segura contra XSS)
+- **Queries Supabase**: Token guardado en localStorage (necesario para RLS)
 
 ---
 

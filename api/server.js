@@ -57,6 +57,17 @@ app.use(compression())
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../public')))
 
+// Helper para parsear cookies
+function parseCookies(cookieHeader) {
+  const cookies = {}
+  if (!cookieHeader) return cookies
+  cookieHeader.split(';').forEach(cookie => {
+    const [name, ...rest] = cookie.split('=')
+    cookies[name.trim()] = rest.join('=').trim()
+  })
+  return cookies
+}
+
 // Rate limiter para llamadas a Finance API (rate limit real, no en memoria)
 const financeLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,  // 5 minutos
@@ -75,13 +86,25 @@ app.get('/', (req, res) => {
 })
 
 // Middleware: verifica el JWT localmente.
+// Acepta token desde Authorization header o desde cookie 'sb-session'
 async function requireAuth(req, res, next) {
+  let token = null
+
+  // Intentar desde Authorization header primero
   const authHeader = req.headers.authorization
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No autorizado' })
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1]
   }
 
-  const token = authHeader.split(' ')[1]
+  // Si no hay header, intentar desde cookie
+  if (!token) {
+    const cookies = parseCookies(req.headers.cookie)
+    token = cookies['sb-session']
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: 'No autorizado' })
+  }
 
   if (!SUPABASE_JWT_SECRET) {
     logger.error('SUPABASE_JWT_SECRET no configurado en .env')
@@ -143,6 +166,103 @@ app.get('/api/csrf-token', requireAuth, (req, res) => {
   const token = csrfTokens.get(req.userId) || generateCsrfToken()
   csrfTokens.set(req.userId, token)
   res.json({ csrfToken: token })
+})
+
+// ── Auth endpoints ──────────────────────────────────────────
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email y password requeridos' })
+  }
+
+  try {
+    const supabaseRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email, password })
+    })
+    const data = await supabaseRes.json()
+
+    if (!supabaseRes.ok) {
+      logger.warn({ email }, 'Login fallido')
+      return res.status(401).json({ error: data.error_description || 'Credenciales inválidas' })
+    }
+
+    res.cookie('sb-session', data.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    })
+
+    logger.info({ userId: data.user?.id }, 'Login exitoso')
+    res.json({ 
+      user: data.user,
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    })
+  } catch (err) {
+    logger.error({ err: err.message }, 'Error en login')
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+app.post('/api/auth/logout', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (token) {
+    try {
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }
+      })
+    } catch (e) {
+      logger.warn({ err: e.message }, 'Error en logout de Supabase')
+    }
+  }
+  res.clearCookie('sb-session')
+  res.json({ success: true })
+})
+
+app.post('/api/auth/signup', async (req, res) => {
+  const { email, password } = req.body
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email y password requeridos' })
+  }
+
+  try {
+    const supabaseRes = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email, password })
+    })
+    const data = await supabaseRes.json()
+
+    if (!supabaseRes.ok) {
+      logger.warn({ email }, 'Signup fallido')
+      return res.status(400).json({ error: data.error_description || data.msg || 'Error en registro' })
+    }
+
+    if (data.access_token) {
+      res.cookie('sb-session', data.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      })
+    }
+
+    res.json({ 
+      user: data.user,
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    })
+  } catch (err) {
+    logger.error({ err: err.message }, 'Error en signup')
+    res.status(500).json({ error: 'Error interno' })
+  }
 })
 
 // ── Validación ────────────────────────────────────────────
