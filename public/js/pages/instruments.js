@@ -267,6 +267,8 @@ export const InstrumentsPage = {
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
+      if (form.dataset.loading === 'true') return
+      
       const ticker = document.getElementById('inst-ticker').value.trim().toUpperCase()
       const name   = document.getElementById('inst-name').value.trim()
       const typeId = document.getElementById('inst-type').value
@@ -279,7 +281,10 @@ export const InstrumentsPage = {
       if (hasError) return
 
       const btn = document.getElementById('btn-inst-submit')
+      const originalBtnText = btn.textContent
       btn.disabled = true
+      btn.textContent = editId ? 'Guardando...' : 'Agregando...'
+      form.dataset.loading = 'true'
 
       try {
         if (editId) {
@@ -294,9 +299,13 @@ export const InstrumentsPage = {
         cacheInvalidate('instruments')
         await this._loadList()
       } catch (err) {
-        showToast(err.code === '23505' ? `El ticker "${ticker}" ya existe.` : 'Error al guardar.', 'error')
+        if (err.status !== 409) { // Ignorar el toast de error si es un duplicado que ya se creó
+          showToast(err.code === '23505' || err.status === 409 ? `El ticker "${ticker}" ya existe.` : 'Error al guardar.', 'error')
+        }
       } finally {
         btn.disabled = false
+        btn.textContent = originalBtnText
+        form.dataset.loading = 'false'
       }
     })
   },

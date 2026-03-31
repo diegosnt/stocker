@@ -71,10 +71,10 @@ export async function apiRequest(method, path, body = undefined) {
     throw Object.assign(new Error('Sesión expirada'), { code: 'session_expired' })
   }
   
-  if (res.status === 403) {
+  if (res.status === 403 && !headers['X-CSRF-Retry']) {
     csrfToken = null
     const newToken = await ensureCsrfToken()
-    if (newToken && !res.headers.get('x-csrf-retry')) {
+    if (newToken) {
       headers['X-CSRF-Token'] = newToken
       headers['X-CSRF-Retry'] = 'true'
       const retryRes = await fetch(path, {
@@ -86,14 +86,15 @@ export async function apiRequest(method, path, body = undefined) {
         window.dispatchEvent(new CustomEvent('session-expired'))
         throw Object.assign(new Error('Sesión expirada'), { code: 'session_expired' })
       }
-      if (retryRes.ok && retryRes.status !== 204) {
+      if (retryRes.ok) {
+        if (retryRes.status === 204) return null
         const json = await retryRes.json()
         return json.data ?? json
       }
-      if (retryRes.status === 204) return null
+      // Si el reintento falla, procesamos su error
       const json = await retryRes.json()
-      const err = new Error('Error en la solicitud')
-      err.code = json.error?.[0]?.code
+      const err = new Error('Error en la solicitud de reintento')
+      err.code = json.error?.[0]?.code || json.code
       err.status = retryRes.status
       err.response = json
       throw err
