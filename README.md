@@ -44,6 +44,7 @@ Frontend (SPA)
 
 ### 📈 Análisis Estratégico Pro
 - **Ejecución Instantánea**: Selección de ALyC mediante botones dinámicos para disparar análisis al toque.
+- **Cache Persistente (24h)**: Sistema de almacenamiento inteligente en `localStorage` para datos históricos. Reduce drásticamente las llamadas a Yahoo Finance y acelera la carga del análisis.
 - **Multicomp (Benchmark Dinámico)**: Comparación en tiempo real contra índices globales (SPY, QQQ, DIA, IWM) con un solo clic.
 - **Algoritmos de Optimización**: Implementación de modelos de Sharpe, Michaud y Hierarchical Risk Parity (HRP).
 - **Métricas de Riesgo Avanzadas**: Cálculo de Beta, Alpha, VaR (95%), Max Drawdown y Expected Shortfall.
@@ -57,7 +58,7 @@ Frontend (SPA)
 
 ### 🛠️ Gestión de Maestros
 - **Estructura Organizada**: Acceso centralizado a Operaciones, Instrumentos, Tipos de Activos y ALyCs/Brokers desde la sección de Maestros.
-- **Importación Masiva**: Motor de normalización para carga de operaciones mediante archivos CSV.
+- **Importación/Exportación CSV**: Motor de normalización para carga masiva y exportación de operaciones filtradas para auditoría externa.
 - **Multi-Moneda**: Soporte nativo para operaciones en ARS y USD con integración de precios de mercado.
 
 ## 💻 Tech Stack
@@ -67,6 +68,7 @@ Frontend (SPA)
 - **Backend**: Node.js (Express) en Vercel.
 - **Base de Datos**: Supabase (PostgreSQL) con lógica de negocio en RPCs y Vistas.
 - **Autenticación**: Supabase Auth (JWT).
+- **Cache**: Sistema híbrido (Memory + LocalStorage) con TTL configurable y limpieza automática (Pruning).
 - **PWA**: Soporte para Service Workers y modo Offline (Cache).
 
 ## 🎨 UI/UX
