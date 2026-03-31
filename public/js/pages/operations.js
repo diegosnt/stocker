@@ -142,6 +142,10 @@ export const OperationsPage = {
     </div>`
 
     document.getElementById('btn-export-csv').addEventListener('click', () => this._exportCSV())
+    document.getElementById('btn-nueva-op').addEventListener('click', () => {
+      state.editingOperation = null
+      this._showFormModal()
+    })
 
     const inputCsv = document.getElementById('input-csv')
     document.getElementById('btn-import-csv').addEventListener('click', () => inputCsv.click())
@@ -523,7 +527,7 @@ export const OperationsPage = {
           <td class="amount total-${op.type}"><strong>${fmtQty(op.quantity)}</strong></td>
           <td class="amount">${fmtPrice(parseFloat(op.price))}</td>
           <td class="amount"><strong class="total-amount total-${op.type}">${fmtPrice(total)}</strong></td>
-          <td class="currency-col"><span class="badge badge-${op.currency.toLowerCase()}">${op.currency}</span></td>
+          <td class="currency-col"><span class="badge badge-${(op.currency || '').toLowerCase()}">${op.currency || '—'}</span></td>
           <td class="actions-cell">
             <button class="btn btn-sm btn-ghost btn-icon-only btn-edit-op" data-op-idx="${idx}" title="Editar" aria-label="Editar">${ICON_EDIT}</button>
             <button class="btn btn-sm btn-danger btn-icon-only btn-delete-op" data-id="${op.id}" title="Eliminar" aria-label="Eliminar">${ICON_DELETE}</button>
@@ -532,8 +536,8 @@ export const OperationsPage = {
         <tr class="op-detail-row" id="detail-${op.id}">
           <td colspan="9">
             <div class="op-detail-content">
-              <div class="op-detail-type"><strong>Tipo:</strong> <span class="badge badge-${op.type}">${op.type.toUpperCase()}</span></div>
-              <div class="op-detail-instrument"><strong>Instrumento:</strong> ${esc(instName)} (${op.currency})</div>
+              <div class="op-detail-type"><strong>Tipo:</strong> <span class="badge badge-${(op.type || '').toLowerCase()}">${(op.type || '—').toUpperCase()}</span></div>
+              <div class="op-detail-instrument"><strong>Instrumento:</strong> ${esc(instName)} (${op.currency || '—'})</div>
               ${op.notes ? `<div><strong>Notas:</strong> <span style="color:var(--text-muted)">${esc(op.notes)}</span></div>` : ''}
               <div class="op-detail-actions">
                 <button class="btn btn-primary btn-edit-op" data-op-idx="${idx}">${ICON_EDIT} Editar</button>
@@ -703,14 +707,14 @@ export const OperationsPage = {
       // Generar CSV
       const headers = ['Fecha', 'Ticker', 'Nombre', 'ALyC', 'Tipo', 'Cantidad', 'Precio', 'Moneda', 'Notas']
       const rows = data.map(op => [
-        op.operated_at.split('T')[0],
-        op.instrument_ticker,
+        (op.operated_at || '').split('T')[0] || '—',
+        op.instrument_ticker || '—',
         `"${(op.instrument_name || '').replace(/"/g, '""')}"`,
         `"${(op.alyc_name || '').replace(/"/g, '""')}"`,
-        op.type,
-        op.quantity,
-        op.price,
-        op.currency,
+        op.type || '—',
+        op.quantity || 0,
+        op.price || 0,
+        op.currency || '—',
         `"${(op.notes || '').replace(/"/g, '""')}"`
       ])
 
@@ -760,7 +764,7 @@ export const OperationsPage = {
 
     let data = cacheGet('alycs')
     if (!data) {
-      ;({ data } = await supabase.from('alycs').select('id, name').order('name'))
+      ;({ data } = await supabase.from('alycs').select('id,name').order('name'))
       if (data) cacheSet('alycs', data)
     }
 
@@ -783,7 +787,7 @@ export const OperationsPage = {
 
     let data = cacheGet('instruments')
     if (!data) {
-      ;({ data } = await supabase.from('instruments').select('id, ticker, name').order('ticker'))
+      ;({ data } = await supabase.from('instruments').select('id,ticker,name').order('ticker'))
       if (data) cacheSet('instruments', data)
     }
 
@@ -1083,7 +1087,7 @@ export const OperationsPage = {
 
     let data = cacheGet('alycs')
     if (!data) {
-      ;({ data } = await supabase.from('alycs').select('id, name').order('name'))
+      ;({ data } = await supabase.from('alycs').select('id,name').order('name'))
       if (data) cacheSet('alycs', data)
     }
 
@@ -1334,8 +1338,10 @@ export const OperationsPage = {
 
 
 function fmtDateShort(iso) {
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
+  if (!iso) return '—'
+  const datePart = iso.split('T')[0]
+  const [y, m, d] = datePart.split('-')
+  return d && m && y ? `${d}/${m}/${y}` : iso
 }
 
 // Genera un rango de páginas con elipsis, ej: [0,1,'...',8,9,10,'...',19,20]
