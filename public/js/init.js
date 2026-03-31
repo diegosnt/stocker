@@ -125,7 +125,27 @@ function renderShell(userEmail) {
 
 window.addEventListener('session-expired', async () => {
   try { await signOut() } catch {}
-  alert('Tu sesión expiró. Ingresá de nuevo.')
+  
+  // En lugar de un alert feo, usamos un modal con el estilo del proyecto
+  const overlay = document.createElement('div')
+  overlay.className = 'modal-overlay'
+  overlay.style.zIndex = '2000'
+  
+  overlay.innerHTML = `
+    <div class="modal-card" style="max-width: 400px; text-align: center; padding: 2.5rem; background: var(--bg-card); border-radius: 16px; box-shadow: var(--shadow);">
+      <div style="background: rgba(79, 70, 230, 0.1); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <h3 style="margin-bottom: 0.75rem; color: var(--text-main); font-size: 1.25rem;">Sesión Finalizada</h3>
+      <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; line-height: 1.5;">Tu sesión ha expirado por inactividad o seguridad. Por favor, volvé a ingresar para continuar.</p>
+      <button class="btn btn-primary" id="btn-reload" style="width: 100%; padding: 0.75rem; font-weight: 600;">Iniciar Sesión</button>
+    </div>
+  `
+  document.body.appendChild(overlay)
+  
+  document.getElementById('btn-reload').onclick = () => {
+    window.location.reload()
+  }
 })
 
 initDarkMode()

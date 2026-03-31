@@ -6,8 +6,18 @@ function getStoredToken() {
   try { return localStorage.getItem(SUPABASE_TOKEN_KEY) } catch { return null }
 }
 
-function setStoredToken(token) {
-  try { token ? localStorage.setItem(SUPABASE_TOKEN_KEY, token) : localStorage.removeItem(SUPABASE_TOKEN_KEY) } catch {}
+function setStoredToken(token, expiresIn = null, refreshToken = null) {
+  try {
+    if (token) {
+      localStorage.setItem(SUPABASE_TOKEN_KEY, token)
+      if (expiresIn) localStorage.setItem('sb-expires-in', expiresIn)
+      if (refreshToken) localStorage.setItem('sb-refresh-token', refreshToken)
+    } else {
+      localStorage.removeItem(SUPABASE_TOKEN_KEY)
+      localStorage.removeItem('sb-expires-in')
+      localStorage.removeItem('sb-refresh-token')
+    }
+  } catch {}
 }
 
 export function createClient(supabaseUrl, supabaseAnonKey) {
@@ -91,7 +101,7 @@ export function createClient(supabaseUrl, supabaseAnonKey) {
       })
       const data = await res.json()
       if (!res.ok) return { data: null, error: { message: data.error_description || data.msg || 'Error', name: data.error || 'AuthError' } }
-      setStoredToken(data.access_token)
+      setStoredToken(data.access_token, data.expires_in, data.refresh_token)
       headers['Authorization'] = `Bearer ${data.access_token}`
       const session = { access_token: data.access_token, token_type: data.token_type, expires_in: data.expires_in, expires_at: data.expires_at, user: data.user }
       window.dispatchEvent(new CustomEvent('supabase-auth', { detail: { event: 'SIGNED_IN', session } }))
@@ -106,7 +116,7 @@ export function createClient(supabaseUrl, supabaseAnonKey) {
       const data = await res.json()
       if (!res.ok) return { data: null, error: { message: data.error_description || data.msg || 'Error', name: data.error || 'AuthError' } }
       if (data.access_token) {
-        setStoredToken(data.access_token)
+        setStoredToken(data.access_token, data.expires_in, data.refresh_token)
         headers['Authorization'] = `Bearer ${data.access_token}`
       }
       return { data, error: null }
@@ -132,7 +142,9 @@ export function createClient(supabaseUrl, supabaseAnonKey) {
       })
       if (!res.ok) { cachedSession = null; return { data: { session: null }, error: null } }
       const user = await res.json()
-      cachedSession = { user, access_token: token, expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600 }
+      // Usamos el expires_in que venga del storage si existe, sino 3600 por defecto
+      const storedExpiresIn = parseInt(localStorage.getItem('sb-expires-in') || '3600')
+      cachedSession = { user, access_token: token, expires_in: storedExpiresIn, expires_at: Math.floor(Date.now() / 1000) + storedExpiresIn }
       return { data: { session: cachedSession }, error: null }
     },
     onAuthStateChange(callback) {
@@ -157,13 +169,10 @@ export function createClient(supabaseUrl, supabaseAnonKey) {
         const data = await res.json()
         if (!res.ok) {
           cachedSession = null
-          localStorage.removeItem('sb-refresh-token')
+          setStoredToken(null)
           return { data: { session: null }, error: { message: data.error_description || 'Refresh failed' } }
         }
-        localStorage.setItem('sb-access-token', data.access_token)
-        if (data.refresh_token) {
-          localStorage.setItem('sb-refresh-token', data.refresh_token)
-        }
+        setStoredToken(data.access_token, data.expires_in, data.refresh_token)
         headers['Authorization'] = `Bearer ${data.access_token}`
         cachedSession = { user: data.user, access_token: data.access_token, expires_in: data.expires_in, expires_at: data.expires_at }
         return { data: { session: cachedSession }, error: null }
