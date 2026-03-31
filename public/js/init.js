@@ -1,6 +1,7 @@
 import { onAuthChange, signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
 import { initDarkMode, toggleDarkMode } from './utils.js'
+import { prunePersistentCache } from './cache.js'
 import { LoginPage }           from './pages/login.js'
 import { InstrumentTypesPage } from './pages/instrument-types.js'
 import { InstrumentsPage }     from './pages/instruments.js'
@@ -149,6 +150,7 @@ window.addEventListener('session-expired', async () => {
 })
 
 initDarkMode()
+prunePersistentCache()
 
 let _currentUserId = null
 

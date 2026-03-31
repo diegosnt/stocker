@@ -284,6 +284,21 @@ export const AnalysisPage = {
     })
   },
 
+  async _fetchHistory(ticker) {
+    const cacheKey = `history_${ticker}`
+    const cached = cacheGet(cacheKey, { persistent: true })
+    if (cached) {
+      return cached
+    }
+
+    const data = await apiRequest('GET', `/api/history/${encodeURIComponent(ticker)}`)
+    if (data && data.length > 0) {
+      // 24 horas = 86400000 ms
+      cacheSet(cacheKey, data, { persistent: true, ttlMs: 86400000 })
+    }
+    return data
+  },
+
   async _runAnalysis(alycId, activeBtn) {
     if (!alycId) return
     this._activeAlycId = alycId
@@ -322,8 +337,8 @@ export const AnalysisPage = {
 
       const benchmarkTicker = document.getElementById('analysis-benchmark').value || 'SPY'
       const historyPromises = [
-        ...alycHoldings.map(h => apiRequest('GET', `/api/history/${encodeURIComponent(h.ticker)}`)),
-        apiRequest('GET', `/api/history/${encodeURIComponent(benchmarkTicker)}`)
+        ...alycHoldings.map(h => this._fetchHistory(h.ticker)),
+        this._fetchHistory(benchmarkTicker)
       ]
       
       const results = await Promise.allSettled(historyPromises)
