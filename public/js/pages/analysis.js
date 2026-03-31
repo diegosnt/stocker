@@ -198,18 +198,11 @@ export const AnalysisPage = {
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Optimización: Sharpe vs Michaud vs HRP</h3>
             <div id="redistribution-table" style="font-size: 0.8rem"></div>
           </div>
-          <div class="card" style="margin-bottom: 0; padding: 1rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem">Aporte al Riesgo</h3>
-            <div style="flex: 1; min-height: 250px; position: relative">
-              <canvas id="risk-contribution-chart"></canvas>
-            </div>
-          </div>
           <div class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Matriz de Correlación</h3>
             <div id="correlation-matrix" style="overflow-x: auto; font-size: 0.75rem"></div>
           </div>
         </div>
-
         <div class="card" style="padding: 1rem">
           <p id="analysis-summary" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4"></p>
         </div>
@@ -367,23 +360,44 @@ export const AnalysisPage = {
       const returnsMatrix = this._calculateReturns(validHistories, benchmarkData)
       const benchmarkReturns = this._calculateReturns([benchmarkData], benchmarkData)[0]
 
-      const analysis = this._performMarkowitz(validTickers, returnsMatrix, validHoldings)
-      
-      analysis.hrp = { weights: this._performHRP(validTickers, returnsMatrix) }
-      analysis.michaud = { weights: this._performMichaud(validTickers, returnsMatrix) }
+      // --- CÁLCULOS PESADOS VÍA WEB WORKER ---
+      const workerResults = await new Promise((resolve, reject) => {
+        const worker = new Worker('/js/analysis-worker.js')
+        worker.postMessage({
+          tickers: validTickers,
+          returnsMatrix,
+          holdings: validHoldings,
+          benchmarkReturns
+        })
+        worker.onmessage = (e) => {
+          if (e.data.status === 'success') resolve(e.data.data)
+          else reject(new Error(e.data.error))
+          worker.terminate()
+        }
+        worker.onerror = (err) => {
+          reject(err)
+          worker.terminate()
+        }
+      })
 
-      const capm = this._performCAPM(analysis, returnsMatrix, benchmarkReturns)
-      analysis.beta = capm.beta
+      const { markowitz, hrp, michaud, monteCarlo, metrics } = workerResults
+      const analysis = { ...markowitz, hrp, michaud, ...metrics }
 
-      this._calculateMDD(analysis, returnsMatrix)
+      // Actualizar métricas CAPM en UI (las que devolvió el worker)
+      this._updateMetricsUI(analysis, benchmarkTicker)
+
       this._renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker)
       this._renderStressTest(analysis.beta)
       await this._renderChart(analysis)
       this._renderRedistribution(analysis, validHoldings)
-      this._renderMonteCarlo(analysis)
-      this._renderCorrelationHeatmap(validTickers, returnsMatrix)
-      this._renderRiskContribution(analysis, returnsMatrix)
 
+      // Renderizar Monte Carlo con los datos del worker
+      const mcCanvas = document.getElementById('montecarlo-chart')
+      if (mcCanvas) {
+        this._mcChart = ChartManager.renderMonteCarloChart(mcCanvas, monteCarlo, { instance: this._mcChart })
+      }
+
+      this._renderCorrelationHeatmap(validTickers, returnsMatrix)
       await this._updateMarketPrices(validTickers)
       this._renderCurrentHoldings(validHoldings)
       this._renderComparisonChart(validHoldings)
@@ -759,24 +773,6 @@ export const AnalysisPage = {
     })
   },
 
-  _performMarkowitz(tickers, returnsMatrix, holdings) {
-    const numAssets = tickers.length, numPortfolios = 1000
-    const avgRD = returnsMatrix.map(r => r.reduce((a, b) => a + b, 0) / r.length), stdRD = returnsMatrix.map((r, i) => Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avgRD[i], 2), 0) / r.length))
-    const avgR = avgRD.map(r => r * 252), stdR = stdRD.map(s => s * Math.sqrt(252)), portfolios = [], minWeight = 0.05, totalMin = numAssets * minWeight
-    let maxSharpeIdx = 0, maxSharpe = -Infinity
-    for (let i = 0; i < numPortfolios; i++) {
-      let w; if (totalMin < 1) { const raw = Array.from({ length: numAssets }, () => Math.random()), sumR = raw.reduce((a, b) => a + b, 0); w = raw.map(rw => minWeight + (rw / sumR) * (1 - totalMin)) }
-      else { w = Array.from({ length: numAssets }, () => Math.random()); const s = w.reduce((a, b) => a + b, 0); w = w.map(v => v / s) }
-      const pR = w.reduce((a, v, idx) => a + v * avgR[idx], 0), pS = w.reduce((a, v, idx) => a + v * stdR[idx], 0), sh = pS === 0 ? 0 : pR / pS
-      portfolios.push({ weights: w, return: pR, std: pS, sharpe: sh }); if (sh > maxSharpe) { maxSharpe = sh; maxSharpeIdx = i }
-    }
-    const totalV = holdings.reduce((a, h) => a + (h.total_quantity * h.avg_buy_price), 0), currW = holdings.map(h => (h.total_quantity * h.avg_buy_price) / totalV)
-    const optimalW = portfolios[maxSharpeIdx].weights
-    const weightsObj = tickers.reduce((acc, t, i) => { acc[t] = optimalW[i]; return acc }, {})
-    const currentWeightsObj = tickers.reduce((acc, t, i) => { acc[t] = currW[i]; return acc }, {})
-    return { portfolios, tickers, optimal: { weights: weightsObj, return: portfolios[maxSharpeIdx].return, std: portfolios[maxSharpeIdx].std }, current: { weights: currentWeightsObj, return: currW.reduce((a, v, i) => a + v * avgR[i], 0), std: currW.reduce((a, v, i) => a + v * stdR[i], 0) } }
-  },
-
   async _renderChart(analysis) {
     const canvas = document.getElementById('markowitz-chart')
     if (!canvas) return
@@ -836,36 +832,20 @@ export const AnalysisPage = {
     container.innerHTML = html + `</tbody></table>`
   },
 
-  _renderMonteCarlo(analysis) {
-    const canvas = document.getElementById('montecarlo-chart')
-    if (!canvas) return
-    
-    const dailyReturn = (analysis.optimal.return / 252)
-    const dailyVol = (analysis.optimal.std / Math.sqrt(252))
-    const datasets = []
-    const randn_bm = () => { 
-      let u = 0, v = 0; 
-      while(u === 0) u = Math.random(); 
-      while(v === 0) v = Math.random(); 
-      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v); 
+  _updateMetricsUI(analysis, benchmarkTicker) {
+    const { beta, alpha, r2, vR, es, maxDrawdown } = analysis
+    document.getElementById('capm-beta').textContent = beta.toFixed(2)
+    document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(0) + '%'
+    document.getElementById('capm-alpha').textContent = (alpha > 0 ? '+' : '') + (alpha * 100).toFixed(1) + '%'
+    document.getElementById('capm-alpha').style.color = alpha >= 0 ? '#10b981' : '#ef4444'
+    document.getElementById('analysis-var').textContent = (vR * 100).toFixed(2) + '%'
+    document.getElementById('analysis-es').textContent = (es * 100).toFixed(2) + '%'
+    document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(2) + '%'
+    const bD = document.getElementById('capm-beta-desc')
+    if (bD) {
+      bD.textContent = beta > 1.2 ? 'Agresivo' : (beta < 0.8 ? 'Defensivo' : 'Neutral')
+      bD.style.color = beta > 1.2 ? '#ef4444' : (beta < 0.8 ? '#3b82f6' : 'var(--text-muted)')
     }
-
-    for (let s = 0; s < 50; s++) {
-      const data = [100]; 
-      let current = 100
-      for (let d = 1; d <= 252; d++) { 
-        current *= (1 + (dailyReturn + dailyVol * randn_bm())); 
-        data.push(current) 
-      }
-      datasets.push({ 
-        label: s === 0 ? 'Mediana' : `Sim ${s}`, 
-        data 
-      })
-    }
-
-    this._mcChart = ChartManager.renderMonteCarloChart(canvas, datasets, {
-      instance: this._mcChart
-    })
   },
 
   _renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker) {
@@ -900,33 +880,6 @@ export const AnalysisPage = {
 
     this._btChart = ChartManager.renderBacktestingChart(canvas, pS, bS, benchmarkTicker, {
       instance: this._btChart
-    })
-  },
-
-  _renderRiskContribution(analysis, returnsMatrix) {
-    const canvas = document.getElementById('risk-contribution-chart')
-    if (!canvas) return
-
-    const tickers = analysis.tickers || []
-    const currentWeights = Array.isArray(analysis.current.weights) 
-      ? analysis.current.weights 
-      : Object.values(analysis.current.weights || {})
-    
-    const stdDevs = returnsMatrix.map(r => { 
-      const avg = r.reduce((a, b) => a + b, 0) / r.length
-      return Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) 
-    })
-    
-    const raw = currentWeights.map((w, i) => w * stdDevs[i])
-    const total = raw.reduce((a, b) => a + b, 0)
-    
-    const items = tickers.map((ticker, i) => ({
-      ticker,
-      value: total > 0 ? (raw[i] / total) * 100 : 0
-    })).sort((a, b) => b.value - a.value) // Ordenar por mayor riesgo
-
-    this._rcChart = ChartManager.renderRiskChart(canvas, items, {
-      instance: this._rcChart
     })
   },
 
@@ -1032,55 +985,5 @@ export const AnalysisPage = {
       html += `</tr>`
     }
     container.innerHTML = html + `</table>`
-  },
-
-  _performHRP(tickers, returnsMatrix) {
-    const n = tickers.length
-    const stats = returnsMatrix.map(r => {
-      const avg = r.reduce((a, b) => a + b, 0) / r.length
-      const v = r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length
-      return { avg, var: v, std: Math.sqrt(v) }
-    })
-    const corr = Array.from({ length: n }, () => new Float64Array(n))
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j <= i; j++) {
-        let cov = 0; for (let d = 0; d < returnsMatrix[0].length; d++) cov += (returnsMatrix[i][d] - stats[i].avg) * (returnsMatrix[j][d] - stats[j].avg)
-        const c = (stats[i].std * stats[j].std === 0) ? 0 : (cov / returnsMatrix[0].length) / (stats[i].std * stats[j].std)
-        corr[i][j] = corr[j][i] = c
-      }
-    }
-    const dist = Array.from({ length: n }, () => new Float64Array(n))
-    for (let i = 0; i < n; i++) { for (let j = 0; j < n; j++) { dist[i][j] = Math.sqrt(Math.max(0, 0.5 * (1 - corr[i][j]))) } }
-    let order = Array.from({ length: n }, (_, i) => i)
-    order.sort((a, b) => dist[a].reduce((acc, v) => acc + v, 0) - dist[b].reduce((acc, v) => acc + v, 0))
-    const weights = new Float64Array(n).fill(1)
-    const recursiveBisection = (items) => {
-      if (items.length <= 1) return
-      const mid = Math.floor(items.length / 2), left = items.slice(0, mid), right = items.slice(mid)
-      const vL = left.reduce((acc, idx) => acc + stats[idx].var, 0) / left.length
-      const vR = right.reduce((acc, idx) => acc + stats[idx].var, 0) / right.length
-      const alpha = 1 - (vL / (vL + vR))
-      left.forEach(idx => weights[idx] *= alpha); right.forEach(idx => weights[idx] *= (1 - alpha))
-      recursiveBisection(left); recursiveBisection(right)
-    }
-    recursiveBisection(order)
-    const totalW = weights.reduce((acc, v) => acc + v, 0)
-    return Array.from(weights).map(w => w / totalW)
-  },
-
-  _performMichaud(tickers, returnsMatrix) {
-    const n = tickers.length, iterations = 50, days = returnsMatrix[0].length
-    const averagedWeights = new Float64Array(n).fill(0)
-    for (let i = 0; i < iterations; i++) {
-      const resampled = Array.from({ length: n }, () => new Float64Array(days))
-      for (let d = 0; d < days; d++) {
-        const randomDay = Math.floor(Math.random() * days)
-        for (let a = 0; a < n; a++) { resampled[a][d] = returnsMatrix[a][randomDay] }
-      }
-      const scenario = this._performMarkowitz(tickers, resampled, Array(n).fill({ total_quantity: 0, avg_buy_price: 0 }))
-      const optWeights = scenario.optimal?.weights || {}
-      tickers.forEach((t, idx) => { averagedWeights[idx] += (optWeights[t] || 0) })
-    }
-    return Array.from(averagedWeights).map(w => w / iterations)
   }
 }

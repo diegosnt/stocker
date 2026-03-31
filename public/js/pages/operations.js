@@ -62,6 +62,7 @@ export const OperationsPage = {
       <div class="page-header">
         <h2>Operaciones</h2>
         <div style="display:flex; gap:0.5rem">
+          <button class="btn btn-ghost" id="btn-export-csv">↓ Exportar CSV</button>
           <button class="btn btn-ghost" id="btn-import-csv">↑ Importar CSV</button>
           <input type="file" id="input-csv" accept=".csv" style="display:none">
           <button class="btn btn-primary" id="btn-nueva-op">+ Nueva Operación</button>
@@ -140,10 +141,7 @@ export const OperationsPage = {
       </div>
     </div>`
 
-    document.getElementById('btn-nueva-op').addEventListener('click', () => {
-      state.editingOperation = null
-      this._showFormModal()
-    })
+    document.getElementById('btn-export-csv').addEventListener('click', () => this._exportCSV())
 
     const inputCsv = document.getElementById('input-csv')
     document.getElementById('btn-import-csv').addEventListener('click', () => inputCsv.click())
@@ -668,6 +666,74 @@ export const OperationsPage = {
         state.pagination.currentPage = page + 1
         this._loadList(state.pagination.currentPage)
       })
+    }
+  },
+
+  async _exportCSV() {
+    const btn = document.getElementById('btn-export-csv')
+    const originalText = btn.innerHTML
+    btn.innerHTML = 'Exportando...'
+    btn.disabled = true
+
+    try {
+      let query = supabase
+        .from('operations_search')
+        .select('*')
+        .order('operated_at', { ascending: false })
+
+      if (state.filters.alycFilter)       query = query.eq('alyc_id', state.filters.alycFilter)
+      if (state.filters.instrumentFilter) query = query.eq('instrument_id', state.filters.instrumentFilter)
+      if (state.filters.typeFilter)       query = query.eq('type', state.filters.typeFilter)
+      if (state.filters.currencyFilter)   query = query.eq('currency', state.filters.currencyFilter)
+      if (state.filters.dateFrom)         query = query.gte('operated_at', state.filters.dateFrom)
+      if (state.filters.dateTo)           query = query.lte('operated_at', state.filters.dateTo)
+
+      if (state.filters.searchQuery) {
+        query = query.ilike('instrument_ticker', `%${state.filters.searchQuery}%`)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        showToast('No hay operaciones para exportar.', 'info')
+        return
+      }
+
+      // Generar CSV
+      const headers = ['Fecha', 'Ticker', 'Nombre', 'ALyC', 'Tipo', 'Cantidad', 'Precio', 'Moneda', 'Notas']
+      const rows = data.map(op => [
+        op.operated_at.split('T')[0],
+        op.instrument_ticker,
+        `"${(op.instrument_name || '').replace(/"/g, '""')}"`,
+        `"${(op.alyc_name || '').replace(/"/g, '""')}"`,
+        op.type,
+        op.quantity,
+        op.price,
+        op.currency,
+        `"${(op.notes || '').replace(/"/g, '""')}"`
+      ])
+
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      
+      const dateStr = new Date().toISOString().split('T')[0]
+      link.setAttribute('href', url)
+      link.setAttribute('download', `stocker_operaciones_${dateStr}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      showToast('Exportación completada.', 'success')
+    } catch (err) {
+      console.error('Error exportando CSV:', err)
+      showToast('Error al exportar. Intentá de nuevo.', 'error')
+    } finally {
+      btn.innerHTML = originalText
+      btn.disabled = false
     }
   },
 
