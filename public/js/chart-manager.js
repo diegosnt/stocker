@@ -223,9 +223,9 @@ export const ChartManager = {
           labels: {
             display: true,
             formatter: options.formatter || ((ctx) => {
-              const d = ctx.raw?._data
-              if (!d) return []
-              return [d.ticker, (d.pct || 0).toFixed(1) + '%']
+              const d = ctx.raw?._data || ctx.raw
+              if (!d || !d.ticker) return []
+              return [d.ticker, (d.pct != null ? d.pct.toFixed(1) : '0') + '%']
             }),
             font: { size: 13, weight: 'bold' },
             color: '#ffffff',
@@ -236,7 +236,12 @@ export const ChartManager = {
       },
       options: {
         ...baseOptions,
-        ...options.chartOptions
+        ...options.chartOptions,
+        plugins: {
+          ...(baseOptions?.plugins || {}),
+          ...(options.chartOptions?.plugins || {}),
+          legend: { display: false }
+        }
       }
     })
   },

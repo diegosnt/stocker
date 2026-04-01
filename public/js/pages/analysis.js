@@ -240,10 +240,10 @@ export const AnalysisPage = {
         const btn = document.createElement('button')
         btn.className = 'btn btn-ghost'
         btn.style.padding = '0.75rem 1.25rem'
-        btn.style.minWidth = '160px'
+        btn.style.minWidth = '110px'
         btn.style.height = '54px'
         btn.style.textAlign = 'center'
-        btn.style.fontSize = '0.95rem'
+        btn.style.fontSize = '0.9rem'
         btn.style.fontWeight = '700'
         btn.style.border = '1px solid var(--border)'
         btn.textContent = alyc.name
@@ -655,9 +655,9 @@ export const AnalysisPage = {
     this._treemapChart = ChartManager.renderTreemapChart(canvas, data, {
       instance: this._treemapChart,
       formatter: (ctx) => {
-        const d = ctx.raw?._data
-        if (!d) return []
-        return [d.ticker, fmt(d.pct) + '%']
+        const d = ctx.raw?._data || ctx.raw
+        if (!d || !d.ticker) return []
+        return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
       },
       chartOptions: {
         plugins: {

@@ -391,9 +391,9 @@ export const DashboardPage = {
     this._heatmapChart = ChartManager.renderTreemapChart(canvas, data, {
       instance: this._heatmapChart,
       formatter: (ctx) => {
-        const d = ctx.raw?._data
-        if (!d) return []
-        return [d.ticker, fmt(d.pct) + '%']
+        const d = ctx.raw?._data || ctx.raw
+        if (!d || !d.ticker) return []
+        return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
       },
       chartOptions: {
         plugins: {
