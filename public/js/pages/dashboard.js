@@ -2,14 +2,20 @@ import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager } from '../chart-manager.js'
+import { get as cacheGet, set as cacheSet } from '../cache.js'
+
+const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 
 export const DashboardPage = {
   _typeChart: null,
   _heatmapChart: null,
+  _compChart: null,
+  _resolvedPrices: {},
 
   cleanup() {
     this._heatmapChart = ChartManager.destroy(this._heatmapChart)
     this._typeChart = ChartManager.destroy(this._typeChart)
+    this._compChart = ChartManager.destroy(this._compChart)
     
     if (this._marketInterval) {
       clearInterval(this._marketInterval)
@@ -20,6 +26,7 @@ export const DashboardPage = {
 
   async render() {
     this.cleanup()
+    this._resolvedPrices = {} // Reset al entrar
 
     const content = document.getElementById('page-content')
     const skeletonHTML = `
@@ -100,22 +107,47 @@ export const DashboardPage = {
   },
 
   async _updateMarketPrices(tickers) {
-    this._resolvedPrices = {}
     if (!tickers || tickers.length === 0) return
 
+    const missingTickers = []
+    
+    // 1. Intentar recuperar de cache primero
+    for (const ticker of tickers) {
+      const cached = cacheGet(`quote_${ticker}`, { persistent: true })
+      if (cached !== null) {
+        this._resolvedPrices[ticker] = cached
+        this._updatePriceCells(ticker, cached)
+      } else {
+        missingTickers.push(ticker)
+      }
+    }
+
+    // 2. Si todo está en cache, no pedimos nada
+    if (missingTickers.length === 0) {
+      console.log('[Dashboard] Todos los precios recuperados de cache (2h)')
+      return
+    }
+
     try {
-      // Un solo request masivo en lugar de uno por cada ticker
-      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(tickers.join(','))}`)
+      // 3. Un solo request masivo para los faltantes
+      console.log(`[Dashboard] Solicitando precios faltantes: ${missingTickers.join(', ')}`)
+      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(missingTickers.join(','))}`)
       
-      for (const ticker of tickers) {
+      for (const ticker of missingTickers) {
         const price = data[ticker]?.price ?? null
         this._resolvedPrices[ticker] = price
+        
+        // Guardar en cache por 2 horas
+        if (price !== null) {
+          cacheSet(`quote_${ticker}`, price, { persistent: true, ttlMs: QUOTE_CACHE_TTL })
+        }
+        
         this._updatePriceCells(ticker, price)
       }
     } catch (err) {
       console.error('Error al actualizar precios masivos:', err)
       // Fallback: marcar como nulo para quitar skeletons si falla
-      tickers.forEach(t => {
+      missingTickers.forEach(t => {
         this._resolvedPrices[t] = null
         this._updatePriceCells(t, null)
       })
@@ -209,16 +241,25 @@ export const DashboardPage = {
         </div>
 
         <div class="card" style="display: flex; flex-direction: column; min-height: 360px;">
-          <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor (Peso vs P&L %)</div>
-          <div id="dash-heatmap" style="flex: 1; min-height: 220px; position: relative">
+          <div class="chart-panel-title" style="margin-bottom:0.75rem">Comparativa: Inversión vs Valor Actual ($)</div>
+          <div id="dash-comparison-chart" style="flex: 1; min-height: 220px; position: relative">
             <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">
-              <span class="spinner"></span> Generando mapa de calor...
+              <span class="spinner"></span> Generando comparativa...
             </div>
           </div>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="margin-top: 1.5rem; display: flex; flex-direction: column; min-height: 300px;">
+        <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor (Peso vs P&L %)</div>
+        <div id="dash-heatmap" style="flex: 1; min-height: 220px; position: relative">
+          <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">
+            <span class="spinner"></span> Generando mapa de calor...
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem">
         <div class="alyc-card-header" id="dash-table-header" style="cursor:pointer;margin-bottom:0">
           <h3 style="margin:0;font-size:1rem">Detalle de Instrumentos</h3>
           <span class="alyc-chevron" id="dash-table-chevron">▾</span>
@@ -271,7 +312,42 @@ export const DashboardPage = {
     this._bindSortHeaders()
     this._bindTableToggle()
     this._refreshHeatmap()
+    this._refreshComparisonChart()
     this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
+  },
+
+  _refreshComparisonChart() {
+    const el = document.getElementById('dash-comparison-chart')
+    if (!el || !this._summary) return
+
+    const grouped = {}
+    Object.entries(this._summary).forEach(([ticker, h]) => {
+      const price = this._resolvedPrices?.[ticker] ?? h.avgBuyPrice
+      const invested = h.quantity * h.avgBuyPrice
+      const current = h.quantity * price
+      const label = `${ticker} (${h.currency})`
+      
+      if (!grouped[label]) {
+        grouped[label] = { invested: 0, current: 0 }
+      }
+      grouped[label].invested += invested
+      grouped[label].current += current
+    })
+
+    const labels = Object.keys(grouped).sort()
+    const investedData = labels.map(l => grouped[l].invested)
+    const currentData = labels.map(l => grouped[l].current)
+
+    if (!labels.length) return
+
+    if (!el.querySelector('canvas')) {
+      el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    }
+    const canvas = el.querySelector('canvas')
+
+    this._compChart = ChartManager.renderComparisonChart(canvas, labels, investedData, currentData, {
+      instance: this._compChart
+    })
   },
 
   _renderPieChart(container, items, total) {
@@ -319,6 +395,7 @@ export const DashboardPage = {
     })
 
     this._refreshHeatmap()
+    this._refreshComparisonChart()
     this._updatePnlKpis()
     if (['marketPrice', 'marketValue', 'pnl', 'pnlPct'].includes(this._sortCol)) {
       this._sortTable()

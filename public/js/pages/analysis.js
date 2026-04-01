@@ -15,15 +15,17 @@ export const AnalysisPage = {
   _treemapChart: null,
   _assetChart: null,
   _typeChart: null,
+  _compChart: null,
   _resolvedPrices: {},
   _activeAlycName: null,
   _activeAlycId: null,
+  _lastValidHoldings: [],
 
   cleanup() {
     const charts = [
       this._chart, this._mcChart, this._btChart, 
       this._rcChart, this._ddChart, this._treemapChart,
-      this._assetChart, this._typeChart
+      this._assetChart, this._typeChart, this._compChart
     ]
     charts.forEach(chart => {
       if (chart) {
@@ -38,6 +40,7 @@ export const AnalysisPage = {
     this._treemapChart = null
     this._assetChart = null
     this._typeChart = null
+    this._compChart = null
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -105,7 +108,12 @@ export const AnalysisPage = {
         <!-- SECCIÓN 0.5: Comparativa y Mapa de Calor -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
           <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Comparativa: Inversión vs Valor Actual ($)</h3>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem">
+              <h3 style="font-size: 0.95rem; margin: 0">Comparativa: Inversión vs Valor Actual ($)</h3>
+              <button id="btn-refresh-comp" class="btn btn-sm btn-ghost btn-icon-only" title="Actualizar precios y gráfico" style="padding: 0; width: 24px; height: 24px; min-width: 24px; min-height: 24px; opacity: 0.8; background: none; border: none; cursor: pointer; color: var(--text-muted); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              </button>
+            </div>
             <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
               Capital invertido frente a valoración de mercado actual por activo.
             </p>
@@ -262,6 +270,20 @@ export const AnalysisPage = {
   _setupEvents() {
     document.getElementById('btn-generate-pdf').addEventListener('click', () => this._generatePDF())
     
+    // Refresh individual Comparison Chart
+    const btnRefreshComp = document.getElementById('btn-refresh-comp')
+    if (btnRefreshComp) {
+      btnRefreshComp.onclick = async () => {
+        btnRefreshComp.style.transform = 'rotate(360deg)'
+        const tickers = (this._lastValidHoldings || []).map(h => h.ticker)
+        if (tickers.length > 0) {
+          await this._updateMarketPrices(tickers)
+          this._renderComparisonChart(this._lastValidHoldings)
+        }
+        setTimeout(() => { btnRefreshComp.style.transform = 'none' }, 400)
+      }
+    }
+
     // Quick Benchmarks
     document.querySelectorAll('.btn-benchmark-quick').forEach(btn => {
       btn.onclick = () => {
@@ -401,19 +423,24 @@ export const AnalysisPage = {
       // Actualizar métricas CAPM en UI (las que devolvió el worker)
       this._updateMetricsUI(analysis, benchmarkTicker)
 
-      this._renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker)
-      this._renderStressTest(analysis.beta)
-      await this._renderChart(analysis)
-      this._renderRedistribution(analysis, validHoldings)
+      // Intentar renderizar gráficos avanzados, pero no dejar que uno solo bloquee el resto
+      try { this._renderBacktestingChart(analysis, returnsMatrix, benchmarkReturns, benchmarkTicker) } catch(e) { console.error('Error Backtesting:', e) }
+      try { this._renderStressTest(analysis.beta) } catch(e) { console.error('Error Stress:', e) }
+      try { await this._renderChart(analysis) } catch(e) { console.error('Error Markowitz:', e) }
+      try { this._renderRedistribution(analysis, validHoldings) } catch(e) { console.error('Error Redist:', e) }
 
       // Renderizar Monte Carlo con los datos del worker
       const mcCanvas = document.getElementById('montecarlo-chart')
       if (mcCanvas) {
-        this._mcChart = ChartManager.renderMonteCarloChart(mcCanvas, monteCarlo, { instance: this._mcChart })
+        try {
+          this._mcChart = ChartManager.renderMonteCarloChart(mcCanvas, monteCarlo, { instance: this._mcChart })
+        } catch(e) { console.error('Error MonteCarlo:', e) }
       }
 
-      this._renderCorrelationHeatmap(validTickers, returnsMatrix)
+      try { this._renderCorrelationHeatmap(validTickers, returnsMatrix) } catch(e) { console.error('Error Correlación:', e) }
+      
       await this._updateMarketPrices(validTickers)
+      this._lastValidHoldings = validHoldings
       this._renderCurrentHoldings(validHoldings)
       this._renderComparisonChart(validHoldings)
 
@@ -565,82 +592,20 @@ export const AnalysisPage = {
     }
   },
 
-  _renderHeatmap(holdings) {
-    const container = document.getElementById('analysis-heatmap')
-    if (!container) return
-
-    const byCurrency = {}
-    holdings.forEach(h => {
-      if (!byCurrency[h.currency]) byCurrency[h.currency] = { total: 0, items: {} }
-      const price = this._resolvedPrices?.[h.ticker] ?? h.avg_buy_price
-      const val = h.total_quantity * price
-      const pnl = ((price / h.avg_buy_price) - 1) * 100
-      
-      if (!byCurrency[h.currency].items[h.ticker]) {
-        byCurrency[h.currency].items[h.ticker] = { ticker: h.ticker, value: 0, pnl: pnl }
-      }
-      byCurrency[h.currency].items[h.ticker].value += val
-      byCurrency[h.currency].total += val
-    })
-
-    const getHeatColor = (pnl) => {
-      if (pnl > 3) return '#059669' 
-      if (pnl > 1) return '#10b981'
-      if (pnl > 0.2) return '#6ee7b7'
-      if (pnl < -3) return '#dc2626'
-      if (pnl < -1) return '#ef4444'
-      if (pnl < -0.2) return '#fca5a1'
-      return 'var(--bg-main)'
-    }
-
-    // Limpiamos y preparamos el container principal para ocupar todo el alto
-    container.style.flexDirection = 'column'
-    container.style.alignItems = 'stretch'
-    container.style.gap = '8px'
-
-    let html = ''
-    const currencies = Object.entries(byCurrency)
-    
-    for (const [curr, data] of currencies) {
-      const items = Object.values(data.items).sort((a, b) => b.value - a.value)
-      
-      // Cada bloque de moneda ocupa una fracción del alto total
-      html += `
-        <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
-          <div style="font-size: 0.7rem; font-weight: 800; color: var(--color-primary); padding: 2px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; text-transform: uppercase">
-            Cartera ${curr}
-          </div>
-          <div style="flex: 1; display: flex; gap: 2px; align-items: stretch">
-            ${items.map(item => {
-              const weight = (item.value / data.total) * 100
-              const bg = getHeatColor(item.pnl)
-              const color = Math.abs(item.pnl) > 1 ? 'white' : 'var(--text-main)'
-              const isThin = weight < 12 // Si el cuadro es muy finito, achicamos/ocultamos cosas
-              
-              return `
-                <div style="flex: ${weight} 0 0%; background: ${bg}; border-radius: 4px; border: 1px solid var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 4px">
-                  <div style="font-weight: 800; font-size: ${isThin ? '0.65rem' : '0.9rem'}; color: ${color}; text-shadow: 0 1px 2px rgba(0,0,0,0.2)">${item.ticker}</div>
-                  ${!isThin ? `<div style="font-size: 0.75rem; font-weight: 700; color: ${color}; opacity: 0.95">${(item.pnl > 0 ? '+' : '')}${item.pnl.toFixed(1)}%</div>` : ''}
-                  <div style="font-size: 0.55rem; color: ${color}; opacity: 0.8">${weight.toFixed(0)}%</div>
-                </div>`
-            }).join('')}
-          </div>
-        </div>`
-    }
-    container.innerHTML = html || '<div style="color:var(--text-muted); font-size:0.8rem; padding: 1rem; text-align: center">Sin datos</div>'
-  },
-
   _renderTreemap(container, items) {
     if (!container || !items || items.length === 0) return
     
-    if (!container.querySelector('canvas')) {
-      container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
-    }
+    // Destruir instancia previa si existe antes de limpiar el contenedor
+    this._treemapChart = ChartManager.destroy(this._treemapChart)
+    
+    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
     const canvas = container.querySelector('canvas')
     
     const getColor = (p) => {
-      if (p > 0) return p > 10 ? '#065f46' : '#10b981'
-      if (p < 0) return p < -10 ? '#991b1b' : '#ef4444'
+      if (p > 5) return '#065f46' 
+      if (p > 0) return '#10b981'
+      if (p < -5) return '#991b1b'
+      if (p < 0) return '#ef4444'
       return '#64748b'
     }
     const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -657,6 +622,9 @@ export const AnalysisPage = {
       formatter: (ctx) => {
         const d = ctx.raw?._data || ctx.raw
         if (!d || !d.ticker) return []
+        // Si el cuadro es muy chico, solo mostrar ticker
+        const area = ctx.element?.width * ctx.element?.height || 1000
+        if (area < 2500) return [d.ticker]
         return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
       },
       chartOptions: {
