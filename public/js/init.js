@@ -124,11 +124,11 @@ function renderShell(userEmail) {
   start()
 }
 
-window.addEventListener('session-expired', async () => {
-  try { await signOut() } catch {}
-  
-  // En lugar de un alert feo, usamos un modal con el estilo del proyecto
+window.addEventListener('session-expired', () => {
+  if (document.getElementById('modal-session-expired')) return
+
   const overlay = document.createElement('div')
+  overlay.id = 'modal-session-expired'
   overlay.className = 'modal-overlay'
   overlay.style.zIndex = '2000'
   
@@ -139,13 +139,13 @@ window.addEventListener('session-expired', async () => {
       </div>
       <h3 style="margin-bottom: 0.75rem; color: var(--text-main); font-size: 1.25rem;">Sesión Finalizada</h3>
       <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; line-height: 1.5;">Tu sesión ha expirado por inactividad o seguridad. Por favor, volvé a ingresar para continuar.</p>
-      <button class="btn btn-primary" id="btn-reload" style="width: 100%; padding: 0.75rem; font-weight: 600;">Iniciar Sesión</button>
+      <button class="btn btn-primary" id="btn-reload-session" style="width: 100%; padding: 0.75rem; font-weight: 600;">Iniciar Sesión</button>
     </div>
   `
   document.body.appendChild(overlay)
   
-  document.getElementById('btn-reload').onclick = () => {
-    window.location.reload()
+  overlay.querySelector('#btn-reload-session').onclick = () => {
+    window.location.href = '/' // Forzar redirección al home/login
   }
 })
 
