@@ -449,7 +449,13 @@ h1, h2, h3, h4, h5 {
   }
 
   /* Toast */
-  .toast-container { bottom: 1rem; right: 1rem; left: 1rem; }
+  .toast-container { 
+    bottom: 1rem; 
+    right: 0.5rem; 
+    left: 0.5rem; 
+    width: auto;
+    max-width: none;
+  }
 
   .pag-pages { gap: 0.15rem; }
   .pag-num { min-width: 1.75rem; font-size: 0.8rem; padding: 0.2rem 0.3rem; }
