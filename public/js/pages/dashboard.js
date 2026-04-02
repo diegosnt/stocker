@@ -11,11 +11,15 @@ export const DashboardPage = {
   _heatmapChart: null,
   _compChart: null,
   _resolvedPrices: {},
+  _chartRendered: false,
+  _chartsReady: false,
 
   cleanup() {
     this._heatmapChart = ChartManager.destroy(this._heatmapChart)
     this._typeChart = ChartManager.destroy(this._typeChart)
     this._compChart = ChartManager.destroy(this._compChart)
+    this._chartRendered = false
+    this._chartsReady = false
     
     if (this._marketInterval) {
       clearInterval(this._marketInterval)
@@ -265,6 +269,7 @@ export const DashboardPage = {
           <span class="alyc-chevron" id="dash-table-chevron">▾</span>
         </div>
         <div id="dash-table-body" style="margin-top:1rem">
+          <!-- Desktop table -->
           <div class="table-wrapper desktop-only">
             <table class="holdings-table" id="dash-table">
               <thead>
@@ -306,14 +311,59 @@ export const DashboardPage = {
               </tbody>
             </table>
           </div>
+          <!-- Mobile cards -->
+          <div class="mobile-only dash-instruments-cards">
+            ${data.items.map(h => {
+              const weight = (h.invested / totalInvested) * 100
+              const qtyStr = h.quantity.toLocaleString('es-AR')
+              return `
+              <div class="dash-instrument-card" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}">
+                <div class="dash-instrument-card-header">
+                  <span class="ticker-chip" title="${h.name}">${h.ticker}</span>
+                  <span class="dash-instrument-meta">
+                    <span class="meta-qty">${qtyStr}</span>
+                    <span class="meta-weight">${weight.toFixed(1)}%</span>
+                    <span class="meta-type">${h.instrumentType}</span>
+                  </span>
+                </div>
+                <div class="dash-instrument-card-body">
+                  <div class="dash-instrument-row">
+                    <span class="dash-instrument-label">Precio compra</span>
+                    <span class="dash-instrument-value">${fmt(h.avgBuyPrice)}</span>
+                  </div>
+                  <div class="dash-instrument-row">
+                    <span class="dash-instrument-label">Precio actual</span>
+                    <span class="dash-instrument-value market-price-cell" data-ticker="${h.ticker}"><span class="cell-skeleton"></span></span>
+                  </div>
+                  <div class="dash-instrument-row">
+                    <span class="dash-instrument-label">Invertido</span>
+                    <span class="dash-instrument-value"><strong>${fmt(h.invested)}</strong></span>
+                  </div>
+                  <div class="dash-instrument-row">
+                    <span class="dash-instrument-label">Valor actual</span>
+                    <span class="dash-instrument-value market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}"><span class="cell-skeleton"></span></span>
+                  </div>
+                  <div class="dash-instrument-row dash-instrument-pnl-row">
+                    <span class="dash-instrument-label">P&amp;L <span class="pnl-pct-cell" data-ticker="${h.ticker}" data-avg-buy-price="${h.avgBuyPrice}" style="font-weight:400;font-size:0.6rem"></span></span>
+                    <span class="dash-instrument-value pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></span>
+                  </div>
+                </div>
+              </div>`
+            }).join('')}
+          </div>
         </div><!-- dash-table-body -->
       </div>`
 
     this._bindSortHeaders()
     this._bindTableToggle()
-    this._refreshHeatmap()
-    this._refreshComparisonChart()
-    this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
+    
+    // Render charts after layout is computed (double-rAF ensures browser has painted)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      this._refreshHeatmap()
+      this._refreshComparisonChart()
+      this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
+      this._chartsReady = true
+    }))
   },
 
   _refreshComparisonChart() {
@@ -394,8 +444,10 @@ export const DashboardPage = {
       el.innerHTML = `<span style="color:${pnlColor(pct)};font-weight:600">${sign(pct)}${pct.toFixed(2)}%</span>`
     })
 
-    this._refreshHeatmap()
-    this._refreshComparisonChart()
+    if (this._chartsReady) {
+      this._refreshHeatmap()
+      this._refreshComparisonChart()
+    }
     this._updatePnlKpis()
     if (['marketPrice', 'marketValue', 'pnl', 'pnlPct'].includes(this._sortCol)) {
       this._sortTable()
