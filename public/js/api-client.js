@@ -44,14 +44,15 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
  * @param {string} method  - 'GET' | 'POST' | 'PATCH' | 'DELETE'
  * @param {string} path    - Ruta relativa, ej: '/api/instruments/123'
  * @param {object} [body]  - Payload JSON (omitir en DELETE/GET)
+ * @param {object} [options] - Opciones adicionales para fetch (ej: { signal })
  * @returns {Promise<any>} - Resuelve con `data` de la respuesta, o null en 204
  * @throws {Error & { code: string }} - Error con `code` del error de Supabase si aplica
  */
-export async function apiRequest(method, path, body = undefined) {
+export async function apiRequest(method, path, body = undefined, options = {}) {
   const { data: { session } } = await supabase.auth.getSession()
 
   const headers = { 'Authorization': `Bearer ${session?.access_token ?? ''}` }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && body !== null) headers['Content-Type'] = 'application/json'
   
   if (MUTATION_METHODS.has(method)) {
     const token = await ensureCsrfToken()
@@ -60,11 +61,18 @@ export async function apiRequest(method, path, body = undefined) {
     }
   }
 
-  const res = await fetch(path, {
+  const fetchOptions = {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined
-  })
+    ...options
+  }
+
+  // Solo incluimos body si NO es un GET y si tenemos datos
+  if (method !== 'GET' && body !== undefined && body !== null) {
+    fetchOptions.body = JSON.stringify(body)
+  }
+
+  const res = await fetch(path, fetchOptions)
 
   if (res.status === 401) {
     window.dispatchEvent(new CustomEvent('session-expired'))
@@ -78,9 +86,8 @@ export async function apiRequest(method, path, body = undefined) {
       headers['X-CSRF-Token'] = newToken
       headers['X-CSRF-Retry'] = 'true'
       const retryRes = await fetch(path, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined
+        ...fetchOptions,
+        headers: { ...headers, 'X-CSRF-Token': newToken, 'X-CSRF-Retry': 'true' }
       })
       if (retryRes.status === 401) {
         window.dispatchEvent(new CustomEvent('session-expired'))

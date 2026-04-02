@@ -1,4 +1,6 @@
-function renderPage({ supabaseUrl, supabaseAnonKey }) {
+function renderPage({ supabaseUrl, supabaseAnonKey, nonce }) {
+  const nonceAttr = nonce ? `nonce="${nonce}"` : ''
+  
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -19,11 +21,11 @@ function renderPage({ supabaseUrl, supabaseAnonKey }) {
   <div id="app">
     <!-- El Skeleton inicial se renderiza vía JS en app.js o DashboardPage -->
     <div class="app-loading">
-      <div class="skeleton" style="height: 100vh; width: 100%"></div>
+      <div class="skeleton" style="height: 100vh; width: 100%;" ${nonceAttr}></div>
     </div>
   </div>
 
-  <script>
+  <script ${nonceAttr}>
     window.__SUPABASE_URL__      = ${JSON.stringify(supabaseUrl)};
     window.__SUPABASE_ANON_KEY__ = ${JSON.stringify(supabaseAnonKey)};
   </script>

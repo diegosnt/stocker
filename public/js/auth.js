@@ -1,7 +1,8 @@
 import { supabase } from './supabase-client.js'
 import { fetchCsrfToken } from './api-client.js'
 
-const SUPABASE_TOKEN_KEY = 'sb-access-token'
+// Los tokens ya no se guardan en localStorage por seguridad (XSS).
+// El servidor maneja la sesión mediante cookies HttpOnly (sb-session).
 
 async function apiFetch(path, options = {}) {
   const res = await fetch(path, {
@@ -20,15 +21,6 @@ async function apiFetch(path, options = {}) {
   return data
 }
 
-function saveSupabaseToken(accessToken, refreshToken) {
-  if (accessToken) {
-    localStorage.setItem(SUPABASE_TOKEN_KEY, accessToken)
-  }
-  if (refreshToken) {
-    localStorage.setItem('sb-refresh-token', refreshToken)
-  }
-}
-
 export async function signIn(email, password) {
   const data = await apiFetch('/api/auth/login', {
     method: 'POST',
@@ -36,8 +28,14 @@ export async function signIn(email, password) {
   })
   
   if (data.access_token) {
-    saveSupabaseToken(data.access_token, data.refresh_token)
+    // Al loguearnos, actualizamos la sesión de Supabase en memoria
+    await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    })
+    
     await fetchCsrfToken()
+    
     window.dispatchEvent(new CustomEvent('supabase-auth', {
       detail: { event: 'SIGNED_IN', session: { user: data.user, access_token: data.access_token } }
     }))
@@ -53,8 +51,14 @@ export async function signUp(email, password) {
   })
   
   if (data.access_token) {
-    saveSupabaseToken(data.access_token, data.refresh_token)
+    // Actualizamos la sesión de Supabase en memoria
+    await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    })
+
     await fetchCsrfToken()
+
     window.dispatchEvent(new CustomEvent('supabase-auth', {
       detail: { event: 'SIGNED_IN', session: { user: data.user, access_token: data.access_token } }
     }))
@@ -64,18 +68,20 @@ export async function signUp(email, password) {
 }
 
 export async function signOut() {
-  const token = localStorage.getItem(SUPABASE_TOKEN_KEY)
-  
-  if (token) {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+  // Intentamos cerrar sesión en el backend para limpiar la cookie HttpOnly
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      })
+    }
+  } catch (e) {
+    console.warn('Error en logout backend:', e)
   }
   
-  localStorage.removeItem(SUPABASE_TOKEN_KEY)
-  localStorage.removeItem('sb-refresh-token')
-  
+  // Limpiamos el estado de Supabase (memoria)
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }

@@ -313,12 +313,30 @@ export const AnalysisPage = {
       return cached
     }
 
-    const data = await apiRequest('GET', `/api/history/${encodeURIComponent(ticker)}`)
-    if (data && data.length > 0) {
-      // 24 horas = 86400000 ms
-      cacheSet(cacheKey, data, { persistent: true, ttlMs: 86400000 })
+    // Timeout de 10 segundos para requests de historial
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+    try {
+      const data = await apiRequest('GET', `/api/history/${encodeURIComponent(ticker)}`, null, {
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (data && data.length > 0) {
+        // 24 horas = 86400000 ms
+        cacheSet(cacheKey, data, { persistent: true, ttlMs: 86400000 })
+      }
+      return data
+    } catch (err) {
+      clearTimeout(timeoutId)
+      if (err.name === 'AbortError') {
+        console.warn(`[Analysis] Timeout cargando historial para ${ticker}`)
+        throw new Error(`La API de historial no respondió para ${ticker} (Timeout 10s)`)
+      }
+      throw err
     }
-    return data
   },
 
   async _runAnalysis(alycId, activeBtn) {
@@ -468,12 +486,27 @@ export const AnalysisPage = {
   async _updateMarketPrices(tickers) {
     this._resolvedPrices = {}
     if (!tickers || tickers.length === 0) return
+    
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+
     try {
-      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(tickers.join(','))}`)
+      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(tickers.join(','))}`, null, {
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      
       for (const ticker of tickers) {
         this._resolvedPrices[ticker] = data[ticker]?.price ?? null
       }
-    } catch (err) { console.error('Error precios:', err) }
+    } catch (err) { 
+      clearTimeout(timeoutId)
+      if (err.name === 'AbortError') {
+        console.warn('[Analysis] Timeout en consulta de precios de mercado (10s)')
+      } else {
+        console.error('Error precios:', err) 
+      }
+    }
   },
 
   _renderCurrentHoldings(holdings) {

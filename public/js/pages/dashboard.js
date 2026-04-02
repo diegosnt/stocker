@@ -69,6 +69,15 @@ export const DashboardPage = {
       const data = await this._loadHoldings()
       this._renderDashboard(data)
       await this._updateMarketPrices(data.tickers)
+
+      // ── Intervalo de actualización automática (cada 2 minutos) ──
+      // Guardamos la referencia para que cleanup() pueda limpiarlo.
+      if (data.tickers && data.tickers.length > 0) {
+        this._marketInterval = setInterval(() => {
+          console.log('[Dashboard] Actualización automática de precios...');
+          this._updateMarketPrices(data.tickers);
+        }, 120000); // 120.000 ms = 2 minutos
+      }
     } catch (err) {
       console.error(err)
       // Forzar re-render en error (no usar cache)

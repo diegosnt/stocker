@@ -16,6 +16,12 @@ const PORT = process.env.PORT || 3000
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET
 const josePromise = import('jose')
 
+// Middleware para generar Nonce de CSP
+app.use((req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64')
+  next()
+})
+
 // ── CSRF Protection ────────────────────────────────────────
 const csrfTokens = new Map()
 
@@ -46,8 +52,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'", "https://esm.sh"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
+      scriptSrc:  ["'self'", (req, res) => `'nonce-${res.locals.cspNonce}'`, "https://esm.sh"],
+      styleSrc:   ["'self'", (req, res) => `'nonce-${res.locals.cspNonce}'`],
+      styleSrcAttr: ["'unsafe-inline'"], // Permitir atributos style="..." dinámicos
       connectSrc: ["'self'", "https://esm.sh", "https://*.supabase.co", "https://cdn.jsdelivr.net"],
       imgSrc:     ["'self'", "data:"],
       fontSrc:    ["'self'"],
@@ -109,7 +116,8 @@ const mutationLimiter = rateLimit({
 app.get('/', (req, res) => {
   res.send(renderPage({
     supabaseUrl:     process.env.SUPABASE_URL     || '',
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ''
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
+    nonce:           res.locals.cspNonce
   }))
 })
 
@@ -852,7 +860,7 @@ app.get('/api/quotes', financeLimiter, requireAuth, async (req, res) => {
   const results = {}
   const toFetch = []
 
-  // 1. Revisar cache
+  // 1. Revisar cache interno de Node (respetando QUOTE_TTL)
   for (const ticker of tickers) {
     const cached = quoteCache.get(ticker)
     if (cached && Date.now() < cached.expiresAt) {
@@ -864,50 +872,48 @@ app.get('/api/quotes', financeLimiter, requireAuth, async (req, res) => {
 
   if (toFetch.length === 0) return res.json(results)
 
-  // Rate limiting ya maneja por financeLimiter middleware
+  // 2. Si faltan precios, consultamos Finance API
   try {
     const yfBase = process.env.FINANCE_URL
     const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
 
-    // Pool de concurrencia: máximo 5 requests simultáneos a Finance
-    const CONCURRENCY_LIMIT = 5
-    
-    async function fetchWithLimit(ticker) {
+    // Helper para fetch individual con timeout
+    async function fetchTickerPrice(ticker) {
       const needsSuffix = !ticker.includes('.')
       const symbol = (needsSuffix && yfSuffix) ? `${ticker}${yfSuffix}` : ticker
-      
       const url = `${yfBase}/${encodeURIComponent(symbol)}?interval=1d&range=1d&includeTimestamps=false`
-      const yfRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
       
-      if (yfRes.ok) {
-        const data = await yfRes.json()
-        const meta = data?.chart?.result?.[0]?.meta
-        if (meta) {
-          const price = meta.regularMarketPrice ?? null
-          const currency = meta.currency ?? null
-          quoteCache.set(ticker, { price, currency, expiresAt: Date.now() + QUOTE_TTL })
-          results[ticker] = { price, currency }
-        }
-      }
-    }
-    
-    const queue = [...toFetch]
-    const workers = []
-    
-    for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, queue.length); i++) {
-      workers.push((async () => {
-        while (queue.length > 0) {
-          const ticker = queue.shift()
-          try {
-            await fetchWithLimit(ticker)
-          } catch (err) {
-            logger.warn({ ticker, err: err.message }, 'Error en bulk quote individual')
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+      try {
+        const yfRes = await fetch(url, { 
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Stocker/1.0)' },
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+
+        if (yfRes.ok) {
+          const data = await yfRes.json()
+          const meta = data?.chart?.result?.[0]?.meta
+          if (meta) {
+            const price = meta.regularMarketPrice ?? null
+            const currency = meta.currency ?? null
+            
+            if (price !== null) {
+              quoteCache.set(ticker, { price, currency, expiresAt: Date.now() + QUOTE_TTL })
+              results[ticker] = { price, currency }
+            }
           }
         }
-      })())
+      } catch (err) {
+        clearTimeout(timeoutId)
+        logger.warn({ ticker, err: err.name === 'AbortError' ? 'Timeout' : err.message }, 'Error en fetch individual para quotes')
+      }
     }
-    
-    await Promise.all(workers)
+
+    // Ejecutamos todos los fetches en paralelo
+    await Promise.all(toFetch.map(t => fetchTickerPrice(t)))
 
     res.json(results)
   } catch (err) {

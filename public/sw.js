@@ -11,7 +11,9 @@ const ASSETS = [
   '/img/logo.svg'
 ]
 
-// Instalación: Cacheamos los assets críticos
+/**
+ * Instalación: Cacheamos los assets críticos
+ */
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -22,147 +24,70 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activación: Limpieza de versiones vieja
+/**
+ * Activación: Limpieza de versiones viejas de caché
+ */
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => {
-          console.log(`[SW] Eliminando cache antiguo: ${key}`)
-          return caches.delete(key)
-        })
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => {
+            console.log(`[SW] Eliminando caché antiguo: ${key}`);
+            return caches.delete(key);
+          })
       );
     })
   );
   self.clients.claim();
 });
 
-// Fetch: Estrategia Stale-While-Revalidate para assets dinámicos
+/**
+ * Fetch: Estrategia de cacheo inteligente
+ * - Navigation: Network First con fallback a '/' (Offline support)
+ * - Assets propios: Stale-While-Revalidate (Velocidad + Actualización)
+ * - APIs/Supabase: Network Only (Datos frescos siempre)
+ */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Solo cacheamos peticiones GET de nuestro propio origen
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
+  // 1. Solo manejamos peticiones GET
+  if (request.method !== 'GET') return;
 
-  // Evitamos cachear llamadas a la API o Supabase
+  // 2. No cacheamos llamadas a la API ni a Supabase (queremos datos reales)
   if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase.co')) {
     return;
   }
 
-  // Para requests de navigation (HTML), siempre vamos a la red
+  // 3. Manejo de Navegación (HTML Principal) - Network First
   if (request.mode === 'navigate') {
-    return fetch(request).catch(() => caches.match('/'));
-  }
-
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      const fetchPromise = fetch(request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const cacheCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, cacheCopy);
-          });
-        }
-        return networkResponse;
-      }).catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
-  );
-});
-
-// Activación: Limpieza de versiones viejas
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => {
-          console.log(`[SW] Eliminando cache antiguo: ${key}`)
-          return caches.delete(key)
-        })
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// Fetch: Estrategia Stale-While-Revalidate para assets dinámicos
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Solo cacheamos peticiones GET de nuestro propio origen
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
+    event.respondWith(
+      fetch(request).catch(() => {
+        return caches.match('/');
+      })
+    );
     return;
   }
 
-  // Evitamos cachear llamadas a la API o Supabase
-  if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase.co')) {
-    return;
+  // 4. Assets Estáticos Propios - Stale-While-Revalidate
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        const fetchPromise = fetch(request).then((networkResponse) => {
+          // Si la respuesta es válida, actualizamos el caché en segundo plano
+          if (networkResponse && networkResponse.status === 200) {
+            const cacheCopy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, cacheCopy);
+            });
+          }
+          return networkResponse;
+        }).catch(() => cachedResponse); // Si falla la red, devolvemos lo que había en caché
+
+        return cachedResponse || fetchPromise;
+      })
+    );
   }
-
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      const fetchPromise = fetch(request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const cacheCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, cacheCopy);
-          });
-        }
-        return networkResponse;
-      });
-
-      return cachedResponse || fetchPromise;
-    })
-  );
-});
-
-// Activación: Limpieza de versiones viejas
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// Fetch: Estrategia Stale-While-Revalidate
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Solo cacheamos peticiones GET de nuestro propio origen (assets estáticos)
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
-
-  // Evitamos cachear llamadas a la API o Supabase
-  if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase.co')) {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      const fetchPromise = fetch(request).then((networkResponse) => {
-        // Actualizamos el cache con la nueva versión de la red
-        if (networkResponse && networkResponse.status === 200) {
-          const cacheCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, cacheCopy);
-          });
-        }
-        return networkResponse;
-      });
-
-      // Devolvemos el cache si existe, sino esperamos a la red
-      return cachedResponse || fetchPromise;
-    })
-  );
 });
