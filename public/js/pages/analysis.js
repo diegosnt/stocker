@@ -53,10 +53,10 @@ export const AnalysisPage = {
       </div>
 
       <div class="card" style="margin-bottom: 2rem">
-        <div style="display: flex; gap: 1.5rem; align-items: stretch; flex-wrap: wrap; justify-content: space-between">
-          
+        <div class="analysis-control-panel">
+
           <!-- Sector ALyCs (Alineado a la izquierda, altura estirada) -->
-          <div style="flex: 1; min-width: 300px; background: var(--bg-main); padding: 1rem 1.25rem; border-radius: var(--radius); border: 1px solid var(--border); display: flex; flex-direction: column">
+          <div class="analysis-control-alycs">
             <label style="display: block; margin-bottom: 1rem; font-weight: 700; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: left">Analizar Cartera por ALyC</label>
             <div id="analysis-alyc-buttons" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; flex: 1; align-items: center">
               <span style="color: var(--text-muted); font-size: 0.85rem">Cargando ALyCs...</span>
@@ -64,7 +64,7 @@ export const AnalysisPage = {
           </div>
 
           <!-- Sector Benchmark (Tarjeta Independiente y Centrada) -->
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-main); padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); min-width: 250px">
+          <div class="analysis-control-benchmark">
             <div class="form-group" style="margin:0; width: 160px; text-align: center">
               <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Benchmark Base</label>
               <div style="display: flex; gap: 0.25rem; margin-bottom: 0.5rem; justify-content: center">
@@ -78,7 +78,7 @@ export const AnalysisPage = {
           </div>
 
           <!-- Contenedor fijo para el botón PDF (Altura igualada a las tarjetas, siempre visible) -->
-          <div style="width: 180px; display: flex; align-items: stretch; justify-content: center">
+          <div class="analysis-control-pdf">
             <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; font-size: 0.85rem; font-weight: 700; flex-direction: column; gap: 0.4rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
               <span>Generar Reporte PDF</span>
@@ -90,7 +90,7 @@ export const AnalysisPage = {
 
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
-        <div id="analysis-section-0" style="display: grid; grid-template-columns: 6fr 2fr 2fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div id="analysis-section-0" class="analysis-grid-top">
           <div class="card" style="margin-bottom: 0; padding: 1.25rem">
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual</h3>
             <div id="current-holdings-table" style="overflow-x: auto"></div>
@@ -106,7 +106,7 @@ export const AnalysisPage = {
         </div>
 
         <!-- SECCIÓN 0.5: Comparativa y Mapa de Calor -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div class="analysis-grid-two">
           <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem">
               <h3 style="font-size: 0.95rem; margin: 0">Comparativa: Inversión vs Valor Actual ($)</h3>
@@ -133,7 +133,7 @@ export const AnalysisPage = {
         </div>
 
         <!-- SECCIÓN 1: KPIs y Eficiencia -->
-        <div style="display: grid; grid-template-columns: 300px 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: stretch">
+        <div class="analysis-grid-mixed">
           <div class="card" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0">
             <h3 style="font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--text-muted)">Riesgo y Retorno</h3>
             <div id="analysis-kpis-container" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 0.4rem">

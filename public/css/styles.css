@@ -325,6 +325,55 @@ h1, h2, h3, h4, h5 {
   overflow: hidden;
 }
 
+/* ---- Mobile / Desktop visibility toggles ---- */
+.mobile-only { display: none; }
+
+.mobile-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+/* ---- Analysis control panel ---- */
+.analysis-control-panel {
+  display: flex;
+  gap: 1.5rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.analysis-control-alycs {
+  flex: 1;
+  min-width: 300px;
+  background: var(--bg-main);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-control-benchmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-main);
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  min-width: 250px;
+}
+
+.analysis-control-pdf {
+  width: 180px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
 /* ---- Responsividad General ---- */
 @media (max-width: 1200px) {
   .main-content { padding: 1.5rem; }
@@ -372,10 +421,36 @@ h1, h2, h3, h4, h5 {
 
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .charts-row { flex-direction: column; }
-  
+
   /* Mobile Cards & Desktop Hiding */
   .desktop-only { display: none !important; }
-  
+  .mobile-only { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }
+
+  /* Analysis control panel */
+  .analysis-control-alycs { min-width: 0; }
+  .analysis-control-benchmark { min-width: 0; width: 100%; }
+  .analysis-control-pdf { width: 100%; }
+
+  /* Analysis panel mobile: allow scrolling horizontally */
+  .analysis-control-panel {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .analysis-control-alycs {
+    flex: 0 0 auto;
+    min-width: 280px;
+  }
+  .analysis-control-benchmark {
+    flex: 0 0 auto;
+  }
+  .analysis-control-pdf {
+    flex: 0 0 auto;
+  }
+
+  /* Toast */
+  .toast-container { bottom: 1rem; right: 1rem; left: 1rem; }
+
   .pag-pages { gap: 0.15rem; }
   .pag-num { min-width: 1.75rem; font-size: 0.8rem; padding: 0.2rem 0.3rem; }
   .pagination { gap: 0.35rem; padding: 0.75rem 0.5rem; }

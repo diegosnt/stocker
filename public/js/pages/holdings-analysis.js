@@ -184,7 +184,7 @@ export const HoldingsAnalysisPage = {
             </table>
           </div>
 
-          <div class="mobile-only" style="display: none">
+          <div class="mobile-only">
             ${items.map(h => `
               <div class="mobile-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem">
