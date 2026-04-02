@@ -236,30 +236,22 @@ export const DashboardPage = {
 
     // ── Contenido Principal (Gráficos y Tabla) ───────────────
     mainEl.innerHTML = `
-      <div class="dash-charts-row">
-        <div class="card dash-chart-card" style="min-height: 360px; display: flex; flex-direction: column;">
-          <div class="chart-panel-title" style="margin-bottom:1rem">Composición de Cartera por Tipo</div>
-          <div id="dash-type-chart" style="flex: 1; min-height: 280px; position: relative">
-            <!-- Canvas -->
+      <div id="dash-charts-wrapper" style="display:none">
+        <div class="dash-charts-row">
+          <div class="card dash-chart-card">
+            <div class="chart-panel-title" style="margin-bottom:1rem">Composición de Cartera por Tipo</div>
+            <div id="dash-type-chart" style="height: 300px; position: relative"></div>
+          </div>
+
+          <div class="card dash-chart-card">
+            <div class="chart-panel-title" style="margin-bottom:0.75rem">Comparativa: Inversión vs Valor Actual ($)</div>
+            <div id="dash-comparison-chart" style="height: 300px; position: relative"></div>
           </div>
         </div>
 
-        <div class="card" style="display: flex; flex-direction: column; min-height: 360px;">
-          <div class="chart-panel-title" style="margin-bottom:0.75rem">Comparativa: Inversión vs Valor Actual ($)</div>
-          <div id="dash-comparison-chart" style="flex: 1; min-height: 220px; position: relative">
-            <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">
-              <span class="spinner"></span> Generando comparativa...
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top: 1.5rem; display: flex; flex-direction: column; min-height: 300px;">
-        <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor (Peso vs P&L %)</div>
-        <div id="dash-heatmap" style="flex: 1; min-height: 220px; position: relative">
-          <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">
-            <span class="spinner"></span> Generando mapa de calor...
-          </div>
+        <div class="card" style="margin-top: 1.5rem">
+          <div class="chart-panel-title" style="margin-bottom:0.75rem">Mapa de Calor (Peso vs P&L %)</div>
+          <div id="dash-heatmap" style="height: 240px; position: relative"></div>
         </div>
       </div>
 
@@ -357,13 +349,14 @@ export const DashboardPage = {
     this._bindSortHeaders()
     this._bindTableToggle()
     
-    // Render charts after layout is computed (double-rAF ensures browser has painted)
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
       this._refreshHeatmap()
       this._refreshComparisonChart()
       this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
       this._chartsReady = true
-    }))
+      const wrapper = document.getElementById('dash-charts-wrapper')
+      if (wrapper) wrapper.style.display = ''
+    })
   },
 
   _refreshComparisonChart() {

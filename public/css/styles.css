@@ -129,7 +129,7 @@ h1, h2, h3, h4, h5 {
   font-weight: 500;
 }
 
-.navbar-hamburger, .navbar-logout, .dark-mode-toggle, .login-dark-mode-toggle {
+.navbar-hamburger, .navbar-logout, .navbar-reload, .dark-mode-toggle, .login-dark-mode-toggle {
   background: var(--bg-main);
   border: 1px solid var(--border);
   color: var(--text-main);
@@ -145,7 +145,7 @@ h1, h2, h3, h4, h5 {
   transition: var(--transition);
 }
 
-.navbar-hamburger:hover, .navbar-logout:hover, .dark-mode-toggle:hover, .login-dark-mode-toggle:hover {
+.navbar-hamburger:hover, .navbar-logout:hover, .navbar-reload:hover, .dark-mode-toggle:hover, .login-dark-mode-toggle:hover {
   background: var(--border);
   transform: translateY(-1px);
 }
@@ -327,6 +327,7 @@ h1, h2, h3, h4, h5 {
 
 /* ---- Mobile / Desktop visibility toggles ---- */
 .mobile-only { display: none; }
+.navbar-reload { display: none; }
 
 .mobile-card {
   background: var(--bg-card);
@@ -381,6 +382,7 @@ h1, h2, h3, h4, h5 {
 
 @media (max-width: 768px) {
   .navbar-hamburger { display: block !important; }
+  .navbar-reload { display: flex !important; }
   .navbar-user { display: none; }
   .main-content { padding: 0.75rem; } /* Menos margen lateral para que la tarjeta sea más ancha */
   
