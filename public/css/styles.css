@@ -455,6 +455,10 @@ h1, h2, h3, h4, h5 {
     left: 0.5rem; 
     width: auto;
     max-width: none;
+    align-items: stretch;
+  }
+  .toast {
+    width: 100%;
   }
 
   .pag-pages { gap: 0.15rem; }
@@ -1104,7 +1108,8 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  z-index: 1000;
+  z-index: 10000;
+  pointer-events: none;
 }
 
 .toast {
