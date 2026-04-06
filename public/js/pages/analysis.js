@@ -19,6 +19,7 @@ export const AnalysisPage = {
   _resolvedPrices: {},
   _activeAlycName: null,
   _activeAlycId: null,
+  _activeBenchmark: 'SPY',
   _lastValidHoldings: [],
 
   cleanup() {
@@ -52,14 +53,23 @@ export const AnalysisPage = {
         <h2>Análisis de Cartera</h2>
       </div>
 
-      <div class="card" style="margin-bottom: 2rem">
+      <div class="card" id="analysis-control-card" style="margin-bottom: 2rem">
+        <div class="analysis-config-header" id="analysis-config-header">
+          <h3 id="analysis-config-title">Configuración de Análisis</h3>
+          <button class="analysis-config-toggle" title="Expandir / Contraer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="analysis-config-body">
         <div class="analysis-control-panel">
 
           <!-- Sector ALyCs (Alineado a la izquierda, altura estirada) -->
           <div class="analysis-control-alycs">
-            <label style="display: block; margin-bottom: 1rem; font-weight: 700; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: left">Analizar Cartera por ALyC</label>
-            <div id="analysis-alyc-buttons" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; flex: 1; align-items: center">
+            <div style="text-align: center">
+            <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Analizar Cartera por ALyC</label>
+            <div id="analysis-alyc-buttons" style="display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: center; align-items: center">
               <span style="color: var(--text-muted); font-size: 0.85rem">Cargando ALyCs...</span>
+            </div>
             </div>
           </div>
 
@@ -68,24 +78,24 @@ export const AnalysisPage = {
             <div class="form-group" style="margin:0; width: 160px; text-align: center">
               <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Benchmark Base</label>
               <div style="display: flex; gap: 0.25rem; margin-bottom: 0.5rem; justify-content: center">
-                <button class="btn-benchmark-quick" data-ticker="SPY" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">SPY</button>
-                <button class="btn-benchmark-quick" data-ticker="QQQ" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">QQQ</button>
-                <button class="btn-benchmark-quick" data-ticker="DIA" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">DIA</button>
-                <button class="btn-benchmark-quick" data-ticker="IWM" style="padding: 2px 6px; font-size: 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-muted); font-weight: 700">IWM</button>
+                <button class="btn-alyc btn-benchmark-quick" data-ticker="SPY">SPY</button>
+                <button class="btn-alyc btn-benchmark-quick" data-ticker="QQQ">QQQ</button>
+                <button class="btn-alyc btn-benchmark-quick" data-ticker="DIA">DIA</button>
+                <button class="btn-alyc btn-benchmark-quick" data-ticker="IWM">IWM</button>
               </div>
-              <input type="text" id="analysis-benchmark" class="form-input" value="SPY" placeholder="Ej: SPY" style="font-weight: 700; height: 32px; text-align: center">
             </div>
           </div>
 
           <!-- Contenedor fijo para el botón PDF (Altura igualada a las tarjetas, siempre visible) -->
           <div class="analysis-control-pdf">
-            <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; font-size: 0.85rem; font-weight: 700; flex-direction: column; gap: 0.4rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; min-height: 0; font-size: 0.75rem; font-weight: 700; flex-direction: column; gap: 0.25rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed; padding: 0.5rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
               <span>Generar Reporte PDF</span>
             </button>
           </div>
 
         </div>
+        </div><!-- analysis-config-body -->
       </div>
 
       <div id="analysis-results" style="display: none">
@@ -222,6 +232,8 @@ export const AnalysisPage = {
       </div>`
 
     this._setupEvents()
+    // Marcar SPY como benchmark activo por defecto
+    document.querySelector('.btn-benchmark-quick[data-ticker="SPY"]')?.classList.add('btn-primary')
     await this._loadAlycs()
   },
 
@@ -246,13 +258,7 @@ export const AnalysisPage = {
       container.innerHTML = ''
       alycs.forEach(alyc => {
         const btn = document.createElement('button')
-        btn.className = 'btn btn-ghost'
-        btn.style.padding = '0.75rem 1.25rem'
-        btn.style.minWidth = '110px'
-        btn.style.height = '54px'
-        btn.style.textAlign = 'center'
-        btn.style.fontSize = '0.9rem'
-        btn.style.fontWeight = '700'
+        btn.className = 'btn-alyc'
         btn.style.border = '1px solid var(--border)'
         btn.textContent = alyc.name
         btn.onclick = () => {
@@ -267,8 +273,21 @@ export const AnalysisPage = {
     }
   },
 
+  _toggleConfigCard(alycName) {
+    const card  = document.getElementById('analysis-control-card')
+    const title = document.getElementById('analysis-config-title')
+    const isCollapsed = card.classList.toggle('collapsed')
+    title.textContent = isCollapsed && alycName
+      ? `Configuración — ${alycName}`
+      : 'Configuración de Análisis'
+  },
+
   _setupEvents() {
     document.getElementById('btn-generate-pdf').addEventListener('click', () => this._generatePDF())
+
+    document.getElementById('analysis-config-header').addEventListener('click', () => {
+      this._toggleConfigCard(this._activeAlycName || null)
+    })
     
     // Refresh individual Comparison Chart
     const btnRefreshComp = document.getElementById('btn-refresh-comp')
@@ -287,15 +306,9 @@ export const AnalysisPage = {
     // Quick Benchmarks
     document.querySelectorAll('.btn-benchmark-quick').forEach(btn => {
       btn.onclick = () => {
-        document.getElementById('analysis-benchmark').value = btn.dataset.ticker
-        document.querySelectorAll('.btn-benchmark-quick').forEach(b => {
-          b.style.background = 'var(--bg-main)'
-          b.style.color = 'var(--text-muted)'
-          b.style.borderColor = 'var(--border)'
-        })
-        btn.style.background = 'var(--color-primary)'
-        btn.style.color = 'white'
-        btn.style.borderColor = 'var(--color-primary)'
+        this._activeBenchmark = btn.dataset.ticker
+        document.querySelectorAll('.btn-benchmark-quick').forEach(b => b.classList.remove('btn-primary'))
+        btn.classList.add('btn-primary')
         
         if (this._activeAlycId) {
           const activeBtn = Array.from(document.querySelectorAll('#analysis-alyc-buttons button'))
@@ -346,13 +359,9 @@ export const AnalysisPage = {
     // Update active button state
     document.querySelectorAll('#analysis-alyc-buttons button').forEach(b => {
       b.classList.remove('btn-primary')
-      b.classList.add('btn-ghost')
-      b.style.borderColor = 'var(--border)'
     })
     if (activeBtn) {
-      activeBtn.classList.remove('btn-ghost')
       activeBtn.classList.add('btn-primary')
-      activeBtn.style.borderColor = 'var(--color-primary)'
     }
 
     const resultsDiv = document.getElementById('analysis-results')
@@ -375,7 +384,7 @@ export const AnalysisPage = {
       const alycHoldings = holdings.filter(h => h.alyc_id === alycId)
       if (alycHoldings.length < 2) throw new Error('Se necesitan al menos 2 activos.')
 
-      const benchmarkTicker = document.getElementById('analysis-benchmark').value || 'SPY'
+      const benchmarkTicker = this._activeBenchmark || 'SPY'
       const historyPromises = [
         ...alycHoldings.map(h => this._fetchHistory(h.ticker)),
         this._fetchHistory(benchmarkTicker)
@@ -473,6 +482,13 @@ export const AnalysisPage = {
       pdfBtn.disabled = false
       pdfBtn.style.opacity = '1'
       pdfBtn.style.cursor = 'pointer'
+
+      // Colapsar la tarjeta de configuración
+      const card = document.getElementById('analysis-control-card')
+      if (!card.classList.contains('collapsed')) {
+        card.classList.add('collapsed')
+        document.getElementById('analysis-config-title').textContent = `Configuración — ${this._activeAlycName}`
+      }
     } catch (e) {
       console.error(e)
       showToast(e.message, 'error')

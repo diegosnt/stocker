@@ -133,16 +133,27 @@ h1, h2, h3, h4, h5 {
   background: var(--bg-main);
   border: 1px solid var(--border);
   color: var(--text-main);
-  padding: 0.35rem 0.6rem;
+  padding: 0;
+  width: 34px;
+  height: 34px;
   border-radius: 0.4rem;
   cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
   transition: var(--transition);
+  line-height: 0; /* Evitar saltos de línea fantasmas */
+  font-size: 0;   /* Evitar espacios en blanco fantasmas */
+}
+
+.navbar-hamburger svg, .navbar-reload svg, .dark-mode-toggle svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.navbar-logout {
+  width: auto;
+  padding: 0 0.75rem;
 }
 
 .navbar-hamburger:hover, .navbar-logout:hover, .navbar-reload:hover, .dark-mode-toggle:hover, .login-dark-mode-toggle:hover {
@@ -336,6 +347,72 @@ h1, h2, h3, h4, h5 {
   padding: 1rem;
 }
 
+/* ---- Analysis config card (collapsible) ---- */
+.analysis-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.analysis-config-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.analysis-config-toggle {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.analysis-config-body {
+  margin-top: 1.25rem;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+#analysis-control-card.collapsed .analysis-config-body {
+  display: none;
+}
+
+#analysis-control-card.collapsed .analysis-config-toggle {
+  transform: rotate(-90deg);
+}
+
+/* ---- Analysis ALyC buttons ---- */
+.btn-alyc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  min-width: 0;
+  height: auto;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: inherit;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.btn-alyc.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
 /* ---- Analysis control panel ---- */
 .analysis-control-panel {
   display: flex;
@@ -349,11 +426,13 @@ h1, h2, h3, h4, h5 {
   flex: 1;
   min-width: 300px;
   background: var(--bg-main);
-  padding: 1rem 1.25rem;
+  padding: 0.5rem 1rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .analysis-control-benchmark {
@@ -362,7 +441,7 @@ h1, h2, h3, h4, h5 {
   align-items: center;
   justify-content: center;
   background: var(--bg-main);
-  padding: 1rem;
+  padding: 0.5rem 1rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   min-width: 250px;
@@ -382,7 +461,7 @@ h1, h2, h3, h4, h5 {
 
 @media (max-width: 768px) {
   .navbar-hamburger { display: block !important; }
-  .navbar-reload { display: flex !important; }
+  .navbar-reload.mobile-only { display: flex !important; flex-direction: row; padding: 0; gap: 0; width: 34px; height: 34px; }
   .navbar-user { display: none; }
   .main-content { padding: 0.75rem; } /* Menos margen lateral para que la tarjeta sea más ancha */
   
@@ -428,27 +507,21 @@ h1, h2, h3, h4, h5 {
   .desktop-only { display: none !important; }
   .mobile-only { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }
 
-  /* Analysis control panel */
-  .analysis-control-alycs { min-width: 0; }
-  .analysis-control-benchmark { min-width: 0; width: 100%; }
-  .analysis-control-pdf { width: 100%; }
-
-  /* Analysis panel mobile: allow scrolling horizontally */
+  /* Analysis control panel — mobile: stack vertical, sin scroll horizontal */
   .analysis-control-panel {
-    overflow-x: auto;
+    flex-direction: column;
     flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
+    gap: 0.75rem;
   }
-  .analysis-control-alycs {
-    flex: 0 0 auto;
-    min-width: 280px;
-  }
-  .analysis-control-benchmark {
-    flex: 0 0 auto;
-  }
+  .analysis-control-alycs,
+  .analysis-control-benchmark,
   .analysis-control-pdf {
-    flex: 0 0 auto;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
   }
+  .analysis-control-benchmark .form-group { width: 100% !important; }
 
   /* Dashboard mobile instruments cards */
   .dash-instruments-cards {
@@ -463,6 +536,13 @@ h1, h2, h3, h4, h5 {
     border-radius: var(--radius);
     overflow: hidden;
     font-size: 0.75rem;
+    transition: box-shadow 0.2s;
+  }
+  .dash-instrument-card.collapsed .dash-instrument-card-body {
+    display: none;
+  }
+  .dash-instrument-card.collapsed .dash-instrument-card-header {
+    border-bottom: none;
   }
   .dash-instrument-card-header {
     background: var(--bg-main);
@@ -473,6 +553,18 @@ h1, h2, h3, h4, h5 {
     border-bottom: 1px solid var(--border);
     gap: 0.5rem;
     flex-wrap: wrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .dash-instrument-card-header::after {
+    content: '▾';
+    font-size: 1rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    margin-left: auto;
+  }
+  .dash-instrument-card.collapsed .dash-instrument-card-header::after {
+    transform: rotate(-90deg);
   }
   .dash-instrument-card-header .ticker-chip {
     font-weight: 700;

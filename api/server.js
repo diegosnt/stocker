@@ -226,6 +226,34 @@ app.get('/api/csrf-token', requireAuth, (req, res) => {
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 
+app.get('/api/auth/session', requireAuth, async (req, res) => {
+  // Si llegó acá es porque requireAuth validó la cookie o el token
+  try {
+    // Obtenemos los datos frescos del usuario desde Supabase
+    const supabaseRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 
+        'apikey': SUPABASE_ANON_KEY, 
+        'Authorization': req.headers.authorization || `Bearer ${parseCookies(req.headers.cookie)['sb-session']}`
+      }
+    })
+    const user = await supabaseRes.json()
+    
+    if (!supabaseRes.ok) {
+      return res.status(401).json({ error: 'Sesión expirada en el proveedor' })
+    }
+
+    // Devolvemos el token de la cookie para que el cliente lo guarde en memoria
+    const token = req.headers.authorization?.replace('Bearer ', '') || parseCookies(req.headers.cookie)['sb-session']
+
+    res.json({ 
+      user,
+      access_token: token
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Error al recuperar sesión' })
+  }
+})
+
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body
   if (!email || !password) {

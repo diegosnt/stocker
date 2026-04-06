@@ -21,6 +21,26 @@ async function apiFetch(path, options = {}) {
   return data
 }
 
+export async function recoverSession() {
+  try {
+    const res = await fetch('/api/auth/session')
+    if (!res.ok) return null
+    
+    const data = await res.json()
+    if (data.access_token) {
+      await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: null // La cookie es la que manda la persistencia
+      })
+      await fetchCsrfToken()
+      return data.user
+    }
+  } catch (e) {
+    console.warn('No se pudo recuperar la sesión:', e)
+  }
+  return null
+}
+
 export async function signIn(email, password) {
   const data = await apiFetch('/api/auth/login', {
     method: 'POST',

@@ -21,10 +21,6 @@ export const DashboardPage = {
     this._chartRendered = false
     this._chartsReady = false
     
-    if (this._marketInterval) {
-      clearInterval(this._marketInterval)
-      this._marketInterval = null
-    }
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -69,15 +65,6 @@ export const DashboardPage = {
       const data = await this._loadHoldings()
       this._renderDashboard(data)
       await this._updateMarketPrices(data.tickers)
-
-      // ── Intervalo de actualización automática (cada 2 minutos) ──
-      // Guardamos la referencia para que cleanup() pueda limpiarlo.
-      if (data.tickers && data.tickers.length > 0) {
-        this._marketInterval = setInterval(() => {
-          console.log('[Dashboard] Actualización automática de precios...');
-          this._updateMarketPrices(data.tickers);
-        }, 120000); // 120.000 ms = 2 minutos
-      }
     } catch (err) {
       console.error(err)
       // Forzar re-render en error (no usar cache)
@@ -174,7 +161,7 @@ export const DashboardPage = {
     this._sortCol = ''
     this._sortAsc = true
 
-    const fmt     = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt     = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const hasUSD  = data.items.some(h => h.currency === 'USD')
     const skeleton = `<span class="cell-skeleton" style="width:80px;height:1.25rem;display:inline-block"></span>`
 
@@ -318,7 +305,7 @@ export const DashboardPage = {
               const weight = (h.invested / totalInvested) * 100
               const qtyStr = h.quantity.toLocaleString('es-AR')
               return `
-              <div class="dash-instrument-card" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}">
+              <div class="dash-instrument-card collapsed" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}">
                 <div class="dash-instrument-card-header">
                   <span class="ticker-chip" title="${h.name}">${h.ticker}</span>
                   <span class="dash-instrument-meta">
@@ -357,6 +344,7 @@ export const DashboardPage = {
 
     this._bindSortHeaders()
     this._bindTableToggle()
+    this._bindMobileAccordion()
     
     requestAnimationFrame(() => {
       this._refreshHeatmap()
@@ -416,7 +404,7 @@ export const DashboardPage = {
   },
 
   _updatePriceCells(ticker, price) {
-    const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const dash     = '<span style="color:var(--text-muted)">—</span>'
     const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
     const sign     = v => v > 0 ? '+' : ''
@@ -472,7 +460,7 @@ export const DashboardPage = {
       else                      { resUSD++; if (price !== null) pnlUSD += (price - h.avgBuyPrice) * h.quantity }
     }
 
-    const fmt   = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt   = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const sign  = v => v > 0 ? '+' : ''
     const color = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-main)'
     const pending = resARS + resUSD < total
@@ -615,5 +603,16 @@ export const DashboardPage = {
     })
 
     rows.forEach(row => tbody.appendChild(row))
+  },
+
+  _bindMobileAccordion() {
+    document.querySelectorAll('.dash-instrument-card-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        const card = e.currentTarget.closest('.dash-instrument-card');
+        if (card) {
+          card.classList.toggle('collapsed');
+        }
+      });
+    });
   }
 }
