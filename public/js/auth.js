@@ -23,14 +23,23 @@ async function apiFetch(path, options = {}) {
 
 export async function recoverSession() {
   try {
-    const res = await fetch('/api/auth/session')
-    if (!res.ok) return null
-    
-    const data = await res.json()
-    if (data.access_token) {
+    let res = await fetch('/api/auth/session')
+    let data = null
+
+    if (res.status === 401) {
+      // Si la sesión no es válida, intentamos refrescar usando la cookie refresh_token
+      const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' })
+      if (refreshRes.ok) {
+        data = await refreshRes.json()
+      }
+    } else if (res.ok) {
+      data = await res.json()
+    }
+
+    if (data && data.access_token) {
       await supabase.auth.setSession({
         access_token: data.access_token,
-        refresh_token: null // La cookie es la que manda la persistencia
+        refresh_token: null // La cookie HttpOnly maneja la persistencia del refresh
       })
       await fetchCsrfToken()
       return data.user
@@ -39,6 +48,22 @@ export async function recoverSession() {
     console.warn('No se pudo recuperar la sesión:', e)
   }
   return null
+}
+
+export async function refreshSession() {
+  const res = await fetch('/api/auth/refresh', { method: 'POST' })
+  if (!res.ok) {
+    throw new Error('No se pudo refrescar la sesión')
+  }
+  const data = await res.json()
+  if (data.access_token) {
+    await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: null
+    })
+    await fetchCsrfToken()
+  }
+  return data
 }
 
 export async function signIn(email, password) {
@@ -51,7 +76,7 @@ export async function signIn(email, password) {
     // Al loguearnos, actualizamos la sesión de Supabase en memoria
     await supabase.auth.setSession({
       access_token: data.access_token,
-      refresh_token: data.refresh_token
+      refresh_token: null // La cookie HttpOnly maneja la persistencia
     })
     
     await fetchCsrfToken()
@@ -74,7 +99,7 @@ export async function signUp(email, password) {
     // Actualizamos la sesión de Supabase en memoria
     await supabase.auth.setSession({
       access_token: data.access_token,
-      refresh_token: data.refresh_token
+      refresh_token: null // La cookie HttpOnly maneja la persistencia
     })
 
     await fetchCsrfToken()
@@ -88,15 +113,15 @@ export async function signUp(email, password) {
 }
 
 export async function signOut() {
-  // Intentamos cerrar sesión en el backend para limpiar la cookie HttpOnly
+  // Intentamos cerrar sesión en el backend para limpiar las cookies HttpOnly
   try {
     const { data: { session } } = await supabase.auth.getSession()
-    if (session?.access_token) {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      })
-    }
+    const token = session?.access_token
+    
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    })
   } catch (e) {
     console.warn('Error en logout backend:', e)
   }

@@ -7,9 +7,17 @@ async function ensureCsrfToken() {
   
   let session = (await supabase.auth.getSession())?.data?.session
   if (!session?.access_token) {
-    const { data, error } = await supabase.auth.refreshSession()
-    if (error || !data?.session) return null
-    session = data.session
+    try {
+      const { refreshSession } = await import('./auth.js')
+      const data = await refreshSession()
+      if (data && data.access_token) {
+        session = { access_token: data.access_token }
+      } else {
+        return null
+      }
+    } catch (e) {
+      return null
+    }
   }
   
   try {
@@ -74,11 +82,37 @@ export async function apiRequest(method, path, body = undefined, options = {}) {
 
   const res = await fetch(path, fetchOptions)
 
-  if (res.status === 401) {
+  if (res.status === 401 && !options._retry) {
+    try {
+      const { refreshSession } = await import('./auth.js')
+      const data = await refreshSession()
+      if (data && data.access_token) {
+        // Reintentar con el nuevo token (los headers necesitan actualizarse)
+        const retryOptions = { ...options, _retry: true }
+        const newHeaders = { ...headers, 'Authorization': `Bearer ${data.access_token}` }
+        
+        // Si era una mutación, también refrescamos el CSRF por las dudas
+        if (MUTATION_METHODS.has(method)) {
+          csrfToken = null
+          const newToken = await ensureCsrfToken()
+          if (newToken) newHeaders['X-CSRF-Token'] = newToken
+        }
+
+        const retryRes = await fetch(path, { ...fetchOptions, headers: newHeaders })
+        if (retryRes.status === 401) throw new Error('Refresh fallido post-reintento')
+        if (retryRes.status === 204) return null
+        const json = await retryRes.json()
+        if (!retryRes.ok) throw Object.assign(new Error('Error en reintento'), { status: retryRes.status, response: json })
+        return json.data ?? json
+      }
+    } catch (e) {
+      console.warn('Silent refresh fallido:', e)
+    }
+    
     window.dispatchEvent(new CustomEvent('session-expired'))
     throw Object.assign(new Error('Sesión expirada'), { code: 'session_expired' })
   }
-  
+
   if (res.status === 403 && !headers['X-CSRF-Retry']) {
     csrfToken = null
     const newToken = await ensureCsrfToken()

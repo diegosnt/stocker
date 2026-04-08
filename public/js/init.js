@@ -193,10 +193,61 @@ async function initAuth() {
 initAuth()
 
 // ── Service Worker ─────────────────────────────────────────
+function showUpdatePrompt(sw) {
+  if (!toastContainer) {
+    toastContainer = document.createElement('div')
+    toastContainer.className = 'toast-container'
+    document.body.appendChild(toastContainer)
+  }
+  
+  const toast = document.createElement('div')
+  toast.className = 'toast toast-update'
+  toast.innerHTML = `
+    <div class="toast-content">
+      <div class="toast-title">Nueva Versión</div>
+      <div class="toast-msg">Actualizá para ver los cambios.</div>
+    </div>
+    <button class="btn btn-primary btn-sm" id="btn-sw-update">Actualizar</button>
+  `
+  toast.style.pointerEvents = 'auto'
+  toastContainer.appendChild(toast)
+
+  toast.querySelector('#btn-sw-update').addEventListener('click', () => {
+    sw.postMessage('SKIP_WAITING')
+    toast.remove()
+  })
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then((reg) => console.log('[SW] Registrado OK:', reg.scope))
+      .then((reg) => {
+        console.log('[SW] Registrado OK:', reg.scope)
+        
+        // 1. Hay un SW esperando (vuelto a abrir después de una descarga silenciosa)
+        if (reg.waiting) {
+          showUpdatePrompt(reg.waiting)
+        }
+
+        // 2. Nuevo SW detectado mientras la app está abierta
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdatePrompt(newSW)
+            }
+          })
+        })
+      })
       .catch((err) => console.error('[SW] Error:', err))
+  })
+
+  // 3. Cuando el nuevo SW tome el control, recargamos
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true
+      window.location.reload()
+    }
   })
 }

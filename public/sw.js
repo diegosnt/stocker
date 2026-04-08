@@ -1,6 +1,5 @@
-// Versionado automático basado en la fecha (cambia diariamente)
-// Esto fuerza actualización del cache automáticamente
-const VERSION = new Date().toISOString().slice(0, 10).replace(/-/g, '') // YYYYMMDD
+// Versionado granular (YYYYMMDD-HHMM)
+const VERSION = '20260408-0055'
 const CACHE_NAME = `stocker-v${VERSION}`
 
 // Assets base que se pre-cachean en cada versión
@@ -21,7 +20,16 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS);
     })
   );
-  self.skipWaiting();
+  // Eliminamos skipWaiting automático para permitir actualización controlada
+});
+
+/**
+ * Mensajes: Escuchamos comandos desde el cliente
+ */
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 /**

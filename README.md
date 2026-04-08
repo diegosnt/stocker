@@ -11,11 +11,11 @@ Aplicación web para el registro, seguimiento y análisis estratégico de operac
 | **Frontend** | Vanilla JS ES6+ (módulos), CSS3 (Variables, Grid, Flexbox) |
 | **Backend** | Node.js + Express, deployado en Vercel |
 | **Base de datos** | Supabase (PostgreSQL) con RPCs, Vistas y RLS |
-| **Autenticación** | Supabase Auth (JWT) + cookies HttpOnly + **Tokens en memoria** |
+| **Autenticación** | Supabase Auth (JWT) + Doble Cookie HttpOnly (Persistencia Mobile) |
 | **Gráficos** | Chart.js + chartjs-chart-treemap |
 | **PDF** | jsPDF + html2canvas |
 | **Cache** | Sistema híbrido memoria + localStorage con TTL configurable |
-| **PWA** | Service Worker optimizado con soporte offline |
+| **PWA** | Service Worker con Versionado Granular y Notificación de Actualización |
 
 Sin build tools ni bundlers — ES modules nativos del browser.
 
@@ -50,14 +50,20 @@ Sin build tools ni bundlers — ES modules nativos del browser.
 - **Vista Mobile Pro**: las operaciones se presentan en **tarjetas modernas y colapsables** que siguen la línea estética del dashboard, optimizando el espacio en pantalla.
 - Acciones rápidas (Editar/Borrar) accesibles tanto en tabla como en tarjetas.
 
+### Resiliencia y Actualizaciones (Nuevo)
+- **Persistencia de Sesión Pro**: Implementación de doble cookie segura para evitar cierres de sesión inesperados en dispositivos móviles al recargar o reiniciar el navegador.
+- **Silent Refresh**: Renovación automática de credenciales en segundo plano para una navegación fluida y sin interrupciones.
+- **Update Notification**: Sistema de detección de nuevas versiones del Service Worker con aviso al usuario (Toast UI) y activación manual controlada para evitar desincronización de estado.
+
 ---
 
 ## Seguridad
 
 | Medida | Detalle |
 |--------|---------|
-| **HttpOnly Cookies** | Tokens de sesión con flags HttpOnly, Secure, SameSite (blindado contra lectura JS) |
-| **Tokens en Memoria** | Access/Refresh tokens ya no se guardan en localStorage (protección contra robo físico/XSS) |
+| **Doble Cookie HttpOnly** | Persistencia de sesión robusta mediante cookies con flags HttpOnly, Secure, SameSite: Lax (protección contra XSS y persistencia en mobile) |
+| **Tokens en Memoria** | El cliente opera con tokens en memoria para requests activos, minimizando la superficie de ataque |
+| **Silent Refresh logic** | Renovación de sesión segura mediante endpoints dedicados con validación de tokens de refresco persistidos en cookies |
 | **CSRF Protection** | Tokens sincronizados en todas las mutaciones (POST/PATCH/DELETE) |
 | **CSP con Nonce** | Content Security Policy dinámica con **Nonces** generados por request (bloquea XSS inyectado) |
 | **XSS Protection** | DOMPurify sanitiza todo el contenido dinámico en el frontend |
@@ -78,14 +84,20 @@ Sin build tools ni bundlers — ES modules nativos del browser.
 - [x] **CSP Robusta** — Implementación de Nonces dinámicos y eliminación de `unsafe-inline` en scripts.
 - [x] **Seguridad de Tokens** — Migración total de localStorage a variables en memoria.
 - [x] **UI Navbar** — Iconos unificados y botones de acción (Logout, Reload, Dark Mode) con tamaño consistente.
+- [x] **Persistencia Mobile** — Implementación de Doble Cookie HttpOnly para evitar logout en recarga.
 
-### 🟡 Importante — Resiliencia y UX (EN PROGRESO 🏗️)
+### 🟡 Importante — Resiliencia y UX (COMPLETADO ✅)
 
 - [x] **Mobile Operations Cards** — Implementación de tarjetas colapsables con estilo Dashboard.
 - [x] **Mejora en botones de Análisis** — Aumento de tamaño y legibilidad para botones de ALyC y Benchmark.
 - [x] **Layout de acciones en mobile** — Botones de exportar/importar/nueva-op adaptados para pantallas pequeñas.
+- [x] **Update Notification System** — Aviso de nueva versión disponible y botón de actualización manual.
+
+### 🔵 Futuras Mejoras — Roadmap 🏗️
+
 - [ ] **Event listeners sin cleanup en modales** — `utils.js` agrega listeners de click al overlay del modal pero solo remueve el listener de `keydown` al cerrar.
 - [ ] **Error handling sin feedback al usuario** — Múltiples `catch(err)` mudos en `init.js`, `operations.js` y `analysis.js`. Reemplazar por `showToast(err.message, 'error')`.
+
 
 ---
 

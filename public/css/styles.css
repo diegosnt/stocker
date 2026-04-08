@@ -1480,6 +1480,28 @@ input:focus, select:focus, textarea:focus {
 .toast-success { border-left-color: var(--color-success); }
 .toast-error { border-left-color: var(--color-danger); }
 
+/* ---- Toast de actualización ---- */
+.toast-update {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  border-left-color: var(--color-warning);
+}
+.toast-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.toast-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.toast-msg {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }

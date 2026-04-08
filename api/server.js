@@ -122,20 +122,20 @@ app.get('/', (req, res) => {
 })
 
 // Middleware: verifica el JWT localmente.
-// Acepta token desde Authorization header o desde cookie 'sb-session'
+// Acepta token desde cookie 'sb-access-token' (preferido) o desde Authorization header
 async function requireAuth(req, res, next) {
   let token = null
 
-  // Intentar desde Authorization header primero
-  const authHeader = req.headers.authorization
-  if (authHeader?.startsWith('Bearer ')) {
-    token = authHeader.split(' ')[1]
-  }
+  // Intentar desde cookie primero para persistencia móvil
+  const cookies = parseCookies(req.headers.cookie)
+  token = cookies['sb-access-token']
 
-  // Si no hay header, intentar desde cookie
+  // Si no hay cookie, intentar desde Authorization header
   if (!token) {
-    const cookies = parseCookies(req.headers.cookie)
-    token = cookies['sb-session']
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1]
+    }
   }
 
   if (!token) {
@@ -233,7 +233,7 @@ app.get('/api/auth/session', requireAuth, async (req, res) => {
     const supabaseRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { 
         'apikey': SUPABASE_ANON_KEY, 
-        'Authorization': req.headers.authorization || `Bearer ${parseCookies(req.headers.cookie)['sb-session']}`
+        'Authorization': req.headers.authorization || `Bearer ${parseCookies(req.headers.cookie)['sb-access-token']}`
       }
     })
     const user = await supabaseRes.json()
@@ -243,7 +243,7 @@ app.get('/api/auth/session', requireAuth, async (req, res) => {
     }
 
     // Devolvemos el token de la cookie para que el cliente lo guarde en memoria
-    const token = req.headers.authorization?.replace('Bearer ', '') || parseCookies(req.headers.cookie)['sb-session']
+    const token = req.headers.authorization?.replace('Bearer ', '') || parseCookies(req.headers.cookie)['sb-access-token']
 
     res.json({ 
       user,
@@ -251,6 +251,52 @@ app.get('/api/auth/session', requireAuth, async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ error: 'Error al recuperar sesión' })
+  }
+})
+
+app.post('/api/auth/refresh', async (req, res) => {
+  const cookies = parseCookies(req.headers.cookie)
+  const refresh_token = cookies['sb-refresh-token']
+
+  if (!refresh_token) {
+    return res.status(401).json({ error: 'No hay token de actualización' })
+  }
+
+  try {
+    const supabaseRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'apikey': SUPABASE_ANON_KEY 
+      },
+      body: JSON.stringify({ refresh_token })
+    })
+    const data = await supabaseRes.json()
+
+    if (!supabaseRes.ok) {
+      logger.warn({ err: data.error_description || data.error }, 'Refresh fallido')
+      return res.status(401).json({ error: 'Token de actualización inválido' })
+    }
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    }
+    res.cookie('sb-access-token', data.access_token, cookieOptions)
+    if (data.refresh_token) {
+      res.cookie('sb-refresh-token', data.refresh_token, cookieOptions)
+    }
+
+    res.json({ 
+      user: data.user,
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    })
+  } catch (err) {
+    logger.error({ err: err.message }, 'Error en refresh')
+    res.status(500).json({ error: 'Error interno' })
   }
 })
 
@@ -273,12 +319,16 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
-    res.cookie('sb-session', data.access_token, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
-    })
+    }
+    res.cookie('sb-access-token', data.access_token, cookieOptions)
+    if (data.refresh_token) {
+      res.cookie('sb-refresh-token', data.refresh_token, cookieOptions)
+    }
 
     logger.info({ userId: data.user?.id }, 'Login exitoso')
     res.json({ 
@@ -304,7 +354,8 @@ app.post('/api/auth/logout', async (req, res) => {
       logger.warn({ err: e.message }, 'Error en logout de Supabase')
     }
   }
-  res.clearCookie('sb-session')
+  res.clearCookie('sb-access-token')
+  res.clearCookie('sb-refresh-token')
   res.json({ success: true })
 })
 
@@ -328,12 +379,16 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
     }
 
     if (data.access_token) {
-      res.cookie('sb-session', data.access_token, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000
-      })
+      }
+      res.cookie('sb-access-token', data.access_token, cookieOptions)
+      if (data.refresh_token) {
+        res.cookie('sb-refresh-token', data.refresh_token, cookieOptions)
+      }
     }
 
     res.json({ 
