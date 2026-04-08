@@ -61,7 +61,7 @@ export const OperationsPage = {
     content.innerHTML = `
       <div class="page-header">
         <h2>Operaciones</h2>
-        <div style="display:flex; gap:0.5rem">
+        <div class="page-header-actions">
           <button class="btn btn-ghost" id="btn-export-csv">↓ Exportar CSV</button>
           <button class="btn btn-ghost" id="btn-import-csv">↑ Importar CSV</button>
           <input type="file" id="input-csv" accept=".csv" style="display:none">
@@ -133,7 +133,7 @@ export const OperationsPage = {
           </div>
           <div id="ops-cards" class="ops-cards-grid">
             ${Array(5).fill(`
-              <div class="op-card skeleton" style="height: 120px; border: none"></div>
+              <div class="op-card--modern skeleton" style="height: 160px; border: none"></div>
             `).join('')}
           </div>
           <div id="ops-pagination"></div>
@@ -548,42 +548,53 @@ export const OperationsPage = {
         </tr>`
 
       cardsHtml += `
-        <div class="op-card op-card-${op.type}" data-id="${op.id}">
-          <div class="op-card-top">
-            <span class="op-card-date">${fmtDateShort(op.operated_at)}</span>
-            <div class="op-card-badges">
-          <div class="op-card-alyc">${esc(alycName)}</div>
+        <div class="op-card--modern ${op.type} collapsed" data-id="${op.id}">
+          <div class="op-card-header">
+            <div class="op-card-ticker-badge">
+              ${esc(ticker)}
             </div>
-          </div>
-          <div class="op-card-instrument">
-            <span class="ticker-chip">${esc(ticker)}</span>
-            <span class="op-card-inst-name">${esc(instName)}</span>
+            <div class="op-card-header-meta">
+              <span class="op-card-header-date">${fmtDateShort(op.operated_at)}</span>
+              <span class="op-card-qty-badge">${fmtQty(op.quantity)}</span>
+              <span class="op-card-header-alyc">${esc(alycName)}</span>
+            </div>
           </div>
 
-          <div class="op-card-amounts">
-            <div class="op-card-amount-item">
-              <span class="op-card-label">CANT</span>
-               <strong class="total-${op.type}">${fmtQty(op.quantity)}</strong>
+          <div class="op-card-body">
+            <div class="op-card-instrument-full">
+              ${esc(instName)}
             </div>
-            <div class="op-card-amount-item">
-              <span class="op-card-label">Precio</span>
-              <strong>${fmtPrice(parseFloat(op.price))}</strong>
-            </div>
-            <div class="op-card-amount-item">
-              <span class="op-card-label">Total</span>
-              <strong>${fmtPrice(total)}</strong>
+            <div class="op-card-stats-row">
+              <div class="op-card-stat">
+                <span class="op-card-stat-label">Precio</span>
+                <span class="op-card-stat-value">${fmtPrice(parseFloat(op.price))}</span>
+              </div>
+              <div class="op-card-stat" style="text-align: right">
+                <span class="op-card-stat-label">Total (${op.currency})</span>
+                <span class="op-card-stat-value" style="color: var(--total-${op.type})">${fmtPrice(total)}</span>
+              </div>
             </div>
           </div>
-          ${hasNotes ? `<div class="op-card-notes">${esc(op.notes)}</div>` : ''}
-          <div class="op-card-actions">
-            <button class="btn btn-sm btn-ghost btn-edit-op" data-op-idx="${idx}" title="Editar" aria-label="Editar">${ICON_EDIT} Editar</button>
-            <button class="btn btn-sm btn-danger btn-delete-op" data-id="${op.id}" title="Eliminar" aria-label="Eliminar">${ICON_DELETE} Eliminar</button>
+          
+          ${hasNotes ? `<div class="op-card-notes-modern">${esc(op.notes)}</div>` : ''}
+
+          <div class="op-card-actions-modern">
+            <button class="btn btn-sm btn-ghost btn-edit-op" data-op-idx="${idx}">${ICON_EDIT} Editar</button>
+            <button class="btn btn-sm btn-ghost btn-delete-op" data-id="${op.id}" style="color: var(--color-danger)">${ICON_DELETE} Borrar</button>
           </div>
         </div>`
     })
 
     tbody.innerHTML = rowsHtml
-    if (opsCards) opsCards.innerHTML = cardsHtml
+    if (opsCards) {
+      opsCards.innerHTML = cardsHtml
+      // Eventos para colapsar/expandir tarjetas mobile
+      opsCards.querySelectorAll('.op-card-header').forEach(header => {
+        header.addEventListener('click', () => {
+          header.parentElement.classList.toggle('collapsed')
+        })
+      })
+    }
 
     // Eventos de expansión (desktop)
     tbody.querySelectorAll('.op-row').forEach(row => {

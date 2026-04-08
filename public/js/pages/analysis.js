@@ -67,33 +67,31 @@ export const AnalysisPage = {
           <div class="analysis-control-alycs">
             <div style="text-align: center">
             <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Analizar Cartera por ALyC</label>
-            <div id="analysis-alyc-buttons" style="display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: center; align-items: center">
-              <span style="color: var(--text-muted); font-size: 0.85rem">Cargando ALyCs...</span>
+            <div id="analysis-alyc-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; align-items: center">
+               <span style="color: var(--text-muted); font-size: 0.85rem">Cargando ALyCs...</span>
+             </div>
+             </div>
             </div>
-            </div>
-          </div>
 
-          <!-- Sector Benchmark (Tarjeta Independiente y Centrada) -->
-          <div class="analysis-control-benchmark">
-            <div class="form-group" style="margin:0; width: 160px; text-align: center">
-              <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Benchmark Base</label>
-              <div style="display: flex; gap: 0.25rem; margin-bottom: 0.5rem; justify-content: center">
-                <button class="btn-alyc btn-benchmark-quick" data-ticker="SPY">SPY</button>
-                <button class="btn-alyc btn-benchmark-quick" data-ticker="QQQ">QQQ</button>
-                <button class="btn-alyc btn-benchmark-quick" data-ticker="DIA">DIA</button>
-                <button class="btn-alyc btn-benchmark-quick" data-ticker="IWM">IWM</button>
-              </div>
+            <!-- Sector Benchmark (Tarjeta Independiente y Centrada) -->
+            <div class="analysis-control-benchmark">
+             <div class="form-group" style="margin:0; width: 240px; text-align: center">
+               <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Benchmark Base</label>
+               <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; justify-content: center">
+                 <button class="btn-alyc btn-benchmark-quick" data-ticker="SPY">SPY</button>
+                 <button class="btn-alyc btn-benchmark-quick" data-ticker="QQQ">QQQ</button>
+                 <button class="btn-alyc btn-benchmark-quick" data-ticker="DIA">DIA</button>
+                 <button class="btn-alyc btn-benchmark-quick" data-ticker="IWM">IWM</button>
+               </div>
+             </div>
             </div>
-          </div>
-
           <!-- Contenedor fijo para el botón PDF (Altura igualada a las tarjetas, siempre visible) -->
           <div class="analysis-control-pdf">
-            <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; min-height: 0; font-size: 0.75rem; font-weight: 700; flex-direction: column; gap: 0.25rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed; padding: 0.5rem;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; min-height: 0; font-size: 0.85rem; font-weight: 700; flex-direction: column; gap: 0.35rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed; padding: 0.75rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
               <span>Generar Reporte PDF</span>
             </button>
           </div>
-
         </div>
         </div><!-- analysis-config-body -->
       </div>
