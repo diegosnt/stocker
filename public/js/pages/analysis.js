@@ -480,13 +480,6 @@ export const AnalysisPage = {
       pdfBtn.disabled = false
       pdfBtn.style.opacity = '1'
       pdfBtn.style.cursor = 'pointer'
-
-      // Colapsar la tarjeta de configuración
-      const card = document.getElementById('analysis-control-card')
-      if (!card.classList.contains('collapsed')) {
-        card.classList.add('collapsed')
-        document.getElementById('analysis-config-title').textContent = `Configuración — ${this._activeAlycName}`
-      }
     } catch (e) {
       console.error(e)
       showToast(e.message, 'error')
