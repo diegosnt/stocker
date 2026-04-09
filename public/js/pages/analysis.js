@@ -212,11 +212,11 @@ export const AnalysisPage = {
          <div class="analysis-grid-bottom">
           <div class="card" style="margin-bottom: 0">
             <h3 style="font-size: 0.75rem; margin: 1rem 1.25rem 0.5rem">Optimización: Sharpe vs Michaud vs HRP</h3>
-            <div id="redistribution-table" style="font-size: 0.7rem"></div>
+            <div id="redistribution-table" style="font-size: 0.65rem"></div>
           </div>
           <div id="correlation-card" class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Matriz de Correlación</h3>
-            <div id="correlation-matrix" style="overflow-x: auto; font-size: 0.75rem"></div>
+            <div id="correlation-matrix"></div>
           </div>
          </div>        <div class="card" style="padding: 1rem">
           <p id="analysis-summary" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4"></p>
@@ -1141,14 +1141,11 @@ export const AnalysisPage = {
     const isMobile = window.innerWidth <= 768
     const n = tickers.length, numDays = returnsMatrix[0].length
     const stats = returnsMatrix.map(r => { const avg = r.reduce((a, b) => a + b, 0) / r.length; return { avg, std: Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) } })
-    const fontSize = isMobile ? '0.5rem' : '0.7rem'
-    const cellPad = isMobile ? '2px 1px' : '4px'
-    const tableLayout = isMobile ? 'fixed' : 'auto'
-    const shortTicker = t => isMobile && t.length > 4 ? t.slice(0, 4) : t
-    const labelStyle = isMobile
-      ? `padding:${cellPad}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:0`
-      : `padding:${cellPad}`
-    let html = `<table style="width:100%; table-layout:${tableLayout}; font-size:${fontSize}; border-collapse:collapse"><tr><th style="${labelStyle}"></th>`
+    const fontSize = isMobile ? '0.5rem' : '0.6rem'
+    const cellPad = '2px 1px'
+    const shortTicker = t => t.length > 4 ? t.slice(0, 4) : t
+    const labelStyle = `padding:${cellPad}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:0`
+    let html = `<table style="width:100%; table-layout:fixed; font-size:${fontSize}; border-collapse:collapse"><tr><th style="${labelStyle}"></th>`
     tickers.forEach(t => html += `<th style="${labelStyle}">${shortTicker(t)}</th>`)
     for (let i = 0; i < n; i++) {
       html += `<tr><td style="font-weight:bold; ${labelStyle}">${shortTicker(tickers[i])}</td>`

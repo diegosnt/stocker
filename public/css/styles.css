@@ -1924,7 +1924,7 @@ input:focus, select:focus, textarea:focus {
 
 .analysis-grid-bottom {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 3fr 2fr;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   align-items: stretch;
@@ -1932,6 +1932,15 @@ input:focus, select:focus, textarea:focus {
 
 .analysis-grid-bottom > * {
   min-width: 0;
+}
+
+#redistribution-table th {
+  padding: 0.25rem 0.3rem;
+  font-size: 0.6rem;
+}
+
+#redistribution-table td {
+  padding: 0.2rem 0.3rem;
 }
 
 @media (max-width: 1200px) {
