@@ -211,8 +211,8 @@ export const AnalysisPage = {
          <!-- SECCIÓN 3: Riesgo y Correlación -->
          <div class="analysis-grid-bottom">
           <div class="card" style="margin-bottom: 0">
-            <h3 style="font-size: 0.9rem; margin: 1rem 1.25rem 0.5rem">Optimización: Sharpe vs Michaud vs HRP</h3>
-            <div id="redistribution-table" style="font-size: 0.8rem"></div>
+            <h3 style="font-size: 0.75rem; margin: 1rem 1.25rem 0.5rem">Optimización: Sharpe vs Michaud vs HRP</h3>
+            <div id="redistribution-table" style="font-size: 0.7rem"></div>
           </div>
           <div id="correlation-card" class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Matriz de Correlación</h3>
@@ -916,7 +916,7 @@ export const AnalysisPage = {
         <td><strong>${ticker}</strong></td>
         <td>${(currentW * 100).toFixed(1)}%</td>
         <td style="color: var(--text-muted)">${(sharpeW * 100).toFixed(1)}%</td>
-        <td style="color: var(--text-muted); font-size: 0.75rem">${sharpeDiff > 0 ? '+' : ''}${sharpeDiff.toFixed(1)}%</td>
+        <td style="color: var(--text-muted); font-size: 0.65rem">${sharpeDiff > 0 ? '+' : ''}${sharpeDiff.toFixed(1)}%</td>
         <td style="color: #10b981; font-weight: 600">${(michW * 100).toFixed(1)}%</td>
         <td style="color: #10b981; font-weight: 800">${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%</td>
         <td style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}%</td>
@@ -1141,7 +1141,7 @@ export const AnalysisPage = {
     const isMobile = window.innerWidth <= 768
     const n = tickers.length, numDays = returnsMatrix[0].length
     const stats = returnsMatrix.map(r => { const avg = r.reduce((a, b) => a + b, 0) / r.length; return { avg, std: Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) } })
-    const fontSize = isMobile ? '0.5rem' : '0.75rem'
+    const fontSize = isMobile ? '0.5rem' : '0.7rem'
     const cellPad = isMobile ? '2px 1px' : '4px'
     const tableLayout = isMobile ? 'fixed' : 'auto'
     const shortTicker = t => isMobile && t.length > 4 ? t.slice(0, 4) : t

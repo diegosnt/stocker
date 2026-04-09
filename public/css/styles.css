@@ -1930,6 +1930,10 @@ input:focus, select:focus, textarea:focus {
   align-items: stretch;
 }
 
+.analysis-grid-bottom > * {
+  min-width: 0;
+}
+
 @media (max-width: 1200px) {
   .analysis-grid-top, 
   .analysis-grid-mixed,
