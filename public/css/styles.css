@@ -1957,6 +1957,17 @@ input:focus, select:focus, textarea:focus {
 
   #correlation-card {
     order: 10;
+    padding: 0.6rem !important;
+  }
+
+  #correlation-card h3 {
+    font-size: 0.8rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  #correlation-matrix {
+    overflow-x: auto;
+    font-size: 0.5rem !important;
   }
 }
   .analysis-alyc-header {

@@ -21,39 +21,92 @@ Sin build tools ni bundlers — ES modules nativos del browser.
 
 ---
 
+## Estructura del Proyecto
+
+```
+server.js                         ← Express + proxy de APIs externas + inyección de config
+public/
+  css/styles.css                  ← Estilos globales, variables, componentes, responsive
+  js/
+    init.js                       ← Bootstrap de la app, showToast(), eventos globales
+    router.js                     ← Hash router: register(), navigate(), start()
+    auth.js                       ← signIn, signUp, signOut, getSession, onAuthChange
+    api-client.js                 ← apiRequest() autenticado con retry y AbortController
+    supabase-client.js            ← createClient() para uso general
+    supabase-minimal.js           ← Cliente liviano para contextos sin módulos completos
+    cache.js                      ← Cache híbrido memoria + localStorage con TTL
+    calculations.js               ← Cálculos financieros reutilizables (retornos, estadísticas)
+    chart-manager.js              ← Wrapper de Chart.js: crea, actualiza y destruye instancias
+    renderer.js                   ← Helpers de render para tablas y listas
+    smart-render.js               ← renderIfChanged(): evita reflows innecesarios por hash
+    utils.js                      ← Helpers: esc(), modal, formatters
+    analysis-worker.js            ← Web Worker: Markowitz, HRP, Michaud, Monte Carlo
+    pages/
+      login.js                    ← LoginPage.mount()
+      dashboard.js                ← DashboardPage: KPIs, gráficos, precios en vivo
+      holdings-analysis.js        ← HoldingsAnalysisPage: posiciones por ALyC con P&L en vivo
+      analysis.js                 ← AnalysisPage: optimización avanzada de cartera
+      operations.js               ← OperationsPage: CRUD, filtros, CSV import/export
+      instrument-types.js         ← InstrumentTypesPage: maestro de tipos
+      instruments.js              ← InstrumentsPage: maestro de instrumentos
+      alycs.js                    ← AlycsPage: maestro de ALyCs
+      settings.js                 ← SettingsPage: configuración de cache, TTL y preferencias
+supabase/
+  schema.sql                      ← Tablas, RLS, constraints y triggers
+  rpc_get_user_holdings.sql       ← RPC: posiciones consolidadas por usuario y ALyC
+  rpc_get_user_holdings_global.sql← RPC: posiciones globales (todas las ALyCs)
+  view_operations_search.sql      ← Vista: búsqueda full-text de operaciones
+  performance_indexes.sql         ← Índices para queries frecuentes
+  migration_app_settings.sql      ← Tabla app_settings por usuario
+  migration_market_badge_setting.sql ← Setting de badge de mercado
+```
+
+---
+
 ## Características
 
 ### Dashboard
-- KPIs de cartera: total invertido ARS/USD y P&L en tiempo real con **tarjetas modernas interactivas**.
-- **Actualización automática de precios** cada 2 minutos sin recargar.
+- KPIs de cartera: total invertido ARS/USD y P&L en tiempo real con tarjetas modernas interactivas.
+- Actualización automática de precios cada 2 minutos sin recargar.
 - Gráfico de composición por tipo de activo (doughnut).
 - Comparativa inversión vs. valor de mercado por instrumento (barras).
 - Mapa de calor (treemap) de Peso vs. P&L %.
 - Tabla de instrumentos con ordenamiento por columna y precios de mercado en vivo.
-- **Vista Mobile optimizada**: los instrumentos se transforman en tarjetas colapsables con el mismo estilo que los KPIs.
+- Vista Mobile optimizada: los instrumentos se transforman en tarjetas colapsables.
+
+### Análisis de Posiciones
+- Vista consolidada de tenencias agrupadas por ALyC con lazy loading por panel.
+- Precio promedio de compra, cantidad, valor actual y P&L absoluto/porcentual por instrumento.
+- Precios de mercado en vivo con actualización automática (solo en horario bursátil ART).
+- Gráficos de distribución (pie) por instrumento y tipo de activo por ALyC.
+- Gráfico de barras de P&L por instrumento.
+- Ordenamiento por columna en cada tabla de ALyC.
 
 ### Análisis Pro
-- Selección de cartera por ALyC con **botones modernos de gran formato** y feedback visual.
-- Algoritmos de optimización: Sharpe, Michaud y Hierarchical Risk Parity (HRP) ejecutados en Web Worker.
-- Métricas de riesgo: Beta, Alpha, VaR 95%, Max Drawdown, Expected Shortfall.
+- Selección de cartera por ALyC con botones modernos de gran formato y feedback visual.
+- Algoritmos de optimización ejecutados en **Web Worker** (sin bloquear el hilo principal):
+  - **Sharpe**: Maximización del ratio de Sharpe (Markowitz).
+  - **Michaud**: Resampling estocástico para robustez ante estimaciones ruidosas.
+  - **HRP**: Hierarchical Risk Parity — diversificación basada en clustering jerárquico.
+- Tabla comparativa Sharpe vs. Michaud vs. HRP con diferencias vs. cartera actual y promedio.
+- Métricas de riesgo: Beta, Alpha, R², VaR 95%, Expected Shortfall, Max Drawdown.
 - Frontera eficiente de Markowitz (scatter).
-- Simulación Monte Carlo (1 año).
+- Simulación Monte Carlo (1 año, 500 trayectorias).
 - Backtesting vs. benchmark dinámico (SPY, QQQ, DIA, IWM o custom).
-- Matriz de correlación entre activos.
-- Generador de reporte PDF con gráficos y KPIs, con botón de acceso rápido mejorado.
+- Matriz de correlación entre activos con heatmap cromático.
+- Generador de reporte PDF con gráficos y KPIs.
 - Caché de datos históricos de 24 horas.
 
 ### Operaciones
 - Gestión completa (CRUD) de compras y ventas de activos.
-- **Filtros avanzados**: por ALyC, instrumento, tipo de operación, moneda y rango de fechas.
-- **Importación/Exportación CSV**: compatible con formatos de brokers locales.
-- **Vista Mobile Pro**: las operaciones se presentan en **tarjetas modernas y colapsables** que siguen la línea estética del dashboard, optimizando el espacio en pantalla.
-- Acciones rápidas (Editar/Borrar) accesibles tanto en tabla como en tarjetas.
+- Filtros avanzados: por ALyC, instrumento, tipo de operación, moneda y rango de fechas.
+- Importación/Exportación CSV compatible con formatos de brokers locales.
+- Vista Mobile Pro: tarjetas modernas y colapsables con acciones integradas.
 
-### Resiliencia y Actualizaciones (Nuevo)
-- **Persistencia de Sesión Pro**: Implementación de doble cookie segura para evitar cierres de sesión inesperados en dispositivos móviles al recargar o reiniciar el navegador.
-- **Silent Refresh**: Renovación automática de credenciales en segundo plano para una navegación fluida y sin interrupciones.
-- **Update Notification**: Sistema de detección de nuevas versiones del Service Worker con aviso al usuario (Toast UI) y activación manual controlada para evitar desincronización de estado.
+### Configuración
+- TTL de cache configurable por usuario (datos históricos y precios de mercado).
+- Badge de estado de mercado (abierto/cerrado) activable desde settings.
+- Datos persistidos por usuario en tabla `app_settings` en Supabase.
 
 ---
 
@@ -61,54 +114,61 @@ Sin build tools ni bundlers — ES modules nativos del browser.
 
 | Medida | Detalle |
 |--------|---------|
-| **Doble Cookie HttpOnly** | Persistencia de sesión robusta mediante cookies con flags HttpOnly, Secure, SameSite: Lax (protección contra XSS y persistencia en mobile) |
-| **Tokens en Memoria** | El cliente opera con tokens en memoria para requests activos, minimizando la superficie de ataque |
-| **Silent Refresh logic** | Renovación de sesión segura mediante endpoints dedicados con validación de tokens de refresco persistidos en cookies |
+| **Doble Cookie HttpOnly** | Persistencia de sesión robusta con flags HttpOnly, Secure, SameSite: Lax |
+| **Tokens en Memoria** | El cliente opera con tokens en memoria para requests activos |
+| **Silent Refresh** | Renovación de sesión segura mediante endpoints dedicados |
 | **CSRF Protection** | Tokens sincronizados en todas las mutaciones (POST/PATCH/DELETE) |
-| **CSP con Nonce** | Content Security Policy dinámica con **Nonces** generados por request (bloquea XSS inyectado) |
+| **CSP con Nonce** | Content Security Policy dinámica con nonces por request (bloquea XSS) |
 | **XSS Protection** | DOMPurify sanitiza todo el contenido dinámico en el frontend |
 | **Row Level Security** | RLS en PostgreSQL — aislamiento total de datos por usuario |
 | **JWT Validation** | Tokens verificados en cada request al backend via `jose` |
 | **Input Sanitization** | Backend sanitiza inputs con `sanitize-html` |
-| **Helmet** | Configurado para bloquear sniffing de tipos, clickjacking y scripts no autorizados |
+| **Helmet** | Bloqueo de sniffing de tipos, clickjacking y scripts no autorizados |
 | **Rate Limiting** | Auth: 10 req/15min · Mutaciones: 60 req/15min · General: 200 req/15min |
 
 ---
 
-## Backlog — Optimización y Buenas Prácticas
+## Base de Datos (Supabase)
 
-### 🔴 Crítico — Bugs y seguridad (COMPLETADO ✅)
+**Tablas principales:**
+- `instrument_types` — tipos de activos (acciones, bonos, CEDEARs, etc.)
+- `instruments` — instrumentos con ticker, tipo y moneda
+- `alycs` — brokers/ALyCs del usuario
+- `operations` — operaciones de compra/venta con FK a instruments y alycs
+- `app_settings` — preferencias por usuario (TTL, badges, etc.)
 
-- [x] **Service Worker consolidado** — Listeners unificados, estrategia Stale-While-Revalidate limpia.
-- [x] **Timeouts en requests externos** — `AbortController` de 10s en servidor y cliente para todas las APIs de finanzas.
-- [x] **CSP Robusta** — Implementación de Nonces dinámicos y eliminación de `unsafe-inline` en scripts.
-- [x] **Seguridad de Tokens** — Migración total de localStorage a variables en memoria.
-- [x] **UI Navbar** — Iconos unificados y botones de acción (Logout, Reload, Dark Mode) con tamaño consistente.
-- [x] **Persistencia Mobile** — Implementación de Doble Cookie HttpOnly para evitar logout en recarga.
+Todas las tablas tienen `user_id UUID REFERENCES auth.users(id)` con RLS habilitado.
 
-### 🟡 Importante — Resiliencia y UX (COMPLETADO ✅)
+**RPCs:**
+- `get_user_holdings(user_id)` — posiciones consolidadas por ALyC (precio promedio ponderado, cantidad neta)
+- `get_user_holdings_global(user_id)` — posiciones globales sin agrupación por ALyC
 
-- [x] **Mobile Operations Cards** — Implementación de tarjetas colapsables con estilo Dashboard.
-- [x] **Mejora en botones de Análisis** — Aumento de tamaño y legibilidad para botones de ALyC y Benchmark.
-- [x] **Layout de acciones en mobile** — Botones de exportar/importar/nueva-op adaptados para pantallas pequeñas.
-- [x] **Update Notification System** — Aviso de nueva versión disponible y botón de actualización manual.
-
-### 🔵 Futuras Mejoras — Roadmap 🏗️
-
-- [ ] **Event listeners sin cleanup en modales** — `utils.js` agrega listeners de click al overlay del modal pero solo remueve el listener de `keydown` al cerrar.
-- [ ] **Error handling sin feedback al usuario** — Múltiples `catch(err)` mudos en `init.js`, `operations.js` y `analysis.js`. Reemplazar por `showToast(err.message, 'error')`.
-
+**Vistas:**
+- `operations_search` — búsqueda full-text sobre operaciones con joins a instruments y alycs
 
 ---
 
-## Backlog — Mejoras Responsive (Completado ✅)
+## Puesta en marcha
+
+```bash
+cp .env.example .env        # Completar SUPABASE_URL y SUPABASE_ANON_KEY
+pnpm install
+pnpm run setup              # Descarga water.css localmente
+# Ejecutar schema.sql + migrations en el Supabase SQL Editor
+pnpm dev
+```
+
+---
+
+## Responsive
 
 | Sección | Estado | Detalle |
 |---------|--------|---------|
-| Dashboard | ✅ Adaptado | KPIs, gráficos y tarjetas de instrumentos modernas |
-| Operaciones | ✅ Adaptado | Tarjetas colapsables modernas y acciones de cabecera responsive |
-| Análisis Pro | ✅ Adaptado | Botones de control optimizados y PDF responsive |
-| Maestros | ⚠️ Parcial | Instrumentos, ALyCs y Tipos con tablas clásicas (pendiente cards) |
+| Dashboard | ✅ | KPIs, gráficos y tarjetas de instrumentos |
+| Posiciones | ✅ | Tablas por ALyC con scroll horizontal |
+| Operaciones | ✅ | Tarjetas colapsables con acciones integradas |
+| Análisis Pro | ✅ | Tabla de optimización en cards, correlación compacta |
+| Maestros | ⚠️ Parcial | Tablas clásicas (sin cards mobile por ahora) |
 
 ---
 
