@@ -209,17 +209,16 @@ export const AnalysisPage = {
          </div>
 
          <!-- SECCIÓN 3: Riesgo y Correlación -->
-        <div class="analysis-grid-bottom">
-          <div class="card" style="margin-bottom: 0; padding: 1rem">
-            <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Optimización: Sharpe vs Michaud vs HRP</h3>
+         <div class="analysis-grid-bottom">
+          <div class="card" style="margin-bottom: 0">
+            <h3 style="font-size: 0.9rem; margin: 1rem 1.25rem 0.5rem">Optimización: Sharpe vs Michaud vs HRP</h3>
             <div id="redistribution-table" style="font-size: 0.8rem"></div>
           </div>
-          <div class="card" style="margin-bottom: 0; padding: 1rem">
+          <div id="correlation-card" class="card" style="margin-bottom: 0; padding: 1rem">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem">Matriz de Correlación</h3>
             <div id="correlation-matrix" style="overflow-x: auto; font-size: 0.75rem"></div>
           </div>
-        </div>
-        <div class="card" style="padding: 1rem">
+         </div>        <div class="card" style="padding: 1rem">
           <p id="analysis-summary" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4"></p>
         </div>
       </div>
@@ -535,10 +534,13 @@ export const AnalysisPage = {
       const totalInv = items.reduce((acc, h) => acc + (h.total_quantity * h.avg_buy_price), 0)
       const totalMarket = items.reduce((acc, h) => acc + (h.total_quantity * (this._resolvedPrices?.[h.ticker] ?? h.avg_buy_price)), 0)
       totalMarketValueAll += totalMarket
+      
       html += `
         <div class="currency-group" style="margin-bottom: 1.5rem">
           <h4 style="font-size: 0.9rem; color: var(--color-primary); margin-bottom: 0.75rem">Tenencia en ${curr}</h4>
-          <div class="table-wrapper">
+          
+          <!-- Desktop table -->
+          <div class="desktop-only table-wrapper">
             <table class="holdings-table">
               <thead>
                 <tr>
@@ -554,7 +556,12 @@ export const AnalysisPage = {
                 </tr>
               </thead>
               <tbody>`
+      
       items.sort((a, b) => (b.total_quantity * (this._resolvedPrices?.[b.ticker] ?? b.avg_buy_price)) - (a.total_quantity * (this._resolvedPrices?.[a.ticker] ?? a.avg_buy_price)))
+      
+      let desktopRows = ''
+      let mobileCards = ''
+
       items.forEach(h => {
         const price = this._resolvedPrices?.[h.ticker] ?? null
         const currentVal = price ? h.total_quantity * price : (h.total_quantity * h.avg_buy_price)
@@ -562,13 +569,14 @@ export const AnalysisPage = {
         const pnl = price ? (price - h.avg_buy_price) * h.total_quantity : 0
         const pnlPct = (h.avg_buy_price > 0 && price) ? ((price / h.avg_buy_price) - 1) * 100 : 0
         const weight = (currentVal / totalMarket) * 100
-        
+        const type = h.instrument_type_name || 'Sin tipo'
+
         // Datos para gráficos
         assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnlPct })
-        const type = h.instrument_type_name || 'Sin tipo'
         typeGroups[type] = (typeGroups[type] || 0) + currentVal
 
-        html += `
+        // Desktop row
+        desktopRows += `
           <tr>
             <td><span class="ticker-chip">${h.ticker}</span></td>
             <td class="amount">${h.total_quantity.toLocaleString('es-AR')}</td>
@@ -580,10 +588,69 @@ export const AnalysisPage = {
             <td class="amount" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(2)}%</td>
             <td class="amount" style="color: var(--text-muted); font-weight: 600">${weight.toFixed(1)}%</td>
           </tr>`
+
+        // Mobile card (using same classes as dashboard)
+        mobileCards += `
+          <div class="dash-instrument-card collapsed">
+            <div class="dash-instrument-card-header">
+              <span class="ticker-chip">${h.ticker}</span>
+              <span class="dash-instrument-meta">
+                <span class="meta-qty">${h.total_quantity.toLocaleString('es-AR')}</span>
+                <span class="meta-weight">${weight.toFixed(1)}%</span>
+                <span class="meta-type">${type}</span>
+              </span>
+            </div>
+            <div class="dash-instrument-card-body">
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">Precio compra</span>
+                <span class="dash-instrument-value">${fmt(h.avg_buy_price)}</span>
+              </div>
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">Precio actual</span>
+                <span class="dash-instrument-value"><strong>${price ? fmt(price) : '--'}</strong></span>
+              </div>
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">Invertido</span>
+                <span class="dash-instrument-value">${fmt(invested)}</span>
+              </div>
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">Valor mercado</span>
+                <span class="dash-instrument-value"><strong>${fmt(currentVal)}</strong></span>
+              </div>
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">P&L $</span>
+                <span class="dash-instrument-value" style="color: ${pnlColor(pnl)}; font-weight: bold">${sign(pnl)}${fmt(pnl)}</span>
+              </div>
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">P&L %</span>
+                <span class="dash-instrument-value" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(2)}%</span>
+              </div>
+            </div>
+          </div>`
       })
-      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(2)}%</td><td class="amount">100%</td></tr></tfoot></table></div></div>`
+
+      html += desktopRows
+      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(2)}%</td><td class="amount">100%</td></tr></tfoot></table></div>`
+      
+      // Mobile cards section
+      html += `
+        <div class="mobile-only dash-instruments-cards">
+          ${mobileCards}
+          <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-main); border-radius: var(--radius); border: 1px solid var(--border)">
+            <div class="dash-instrument-row" style="font-weight: 700">
+              <span>TOTAL ${curr}</span>
+              <span>${fmt(totalMarket)}</span>
+            </div>
+            <div class="dash-instrument-row" style="font-size: 0.75rem; color: ${pnlColor(totalMarket - totalInv)}">
+              <span>P&L Total</span>
+              <span>${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)} (${((totalMarket / totalInv - 1) * 100).toFixed(2)}%)</span>
+            </div>
+          </div>
+        </div>
+      </div>`
     }
     tableContainer.innerHTML = html || '<div class="table-empty">No hay tenencias registradas.</div>'
+    this._bindMobileAccordion()
 
     // Renderizar gráficos si hay datos
     const numAssets = assetData.length
@@ -594,12 +661,15 @@ export const AnalysisPage = {
 
     if (numAssets > 0) {
       // Caso 1: Solo 1 tipo -> Ocultar gráfico de tipo y ensanchar tabla/otros
+      const isDesktop = window.innerWidth > 768
       if (numTypes <= 1) {
         typeCard.style.display = 'none'
-        section0.style.gridTemplateColumns = '7fr 3fr'
+        if (isDesktop) section0.style.gridTemplateColumns = '7fr 3fr'
+        else section0.style.gridTemplateColumns = ''
       } else {
         typeCard.style.display = 'flex'
-        section0.style.gridTemplateColumns = '6fr 2fr 2fr'
+        if (isDesktop) section0.style.gridTemplateColumns = '6fr 2fr 2fr'
+        else section0.style.gridTemplateColumns = ''
       }
 
       // Renderizar gráfico de activos (siempre que haya más de 1, o si es el único gráfico visible)
@@ -610,7 +680,8 @@ export const AnalysisPage = {
       } else {
         // Si solo hay 1 activo y 1 tipo, ocultamos ambos gráficos y dejamos la tabla sola
         assetCard.style.display = 'none'
-        section0.style.gridTemplateColumns = '1fr'
+        if (isDesktop) section0.style.gridTemplateColumns = '1fr'
+        else section0.style.gridTemplateColumns = ''
       }
 
       // Renderizar gráfico de tipos si hay más de 1
@@ -824,22 +895,24 @@ export const AnalysisPage = {
       ? tickers.reduce((acc, t, i) => { acc[t] = analysis.hrp.weights[i] || 0; return acc }, {})
       : analysis.hrp?.weights || {}
     
-    let html = `<table class="table"><thead><tr><th>Activo</th><th>Actual</th><th>Sharpe</th><th style="color: var(--text-muted)">Dif S</th><th>Michaud</th><th style="color: #10b981">Dif M</th><th>HRP</th><th style="color: #4f46e6">Dif HRP</th><th style="background: var(--bg-main)">Promedio</th><th style="background: var(--bg-main)">Diff</th></tr></thead><tbody>`
-    
+    let desktopRows = ''
+    let mobileCards = ''
+
     tickers.forEach(ticker => {
       const currentW = currentWeights[ticker] || 0
       const sharpeW = optimalWeights[ticker] || 0
       const michW = michaudWeights[ticker] || 0
       const hrpW = hrpWeights[ticker] || 0
-      
+
       const sharpeDiff = (sharpeW - currentW) * 100
       const michaudDiff = (michW - currentW) * 100
       const hrpDiff = (hrpW - currentW) * 100
 
       const avgW = (sharpeW + michW + hrpW) / 3
       const avgDiff = (avgW - currentW) * 100
-      
-      html += `<tr>
+
+      // Desktop row
+      desktopRows += `<tr>
         <td><strong>${ticker}</strong></td>
         <td>${(currentW * 100).toFixed(1)}%</td>
         <td style="color: var(--text-muted)">${(sharpeW * 100).toFixed(1)}%</td>
@@ -851,10 +924,86 @@ export const AnalysisPage = {
         <td style="background: var(--bg-main); font-weight: 700">${(avgW * 100).toFixed(1)}%</td>
         <td style="background: var(--bg-main); color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900">${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%</td>
       </tr>`
-    })
-    container.innerHTML = html + `</tbody></table>`
-  },
 
+      // Mobile card
+      mobileCards += `
+        <div class="dash-instrument-card collapsed" style="margin-bottom: 0.5rem">
+          <div class="dash-instrument-card-header">
+            <span class="ticker-chip">${ticker}</span>
+            <span class="dash-instrument-meta">
+              <span class="meta-qty" style="background: var(--bg-main); color: var(--text-main); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700; font-size: 0.65rem">PROM: ${(avgW * 100).toFixed(1)}%</span>
+              <span class="meta-weight" style="background: ${avgDiff >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900; font-size: 0.7rem">
+                ${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%
+              </span>
+            </span>
+          </div>
+          <div class="dash-instrument-card-body">
+            <div class="dash-instrument-row" style="margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; font-size: 0.75rem">
+              <span class="dash-instrument-label">Peso Actual</span>
+              <span class="dash-instrument-value" style="font-weight: 700">${(currentW * 100).toFixed(1)}%</span>
+            </div>
+
+            <div class="dash-instrument-row" style="font-size: 0.75rem">
+              <span class="dash-instrument-label">Sharpe (Tradicional)</span>
+              <span class="dash-instrument-value">${(sharpeW * 100).toFixed(1)}% <small style="color: var(--text-muted)">(${sharpeDiff > 0 ? '+' : ''}${sharpeDiff.toFixed(1)}%)</small></span>
+            </div>
+
+            <div class="dash-instrument-row" style="font-size: 0.75rem">
+              <span class="dash-instrument-label" style="color: #10b981">Michaud (Resampling)</span>
+              <span class="dash-instrument-value" style="color: #10b981; font-weight: 600">${(michW * 100).toFixed(1)}% <small style="font-weight: 800">(${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%)</small></span>
+            </div>
+
+            <div class="dash-instrument-row" style="font-size: 0.75rem">
+              <span class="dash-instrument-label" style="color: #4f46e6">HRP (Machine Learning)</span>
+              <span class="dash-instrument-value" style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}% <small style="font-weight: 800">(${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%)</small></span>
+            </div>
+          </div>
+        </div>`
+      })
+
+      let html = `
+        <!-- Desktop Table -->
+        <div class="desktop-only table-wrapper" style="padding: 1rem">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Activo</th>
+                <th>Actual</th>
+                <th>Sharpe</th>
+                <th style="color: var(--text-muted)">Dif S</th>
+                <th>Michaud</th>
+                <th style="color: #10b981">Dif M</th>
+                <th>HRP</th>
+                <th style="color: #4f46e6">Dif HRP</th>
+                <th style="background: var(--bg-main)">Promedio</th>
+                <th style="background: var(--bg-main)">Diff</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${desktopRows}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Cards -->
+        <div class="mobile-only dash-instruments-cards" style="padding: 0.5rem; gap: 0.5rem; box-sizing: border-box; width: 100%">
+          ${mobileCards}
+        </div>`
+
+      container.innerHTML = html
+      // Quitar el padding de la card madre solo en mobile para ganar espacio
+      const parentCard = container.closest('.card')
+      if (parentCard) {
+        if (window.innerWidth <= 768) {
+          parentCard.style.padding = '0'
+          // El título necesita recuperar su padding
+          const title = parentCard.querySelector('h3')
+          if (title) title.style.padding = '1rem 1rem 0'
+        } else {
+          parentCard.style.padding = ''
+        }
+      }
+      },
   _updateMetricsUI(analysis, benchmarkTicker) {
     const { beta, alpha, r2, vR, es, maxDrawdown } = analysis
     document.getElementById('capm-beta').textContent = beta.toFixed(2)
@@ -1008,5 +1157,16 @@ export const AnalysisPage = {
       html += `</tr>`
     }
     container.innerHTML = html + `</table>`
+  },
+
+  _bindMobileAccordion() {
+    document.querySelectorAll('.dash-instrument-card-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        const card = e.currentTarget.closest('.dash-instrument-card');
+        if (card) {
+          card.classList.toggle('collapsed');
+        }
+      });
+    });
   }
 }
