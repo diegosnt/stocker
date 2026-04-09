@@ -1947,6 +1947,14 @@ input:focus, select:focus, textarea:focus {
     gap: 1rem;
   }
 
+  .analysis-grid-top > *,
+  .analysis-grid-two > *,
+  .analysis-grid-mixed > *,
+  .analysis-grid-bottom > * {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   #correlation-card {
     order: 10;
   }

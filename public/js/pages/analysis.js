@@ -927,84 +927,80 @@ export const AnalysisPage = {
 
       // Mobile card
       mobileCards += `
-        <div class="dash-instrument-card collapsed" style="margin-bottom: 0.5rem">
-          <div class="dash-instrument-card-header">
-            <span class="ticker-chip">${ticker}</span>
-            <span class="dash-instrument-meta">
-              <span class="meta-qty" style="background: var(--bg-main); color: var(--text-main); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700; font-size: 0.65rem">PROM: ${(avgW * 100).toFixed(1)}%</span>
-              <span class="meta-weight" style="background: ${avgDiff >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900; font-size: 0.7rem">
+        <div class="dash-instrument-card collapsed" style="margin-bottom: 0.4rem; border-radius: 6px; border-color: var(--border); overflow: hidden">
+          <div class="dash-instrument-card-header" style="padding: 0.4rem 0.6rem; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center">
+            <span class="ticker-chip" style="font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.3rem">${ticker}</span>
+            <div style="display: flex; gap: 0.2rem; margin-left: auto; flex-wrap: wrap; justify-content: flex-end">
+              <span style="background: var(--bg-main); color: var(--text-main); padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 700; font-size: 0.6rem; white-space: nowrap">P: ${(avgW * 100).toFixed(1)}%</span>
+              <span style="background: ${avgDiff >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 3px; white-space: nowrap">
                 ${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%
               </span>
-            </span>
+            </div>
           </div>
-          <div class="dash-instrument-card-body">
-            <div class="dash-instrument-row" style="margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; font-size: 0.75rem">
-              <span class="dash-instrument-label">Peso Actual</span>
+          <div class="dash-instrument-card-body" style="padding: 0.4rem 0.6rem; gap: 0.2rem">
+            <div class="dash-instrument-row" style="margin-bottom: 0.3rem; border-bottom: 1px solid var(--border); padding-bottom: 0.2rem; font-size: 0.65rem">
+              <span class="dash-instrument-label">Actual</span>
               <span class="dash-instrument-value" style="font-weight: 700">${(currentW * 100).toFixed(1)}%</span>
             </div>
 
-            <div class="dash-instrument-row" style="font-size: 0.75rem">
-              <span class="dash-instrument-label">Sharpe (Tradicional)</span>
-              <span class="dash-instrument-value">${(sharpeW * 100).toFixed(1)}% <small style="color: var(--text-muted)">(${sharpeDiff > 0 ? '+' : ''}${sharpeDiff.toFixed(1)}%)</small></span>
+            <div class="dash-instrument-row" style="font-size: 0.65rem">
+              <span class="dash-instrument-label">Sharpe</span>
+              <span class="dash-instrument-value">${(sharpeW * 100).toFixed(1)}% <small style="color: var(--text-muted); font-size: 0.55rem">(${sharpeDiff > 0 ? '+' : ''}${sharpeDiff.toFixed(1)}%)</small></span>
             </div>
 
-            <div class="dash-instrument-row" style="font-size: 0.75rem">
-              <span class="dash-instrument-label" style="color: #10b981">Michaud (Resampling)</span>
-              <span class="dash-instrument-value" style="color: #10b981; font-weight: 600">${(michW * 100).toFixed(1)}% <small style="font-weight: 800">(${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%)</small></span>
+            <div class="dash-instrument-row" style="font-size: 0.65rem">
+              <span class="dash-instrument-label" style="color: #10b981">Michaud</span>
+              <span class="dash-instrument-value" style="color: #10b981; font-weight: 600">${(michW * 100).toFixed(1)}% <small style="font-weight: 800; font-size: 0.55rem">(${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%)</small></span>
             </div>
 
-            <div class="dash-instrument-row" style="font-size: 0.75rem">
-              <span class="dash-instrument-label" style="color: #4f46e6">HRP (Machine Learning)</span>
-              <span class="dash-instrument-value" style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}% <small style="font-weight: 800">(${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%)</small></span>
+            <div class="dash-instrument-row" style="font-size: 0.65rem">
+              <span class="dash-instrument-label" style="color: #4f46e6">HRP</span>
+              <span class="dash-instrument-value" style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}% <small style="font-weight: 800; font-size: 0.55rem">(${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%)</small></span>
             </div>
           </div>
         </div>`
       })
 
       let html = `
-        <!-- Desktop Table -->
-        <div class="desktop-only table-wrapper" style="padding: 1rem">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Activo</th>
-                <th>Actual</th>
-                <th>Sharpe</th>
-                <th style="color: var(--text-muted)">Dif S</th>
-                <th>Michaud</th>
-                <th style="color: #10b981">Dif M</th>
-                <th>HRP</th>
-                <th style="color: #4f46e6">Dif HRP</th>
-                <th style="background: var(--bg-main)">Promedio</th>
-                <th style="background: var(--bg-main)">Diff</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${desktopRows}
-            </tbody>
-          </table>
-        </div>
+      <!-- Desktop Table -->
+      <div class="desktop-only table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Activo</th>
+              <th>Actual</th>
+              <th>Sharpe</th>
+              <th style="color: var(--text-muted)">Dif S</th>
+              <th>Michaud</th>
+              <th style="color: #10b981">Dif M</th>
+              <th>HRP</th>
+              <th style="color: #4f46e6">Dif HRP</th>
+              <th style="background: var(--bg-main)">Promedio</th>
+              <th style="background: var(--bg-main)">Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${desktopRows}
+          </tbody>
+        </table>
+      </div>
 
-        <!-- Mobile Cards -->
-        <div class="mobile-only dash-instruments-cards" style="padding: 0.5rem; gap: 0.5rem; box-sizing: border-box; width: 100%">
-          ${mobileCards}
-        </div>`
+      <!-- Mobile Cards -->
+      <div class="mobile-only dash-instruments-cards" style="padding: 0.4rem; box-sizing: border-box; width: 100%">
+        ${mobileCards}
+      </div>`
 
       container.innerHTML = html
-      // Quitar el padding de la card madre solo en mobile para ganar espacio
+
+      // Aplicar ajuste de padding a la tarjeta contenedora en mobile
+      if (window.innerWidth <= 768) {
       const parentCard = container.closest('.card')
       if (parentCard) {
-        if (window.innerWidth <= 768) {
-          parentCard.style.padding = '0'
-          // El título necesita recuperar su padding
-          const title = parentCard.querySelector('h3')
-          if (title) title.style.padding = '1rem 1rem 0'
-        } else {
-          parentCard.style.padding = ''
-        }
+        parentCard.style.paddingLeft = '0.4rem'
+        parentCard.style.paddingRight = '0.4rem'
       }
-      },
-  _updateMetricsUI(analysis, benchmarkTicker) {
+      }
+      },  _updateMetricsUI(analysis, benchmarkTicker) {
     const { beta, alpha, r2, vR, es, maxDrawdown } = analysis
     document.getElementById('capm-beta').textContent = beta.toFixed(2)
     document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(0) + '%'
