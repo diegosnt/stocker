@@ -16,6 +16,7 @@ export const AnalysisPage = {
   _assetChart: null,
   _typeChart: null,
   _compChart: null,
+  _activityChart: null,
   _resolvedPrices: {},
   _activeAlycName: null,
   _activeAlycId: null,
@@ -28,7 +29,7 @@ export const AnalysisPage = {
     const charts = [
       this._chart, this._mcChart, this._btChart, 
       this._rcChart, this._ddChart, this._treemapChart,
-      this._assetChart, this._typeChart, this._compChart
+      this._assetChart, this._typeChart, this._compChart, this._activityChart
     ]
     charts.forEach(chart => {
       if (chart) {
@@ -44,6 +45,7 @@ export const AnalysisPage = {
     this._assetChart = null
     this._typeChart = null
     this._compChart = null
+    this._activityChart = null
     this._validHistories = []
     this._validTickers = []
     clearRenderCache(document.getElementById('page-content'))
@@ -114,6 +116,15 @@ export const AnalysisPage = {
           <div id="type-distribution-card" class="card analysis-chart-bottom" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
             <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Tipo</h3>
             <div id="current-type-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 0.2: Actividad de Operaciones -->
+        <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem">
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.2rem">Actividad de Operaciones</h3>
+          <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">Frecuencia de compras y ventas por mes.</p>
+          <div id="activity-chart-container" style="height: 200px; position: relative">
+            <div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding-top:2rem">Cargando actividad...</div>
           </div>
         </div>
 
@@ -474,6 +485,7 @@ export const AnalysisPage = {
       this._lastValidHoldings = validHoldings
       this._renderCurrentHoldings(validHoldings, analysis)
       this._renderComparisonChart(validHoldings)
+      this._renderActivityChart(alycId)
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${sanitize(benchmarkTicker)}.`
       
@@ -688,31 +700,19 @@ export const AnalysisPage = {
     const assetCard = assetChartContainer.parentElement
 
     if (numAssets > 0) {
-      // Caso 1: Solo 1 tipo -> Ocultar gráfico de tipo y ensanchar tabla/otros
-      const isDesktop = window.innerWidth > 768
-      if (numTypes <= 1) {
-        typeCard.style.display = 'none'
-        if (isDesktop) section0.style.gridTemplateColumns = '7fr 3fr'
-        else section0.style.gridTemplateColumns = ''
-      } else {
-        typeCard.style.display = 'flex'
-        if (isDesktop) section0.style.gridTemplateColumns = '6fr 2fr 2fr'
-        else section0.style.gridTemplateColumns = ''
-      }
+      typeCard.style.display = numTypes > 1 ? 'flex' : 'none'
 
-      // Renderizar gráfico de activos (siempre que haya más de 1, o si es el único gráfico visible)
       if (numAssets > 1 || numTypes > 1) {
         assetCard.style.display = 'flex'
+        section0.style.gridTemplateColumns = ''
         const sortedAssets = assetData.sort((a, b) => b.currentValue - a.currentValue)
         this._renderDonutChart(assetChartContainer, sortedAssets, totalMarketValueAll, '_assetChart')
       } else {
-        // Si solo hay 1 activo y 1 tipo, ocultamos ambos gráficos y dejamos la tabla sola
         assetCard.style.display = 'none'
-        if (isDesktop) section0.style.gridTemplateColumns = '1fr'
-        else section0.style.gridTemplateColumns = ''
+        typeCard.style.display = 'none'
+        section0.style.gridTemplateColumns = '1fr'
       }
 
-      // Renderizar gráfico de tipos si hay más de 1
       if (numTypes > 1) {
         const typeItems = Object.entries(typeGroups)
           .map(([ticker, currentValue]) => ({ ticker, currentValue }))
@@ -720,7 +720,6 @@ export const AnalysisPage = {
         this._renderDonutChart(typeChartContainer, typeItems, totalMarketValueAll, '_typeChart')
       }
 
-      // Renderizar Treemap en Mapa de Calor
       this._renderTreemap(document.getElementById('analysis-heatmap'), assetData.slice().sort((a, b) => b.currentValue - a.currentValue))
     } else {
       assetCard.style.display = 'none'
@@ -807,6 +806,77 @@ export const AnalysisPage = {
         }
       }
     })
+  },
+
+  async _renderActivityChart(alycId) {
+    const container = document.getElementById('activity-chart-container')
+    if (!container) return
+
+    try {
+      let query = supabase
+        .from('operations_search')
+        .select('operated_at, type')
+        .order('operated_at', { ascending: true })
+
+      if (alycId) query = query.eq('alyc_id', alycId)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding-top:2rem">Sin operaciones registradas</div>'
+        return
+      }
+
+      const byMonth = {}
+      data.forEach(op => {
+        const month = (op.operated_at || '').slice(0, 7)
+        if (!month) return
+        if (!byMonth[month]) byMonth[month] = { compra: 0, venta: 0 }
+        if (op.type === 'compra') byMonth[month].compra++
+        else if (op.type === 'venta') byMonth[month].venta++
+      })
+
+      const months = Object.keys(byMonth).sort()
+      const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+      const labels = months.map(m => {
+        const [y, mo] = m.split('-')
+        return `${monthNames[parseInt(mo, 10) - 1]} ${y.slice(2)}`
+      })
+      const compras = months.map(m => byMonth[m].compra)
+      const ventas  = months.map(m => byMonth[m].venta)
+
+      container.innerHTML = '<canvas></canvas>'
+      const canvas = container.querySelector('canvas')
+
+      if (this._activityChart) { this._activityChart.destroy(); this._activityChart = null }
+
+      this._activityChart = new window.Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Compras', data: compras, backgroundColor: '#10b981', borderRadius: 3 },
+            { label: 'Ventas',  data: ventas,  backgroundColor: '#f59e0b', borderRadius: 3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+            tooltip: { mode: 'index', intersect: false }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { grid: { color: 'rgba(100,116,139,0.12)' }, ticks: { precision: 0, font: { size: 10 } }, beginAtZero: true }
+          }
+        }
+      })
+    } catch (e) {
+      console.error('[ActivityChart]', e)
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding-top:2rem">Error al cargar actividad</div>'
+    }
   },
 
   _renderDonutChart(container, items, total, chartKey) {
