@@ -1901,15 +1901,24 @@ input:focus, select:focus, textarea:focus {
 .analysis-grid-top {
   display: grid;
   grid-template-columns: 3fr 1fr;
+  grid-template-rows: auto auto;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
-  align-items: stretch;
 }
 
-.charts-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+.analysis-grid-top > :first-child {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+
+.analysis-chart-top {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.analysis-chart-bottom {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .analysis-grid-two {
@@ -1959,10 +1968,28 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 1200px) {
-  .analysis-grid-top, 
+  .analysis-grid-top {
+    grid-template-columns: 2fr 1fr;
+  }
   .analysis-grid-mixed,
   .analysis-grid-bottom {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .analysis-grid-top {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  .analysis-grid-top > :first-child {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .analysis-chart-top,
+  .analysis-chart-bottom {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 
