@@ -21,6 +21,8 @@ export const AnalysisPage = {
   _activeAlycId: null,
   _activeBenchmark: 'SPY',
   _lastValidHoldings: [],
+  _validHistories: [],
+  _validTickers: [],
 
   cleanup() {
     const charts = [
@@ -42,6 +44,8 @@ export const AnalysisPage = {
     this._assetChart = null
     this._typeChart = null
     this._compChart = null
+    this._validHistories = []
+    this._validTickers = []
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -421,6 +425,9 @@ export const AnalysisPage = {
       const returnsMatrix = this._calculateReturns(validHistories, benchmarkData)
       const benchmarkReturns = this._calculateReturns([benchmarkData], benchmarkData)[0]
 
+      this._validHistories = validHistories
+      this._validTickers = validTickers
+
       // --- CÁLCULOS PESADOS VÍA WEB WORKER ---
       const workerResults = await new Promise((resolve, reject) => {
         const worker = new Worker('/js/analysis-worker.js')
@@ -465,7 +472,7 @@ export const AnalysisPage = {
       
       await this._updateMarketPrices(validTickers)
       this._lastValidHoldings = validHoldings
-      this._renderCurrentHoldings(validHoldings)
+      this._renderCurrentHoldings(validHoldings, analysis)
       this._renderComparisonChart(validHoldings)
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${sanitize(benchmarkTicker)}.`
@@ -515,7 +522,7 @@ export const AnalysisPage = {
     }
   },
 
-  _renderCurrentHoldings(holdings) {
+  _renderCurrentHoldings(holdings, analysis = null) {
     const tableContainer = document.getElementById('current-holdings-table')
     const assetChartContainer = document.getElementById('current-holdings-chart')
     const typeChartContainer = document.getElementById('current-type-chart')
@@ -553,6 +560,7 @@ export const AnalysisPage = {
                   <th style="text-align:right">P&L $</th>
                   <th style="text-align:right">P&L %</th>
                   <th style="text-align:right">%</th>
+                  <th style="text-align:center">Señal</th>
                 </tr>
               </thead>
               <tbody>`
@@ -575,6 +583,21 @@ export const AnalysisPage = {
         assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnlPct })
         typeGroups[type] = (typeGroups[type] || 0) + currentVal
 
+        // Signal: Technical zone (52w) + Markowitz rebalance
+        const buyZone = this._calcBuyZone(h.ticker)
+        const optW = analysis?.optimal?.weights?.[h.ticker] ?? null
+        const wDiff = optW !== null ? (optW - weight / 100) : null
+        let mrkLabel, mrkColor
+        if (wDiff === null)       { mrkLabel = '--';          mrkColor = 'var(--text-muted)' }
+        else if (wDiff > 0.05)   { mrkLabel = '↑ Comprar'; mrkColor = '#3b82f6' }
+        else if (wDiff < -0.05)  { mrkLabel = '↓ Vender';     mrkColor = '#f59e0b' }
+        else                      { mrkLabel = '✓ OK';          mrkColor = '#64748b' }
+
+        const techBadge = buyZone
+          ? `<span title="52s: $${buyZone.low52w.toFixed(2)} – $${buyZone.high52w.toFixed(2)} | MA50: $${buyZone.ma50.toFixed(2)}${buyZone.ma200 ? ' | MA200: $' + buyZone.ma200.toFixed(2) : ''} | Percentil: ${buyZone.percentile.toFixed(0)}%" style="display:inline-block;font-size:0.6rem;padding:0.15rem 0.35rem;border-radius:3px;background:${buyZone.color}20;color:${buyZone.color};border:1px solid ${buyZone.color}40;cursor:help;white-space:nowrap">${buyZone.label}</span>`
+          : ''
+        const mrkBadge = `<span style="display:inline-block;font-size:0.6rem;padding:0.15rem 0.35rem;border-radius:3px;background:${mrkColor}20;color:${mrkColor};border:1px solid ${mrkColor}40;white-space:nowrap">${mrkLabel}</span>`
+
         // Desktop row
         desktopRows += `
           <tr>
@@ -587,6 +610,7 @@ export const AnalysisPage = {
             <td class="amount" style="color: ${pnlColor(pnl)}; font-weight: bold">${sign(pnl)}${fmt(pnl)}</td>
             <td class="amount" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(2)}%</td>
             <td class="amount" style="color: var(--text-muted); font-weight: 600">${weight.toFixed(1)}%</td>
+            <td style="text-align:center"><div style="display:flex;flex-direction:row;gap:0.2rem;align-items:center;justify-content:center;flex-wrap:wrap">${techBadge}${mrkBadge}</div></td>
           </tr>`
 
         // Mobile card (using same classes as dashboard)
@@ -625,12 +649,16 @@ export const AnalysisPage = {
                 <span class="dash-instrument-label">P&L %</span>
                 <span class="dash-instrument-value" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(2)}%</span>
               </div>
+              <div class="dash-instrument-row">
+                <span class="dash-instrument-label">Señal</span>
+                <span class="dash-instrument-value" style="display:flex;gap:0.25rem;flex-wrap:wrap">${techBadge}${mrkBadge}</span>
+              </div>
             </div>
           </div>`
       })
 
       html += desktopRows
-      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(2)}%</td><td class="amount">100%</td></tr></tfoot></table></div>`
+      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(2)}%</td><td class="amount">100%</td><td></td></tr></tfoot></table></div>`
       
       // Mobile cards section
       html += `
@@ -701,6 +729,33 @@ export const AnalysisPage = {
       if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
       document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
+  },
+
+  _calcBuyZone(ticker) {
+    if (!this._validHistories?.length || !this._validTickers?.length) return null
+    const idx = this._validTickers.indexOf(ticker)
+    if (idx === -1) return null
+    const history = this._validHistories[idx]
+    if (!history || history.length < 10) return null
+
+    const prices = history.map(p => p.price)
+    const last252 = prices.slice(-252)
+    const high52w = Math.max(...last252)
+    const low52w = Math.min(...last252)
+    const currentPrice = prices[prices.length - 1]
+    const range = high52w - low52w
+    const percentile = range > 0 ? ((currentPrice - low52w) / range) * 100 : 50
+
+    const ma50 = prices.slice(-50).reduce((a, b) => a + b, 0) / Math.min(prices.length, 50)
+    const ma200Slice = prices.slice(-200)
+    const ma200 = ma200Slice.length >= 100 ? ma200Slice.reduce((a, b) => a + b, 0) / ma200Slice.length : null
+
+    let label, color
+    if (percentile < 30) { label = '↓ Bajo';    color = '#10b981' }
+    else if (percentile > 70) { label = '↑ Alto'; color = '#f59e0b' }
+    else                      { label = '→ Neutro';         color = '#64748b' }
+
+    return { percentile, high52w, low52w, ma50, ma200, label, color }
   },
 
   _renderTreemap(container, items) {

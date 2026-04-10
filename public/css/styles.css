@@ -1943,6 +1943,15 @@ input:focus, select:focus, textarea:focus {
   padding: 0.2rem 0.3rem;
 }
 
+#current-holdings-table table td {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.5rem;
+}
+
+#current-holdings-table table th {
+  padding: 0.35rem 0.5rem;
+}
+
 @media (max-width: 1200px) {
   .analysis-grid-top, 
   .analysis-grid-mixed,

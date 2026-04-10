@@ -94,6 +94,9 @@ supabase/
 - Simulación Monte Carlo (1 año, 500 trayectorias).
 - Backtesting vs. benchmark dinámico (SPY, QQQ, DIA, IWM o custom).
 - Matriz de correlación entre activos con heatmap cromático.
+- **Señales de compra por activo** en la tabla de tenencias, combinando dos fuentes:
+  - **Técnica (52 semanas):** ubica el precio actual en el rango histórico anual → `↓ Precio bajo` / `→ Neutral` / `↑ Precio elevado`. El tooltip muestra mínimo, máximo, MA50, MA200 y percentil exacto.
+  - **Markowitz:** compara el peso actual vs. el peso óptimo calculado → `↑ Comprar más` / `✓ OK` / `↓ Reducir`.
 - Generador de reporte PDF con gráficos y KPIs.
 - Caché de datos históricos de 24 horas.
 
