@@ -1900,10 +1900,15 @@ input:focus, select:focus, textarea:focus {
 /* ── Analysis Page Responsive Grids ─────────────────────── */
 .analysis-grid-top {
   display: grid;
-  grid-template-columns: 6fr 2fr 2fr;
+  grid-template-columns: 3fr 1fr;
+  grid-template-rows: 1fr 1fr;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   align-items: stretch;
+}
+
+.analysis-grid-top > :first-child {
+  grid-row: span 2;
 }
 
 .analysis-grid-two {
@@ -1966,7 +1971,12 @@ input:focus, select:focus, textarea:focus {
   .analysis-grid-mixed,
   .analysis-grid-bottom {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
     gap: 1rem;
+  }
+
+  .analysis-grid-top > :first-child {
+    grid-row: span 1;
   }
 
   .analysis-grid-top > *,
