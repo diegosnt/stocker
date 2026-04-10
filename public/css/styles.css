@@ -1901,14 +1901,15 @@ input:focus, select:focus, textarea:focus {
 .analysis-grid-top {
   display: grid;
   grid-template-columns: 3fr 1fr;
-  grid-template-rows: 1fr 1fr;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   align-items: stretch;
 }
 
-.analysis-grid-top > :first-child {
-  grid-row: span 2;
+.charts-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .analysis-grid-two {
@@ -1973,10 +1974,6 @@ input:focus, select:focus, textarea:focus {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
     gap: 1rem;
-  }
-
-  .analysis-grid-top > :first-child {
-    grid-row: span 1;
   }
 
   .analysis-grid-top > *,

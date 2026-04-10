@@ -107,13 +107,15 @@ export const AnalysisPage = {
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual</h3>
             <div id="current-holdings-table" style="overflow-x: auto"></div>
           </div>
-          <div class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Activo</h3>
-            <div id="current-holdings-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
-          </div>
-          <div id="type-distribution-card" class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Tipo</h3>
-            <div id="current-type-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
+          <div class="charts-column">
+            <div class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column; flex: 1">
+              <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Activo</h3>
+              <div id="current-holdings-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
+            </div>
+            <div id="type-distribution-card" class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column; flex: 1">
+              <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Tipo</h3>
+              <div id="current-type-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
+            </div>
           </div>
         </div>
 
