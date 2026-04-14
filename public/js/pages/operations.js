@@ -6,6 +6,7 @@ import { esc, confirmModal, setFieldError } from '../utils.js'
 
 const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
 const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
+const ICON_CLONE  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
 
 const PAGE_SIZE = 10
 
@@ -530,6 +531,7 @@ export const OperationsPage = {
           <td class="currency-col"><span class="badge badge-${(op.currency || '').toLowerCase()}">${op.currency || '—'}</span></td>
           <td class="actions-cell">
             <button class="btn btn-sm btn-ghost btn-icon-only btn-edit-op" data-op-idx="${idx}" title="Editar" aria-label="Editar">${ICON_EDIT}</button>
+            <button class="btn btn-sm btn-ghost btn-icon-only btn-clone-op" data-op-idx="${idx}" title="Clonar" aria-label="Clonar">${ICON_CLONE}</button>
             <button class="btn btn-sm btn-danger btn-icon-only btn-delete-op" data-id="${op.id}" title="Eliminar" aria-label="Eliminar">${ICON_DELETE}</button>
           </td>
         </tr>
@@ -541,6 +543,7 @@ export const OperationsPage = {
               ${op.notes ? `<div><strong>Notas:</strong> <span style="color:var(--text-muted)">${esc(op.notes)}</span></div>` : ''}
               <div class="op-detail-actions">
                 <button class="btn btn-primary btn-edit-op" data-op-idx="${idx}">${ICON_EDIT} Editar</button>
+                <button class="btn btn-ghost btn-clone-op" data-op-idx="${idx}">${ICON_CLONE} Clonar</button>
                 <button class="btn btn-danger btn-delete-op" data-id="${op.id}">${ICON_DELETE} Eliminar</button>
               </div>
             </div>
@@ -580,6 +583,7 @@ export const OperationsPage = {
 
           <div class="op-card-actions-modern">
             <button class="btn btn-sm btn-ghost btn-edit-op" data-op-idx="${idx}">${ICON_EDIT} Editar</button>
+            <button class="btn btn-sm btn-ghost btn-clone-op" data-op-idx="${idx}">${ICON_CLONE} Clonar</button>
             <button class="btn btn-sm btn-ghost btn-delete-op" data-id="${op.id}" style="color: var(--color-danger)">${ICON_DELETE} Borrar</button>
           </div>
         </div>`
@@ -609,12 +613,21 @@ export const OperationsPage = {
       this._showFormModal()
     }
 
+    const handleClone = (btn) => {
+      const { id, created_at, ...rest } = data[btn.dataset.opIdx]
+      state.editingOperation = { ...rest, _cloning: true }
+      this._showFormModal()
+    }
+
     const handleDelete = async (btn) => {
       await this._deleteOp(btn.dataset.id)
     }
 
     tbody.querySelectorAll('.btn-edit-op').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); handleEdit(btn) })
+    })
+    tbody.querySelectorAll('.btn-clone-op').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); handleClone(btn) })
     })
     tbody.querySelectorAll('.btn-delete-op').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); handleDelete(btn) })
@@ -623,6 +636,9 @@ export const OperationsPage = {
     if (opsCards) {
       opsCards.querySelectorAll('.btn-edit-op').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); handleEdit(btn) })
+      })
+      opsCards.querySelectorAll('.btn-clone-op').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); handleClone(btn) })
       })
       opsCards.querySelectorAll('.btn-delete-op').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); handleDelete(btn) })
@@ -942,7 +958,7 @@ export const OperationsPage = {
     overlay.innerHTML = `
       <div class="modal-card modal-card-lg">
         <div class="modal-header">
-          <h3 style="margin:0">${editing ? 'Editar Operación' : 'Nueva Operación'}</h3>
+          <h3 style="margin:0">${editing?._cloning ? 'Clonar Operación' : editing ? 'Editar Operación' : 'Nueva Operación'}</h3>
           <button type="button" class="btn btn-sm btn-ghost" id="btn-op-close">✕</button>
         </div>
         <form id="form-op" novalidate>
@@ -963,9 +979,13 @@ export const OperationsPage = {
 
           <div class="form-row">
             <div class="form-group">
-              <label for="op-instrument">Instrumento *</label>
+              <label for="op-instrument-search">Instrumento *</label>
               <div style="display:flex; gap:0.5rem; align-items:center">
-                <select id="op-instrument" required style="flex:1"><option value="">Cargando...</option></select>
+                <div class="combobox" id="op-instrument-combobox" style="flex:1">
+                  <input type="text" id="op-instrument-search" class="combobox-input" placeholder="Buscar por ticker o nombre..." autocomplete="off">
+                  <input type="hidden" id="op-instrument">
+                  <ul class="combobox-list" id="op-instrument-list" hidden></ul>
+                </div>
                 <button type="button" class="btn btn-sm btn-ghost btn-icon-only" id="btn-new-instrument" title="Crear nuevo instrumento" aria-label="Crear nuevo instrumento" style="flex-shrink:0">+</button>
               </div>
             </div>
@@ -1007,7 +1027,7 @@ export const OperationsPage = {
 
           <div class="form-actions">
             <button type="submit" class="btn btn-primary" id="btn-op-submit">
-              ${editing ? 'Guardar cambios' : 'Registrar operación'}
+              ${editing?._cloning ? 'Clonar operación' : editing ? 'Guardar cambios' : 'Registrar operación'}
             </button>
             <button type="button" class="btn btn-ghost" id="btn-op-cancel">Cancelar</button>
           </div>
@@ -1069,27 +1089,120 @@ export const OperationsPage = {
   },
 
   async _loadInstrumentsSelect(selectedId = null) {
-    const sel = document.getElementById('op-instrument')
-    if (!sel) return
+    const searchEl  = document.getElementById('op-instrument-search')
+    const hiddenEl  = document.getElementById('op-instrument')
+    const listEl    = document.getElementById('op-instrument-list')
+    if (!searchEl || !hiddenEl || !listEl) return
 
-    let data = cacheGet('instruments')
-    if (!data) {
-      ;({ data } = await supabase
+    let instruments = cacheGet('instruments')
+    if (!instruments) {
+      ;({ data: instruments } = await supabase
         .from('instruments')
         .select('id, ticker, name, instrument_types(name)')
         .order('ticker'))
-      if (data) cacheSet('instruments', data)
+      if (instruments) cacheSet('instruments', instruments)
     }
 
-    if (!data?.length) {
-      sel.innerHTML = '<option value="">— Sin instrumentos (creá uno primero) —</option>'
+    if (!instruments?.length) {
+      searchEl.placeholder = 'Sin instrumentos — creá uno primero'
+      searchEl.disabled = true
       return
     }
 
-    sel.innerHTML = '<option value="">— Seleccioná un instrumento —</option>' +
-      data.map(i =>
-        `<option value="${i.id}" ${i.id === selectedId ? 'selected' : ''}>[${esc(i.ticker)}] ${esc(i.name)} (${i.instrument_types?.name ?? ''})</option>`
-      ).join('')
+    const labelFor = (i) => `[${i.ticker}] ${i.name}${i.instrument_types?.name ? ` (${i.instrument_types.name})` : ''}`
+
+    // Pre-fill si hay un instrumento seleccionado (editar / clonar)
+    if (selectedId) {
+      const found = instruments.find(i => i.id === selectedId)
+      if (found) {
+        hiddenEl.value   = found.id
+        searchEl.value   = labelFor(found)
+      }
+    }
+
+    const renderList = (query) => {
+      const q = query.trim().toLowerCase()
+      const filtered = q
+        ? instruments.filter(i =>
+            i.ticker.toLowerCase().includes(q) ||
+            i.name.toLowerCase().includes(q)
+          )
+        : instruments
+
+      if (!filtered.length) {
+        listEl.innerHTML = `<li class="combobox-empty">Sin resultados para "${esc(query)}"</li>`
+      } else {
+        listEl.innerHTML = filtered.map(i =>
+          `<li class="combobox-option" data-id="${i.id}" data-label="${esc(labelFor(i))}">`+
+          `<span class="combobox-ticker">${esc(i.ticker)}</span>`+
+          `<span class="combobox-name">${esc(i.name)}</span>`+
+          `</li>`
+        ).join('')
+
+        listEl.querySelectorAll('.combobox-option').forEach(opt => {
+          opt.addEventListener('mousedown', (e) => {
+            e.preventDefault() // evita que blur se dispare antes
+            hiddenEl.value  = opt.dataset.id
+            searchEl.value  = opt.dataset.label
+            listEl.hidden   = true
+            searchEl.classList.remove('field-error-input')
+            // Limpiar mensaje de error si había
+            const errMsg = searchEl.closest('.form-group')?.querySelector('.field-error-msg')
+            if (errMsg) errMsg.remove()
+          })
+        })
+      }
+
+      listEl.hidden = false
+    }
+
+    searchEl.addEventListener('input', () => {
+      // Si el usuario edita el texto, limpiar la selección oculta
+      hiddenEl.value = ''
+      renderList(searchEl.value)
+    })
+
+    searchEl.addEventListener('focus', () => {
+      renderList(searchEl.value)
+    })
+
+    searchEl.addEventListener('blur', () => {
+      // Pequeño delay para permitir el mousedown del option
+      setTimeout(() => {
+        listEl.hidden = true
+        // Si no hay nada seleccionado, limpiar el texto
+        if (!hiddenEl.value) searchEl.value = ''
+      }, 150)
+    })
+
+    searchEl.addEventListener('keydown', (e) => {
+      if (listEl.hidden) return
+      const opts = listEl.querySelectorAll('.combobox-option')
+      const active = listEl.querySelector('.combobox-option.active')
+      let idx = [...opts].indexOf(active)
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        idx = (idx + 1) % opts.length
+        opts.forEach(o => o.classList.remove('active'))
+        opts[idx]?.classList.add('active')
+        opts[idx]?.scrollIntoView({ block: 'nearest' })
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        idx = idx <= 0 ? opts.length - 1 : idx - 1
+        opts.forEach(o => o.classList.remove('active'))
+        opts[idx]?.classList.add('active')
+        opts[idx]?.scrollIntoView({ block: 'nearest' })
+      } else if (e.key === 'Enter' && active) {
+        e.preventDefault()
+        hiddenEl.value = active.dataset.id
+        searchEl.value = active.dataset.label
+        listEl.hidden  = true
+      } else if (e.key === 'Escape') {
+        listEl.hidden = true
+        if (!hiddenEl.value) searchEl.value = ''
+      }
+    })
   },
 
   async _loadAlycsSelect(selectedId = null) {
@@ -1305,7 +1418,7 @@ export const OperationsPage = {
       let hasError = false
       if (!type)                           { setFieldError('op-type',       'Seleccioná un tipo de operación'); hasError = true }
       if (!operatedAt)                     { setFieldError('op-date',       'Ingresá una fecha');              hasError = true }
-      if (!instrumentId)                   { setFieldError('op-instrument', 'Seleccioná un instrumento');      hasError = true }
+      if (!instrumentId)                   { setFieldError('op-instrument-search', 'Seleccioná un instrumento'); hasError = true }
       if (!alycId)                         { setFieldError('op-alyc',       'Seleccioná una ALyC');           hasError = true }
       if (!qty   || parseFloat(qty)   <= 0){ setFieldError('op-qty',        'Ingresá una cantidad mayor a 0'); hasError = true }
       if (!price || parseFloat(price) <= 0){ setFieldError('op-price',      'Ingresá un precio mayor a 0');   hasError = true }
@@ -1327,7 +1440,7 @@ export const OperationsPage = {
       }
 
       try {
-        if (editing) {
+        if (editing && !editing._cloning) {
           await apiRequest('PATCH', `/api/operations/${editing.id}`, payload)
           showToast('Operación actualizada correctamente.', 'success')
         } else {
@@ -1341,7 +1454,7 @@ export const OperationsPage = {
       } catch {
         showToast('Error al guardar la operación.', 'error')
         btn.disabled    = false
-        btn.textContent = editing ? 'Guardar cambios' : 'Registrar operación'
+        btn.textContent = editing?._cloning ? 'Clonar operación' : editing ? 'Guardar cambios' : 'Registrar operación'
       }
     })
   }

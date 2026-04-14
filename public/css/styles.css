@@ -1724,6 +1724,64 @@ input:focus, select:focus, textarea:focus {
   color: var(--text-muted);
 }
 
+/* ---- Combobox ---- */
+.combobox {
+  position: relative;
+}
+.combobox-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.combobox-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.1s;
+}
+.combobox-option:hover,
+.combobox-option.active {
+  background: var(--color-primary-light, rgba(99,102,241,0.1));
+}
+.combobox-ticker {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  min-width: 3.5rem;
+  flex-shrink: 0;
+}
+.combobox-name {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combobox-empty {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* ---- Form Validation ---- */
 .field-error-input {
   border-color: var(--color-danger) !important;

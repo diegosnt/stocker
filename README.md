@@ -102,6 +102,8 @@ supabase/
 
 ### Operaciones
 - Gestión completa (CRUD) de compras y ventas de activos.
+- **Clonar operación**: duplica cualquier registro con un click, abre el formulario pre-llenado para editarlo antes de guardar.
+- Formulario con **combobox de instrumentos**: buscador en tiempo real por ticker o nombre con navegación por teclado (↑↓ Enter Escape).
 - Filtros avanzados: por ALyC, instrumento, tipo de operación, moneda y rango de fechas.
 - Importación/Exportación CSV compatible con formatos de brokers locales.
 - Vista Mobile Pro: tarjetas modernas y colapsables con acciones integradas.
