@@ -2094,7 +2094,6 @@ input:focus, select:focus, textarea:focus {
   .chart-panel {
     min-height: 300px;
   }
-}
 
 /* ── Skeletons (Shimmer Animation) ───────────────────────── */
 .skeleton {

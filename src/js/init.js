@@ -1,3 +1,9 @@
+import { Chart, registerables } from 'chart.js'
+import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
+
+Chart.register(...registerables, TreemapController, TreemapElement)
+window.Chart = Chart
+
 import { onAuthChange, signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
 import { initDarkMode, toggleDarkMode } from './utils.js'

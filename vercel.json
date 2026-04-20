@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "framework": "vite",
   "headers": [
     {
       "source": "/(fonts|img|favicon.ico)(.*)",
@@ -11,11 +12,11 @@
       ]
     },
     {
-      "source": "/(css|js)(.*)",
+      "source": "/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     },
@@ -35,8 +36,8 @@
       "destination": "/api/server.js"
     },
     {
-      "source": "/((?!api/|css/|js/|img/|fonts/|favicon.ico|sw.js).*)",
-      "destination": "/api/server.js"
+      "source": "/((?!api/|assets/|img/|fonts/|favicon.ico|sw.js).*)",
+      "destination": "/index.html"
     }
   ]
 }

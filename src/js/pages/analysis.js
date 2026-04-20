@@ -441,7 +441,7 @@ export const AnalysisPage = {
 
       // --- CÁLCULOS PESADOS VÍA WEB WORKER ---
       const workerResults = await new Promise((resolve, reject) => {
-        const worker = new Worker('/js/analysis-worker.js')
+        const worker = new Worker(new URL('../analysis-worker.js', import.meta.url), { type: 'module' })
         worker.postMessage({
           tickers: validTickers,
           returnsMatrix,
@@ -889,10 +889,11 @@ export const AnalysisPage = {
     this[chartKey] = ChartManager.renderPieChart(canvas, items)
   },
 
-  async _loadPdfLibraries() {    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
+  async _loadPdfLibraries() {
+    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
     await new Promise((resolve, reject) => {
       const s = document.createElement('script')
-      s.src = '/js/vendor/jspdf.js'
+      s.src = '/src/js/vendor/jspdf.js'
       s.onload = () => {
         const check = () => {
           if (window.jspdf && window.jspdf.jsPDF) resolve()
@@ -905,7 +906,7 @@ export const AnalysisPage = {
     })
     await new Promise((resolve, reject) => {
       const s = document.createElement('script')
-      s.src = '/js/vendor/html2canvas.js'
+      s.src = '/src/js/vendor/html2canvas.js'
       s.onload = resolve
       s.onerror = reject
       document.head.appendChild(s)

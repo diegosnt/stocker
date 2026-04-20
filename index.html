@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stocker</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  
+  <!-- Fonts preloading (Vite las optimiza solas, pero las dejamos por prolijidad) -->
+  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-500.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
+  
+  <link rel="stylesheet" href="/src/css/styles.css">
+  
+  <!-- Scripts de vendor manuales -->
+  <script type="module" src="/src/js/vendor/dompurify.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div class="app-loading">
+      <div class="skeleton" style="height: 100vh; width: 100%;"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Inyectamos los env vars de Vite en el window por si tu JS viejo todavía los espera ahí.
+    window.__SUPABASE_URL__      = import.meta.env.VITE_SUPABASE_URL;
+    window.__SUPABASE_ANON_KEY__ = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  </script>
+
+  <!-- Punto de entrada principal -->
+  <script type="module" src="/src/js/init.js"></script>
+  </body>
+  </html>
