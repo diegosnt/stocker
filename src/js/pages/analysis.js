@@ -890,28 +890,26 @@ export const AnalysisPage = {
   },
 
   async _loadPdfLibraries() {
-    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script')
-      s.src = '/src/js/vendor/jspdf.js'
-      s.onload = () => {
-        const check = () => {
-          if (window.jspdf && window.jspdf.jsPDF) resolve()
-          else setTimeout(check, 10)
-        }
-        check()
-      }
-      s.onerror = reject
-      document.head.appendChild(s)
-    })
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script')
-      s.src = '/src/js/vendor/html2canvas.js'
-      s.onload = resolve
-      s.onerror = reject
-      document.head.appendChild(s)
-    })
-    return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
+    if (window.jspdf && window.jspdf.jsPDF && window.html2canvas) {
+      return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas }
+    }
+
+    // Usamos el poder de Vite para importar dinámicamente desde npm.
+    try {
+      const [{ jsPDF }, html2canvas] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas')
+      ])
+      
+      // Como tu código viejo todavía los busca en el window, los inyectamos por si acaso.
+      window.jspdf = { jsPDF }
+      window.html2canvas = html2canvas.default || html2canvas
+      
+      return { jsPDF, html2canvas: window.html2canvas }
+    } catch (err) {
+      console.error('[Analysis] Error cargando librerías PDF:', err)
+      throw new Error('Error al cargar generador de PDF')
+    }
   },
 
   async _generatePDF() {

@@ -1,8 +1,10 @@
 import { Chart, registerables } from 'chart.js'
 import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
+import DOMPurify from 'dompurify'
 
 Chart.register(...registerables, TreemapController, TreemapElement)
 window.Chart = Chart
+window.DOMPurify = DOMPurify
 
 import { onAuthChange, signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
