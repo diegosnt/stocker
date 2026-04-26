@@ -431,7 +431,7 @@ export const DashboardPage = {
       const abp = parseFloat(el.dataset.avgBuyPrice)
       if (!abp) { el.innerHTML = dash; return }
       const pct = (price / abp - 1) * 100
-      el.innerHTML = `<span style="color:${pnlColor(pct)};font-weight:600">${sign(pct)}${pct.toFixed(2)}%</span>`
+      el.innerHTML = `<span style="color:${pnlColor(pct)};font-weight:600">${sign(pct)}${pct.toFixed(1)}%</span>`
     })
 
     if (this._chartsReady) {

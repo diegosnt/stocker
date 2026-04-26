@@ -126,7 +126,7 @@ export const HoldingsAnalysisPage = {
           <div class="alyc-summary-row" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 1rem">
             <div class="kpi-card kpi-card--compact" style="flex: 1; min-width: 150px">
               <div class="kpi-label">Total Invertido (${curr})</div>
-              <div class="kpi-value">${totalInv.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+              <div class="kpi-value">${totalInv.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div class="kpi-card kpi-card--compact" style="flex: 1; min-width: 150px">
               <div class="kpi-label">Valor Actual (${curr})</div>
@@ -171,8 +171,8 @@ export const HoldingsAnalysisPage = {
                   <tr data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}" data-value="${h.currentValue}">
                     <td><span class="ticker-chip" title="${h.name}">${h.ticker}</span></td>
                     <td class="amount">${h.quantity.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
-                    <td class="amount">${h.avgBuyPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                    <td class="amount"><strong>${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
+                    <td class="amount">${h.avgBuyPrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="amount"><strong>${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
                     <td class="amount market-price-cell" data-ticker="${h.ticker}"><span class="cell-skeleton"></span></td>
                     <td class="amount market-value-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}"><span class="cell-skeleton"></span></td>
                     <td class="amount pnl-amount-cell" data-ticker="${h.ticker}" data-quantity="${h.quantity}" data-avg-buy-price="${h.avgBuyPrice}"><span class="cell-skeleton"></span></td>
@@ -195,7 +195,7 @@ export const HoldingsAnalysisPage = {
                   <div style="color: var(--text-muted)">Cantidad:</div>
                   <div style="text-align: right; font-weight: 500">${h.quantity.toLocaleString('es-AR')}</div>
                   <div style="color: var(--text-muted)">Valor Invertido:</div>
-                  <div style="text-align: right; font-weight: 700; color: var(--color-primary)">${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                  <div style="text-align: right; font-weight: 700; color: var(--color-primary)">${h.currentValue.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   <div style="color: var(--text-muted)">Precio Actual:</div>
                   <div class="market-price-cell" data-ticker="${h.ticker}" style="text-align: right; font-weight: 500"><span class="cell-skeleton"></span></div>
                   <div style="color: var(--text-muted)">Valor Actual:</div>
@@ -215,7 +215,7 @@ export const HoldingsAnalysisPage = {
   },
 
   _updatePriceCells(ticker, price) {
-    const fmt  = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt  = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const dash = '<span style="color:var(--text-muted)">—</span>'
     const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
     const sign     = v => v > 0 ? '+' : ''
@@ -245,7 +245,7 @@ export const HoldingsAnalysisPage = {
       if (avgBuyPrice === 0) { el.innerHTML = dash; return }
       const pct   = ((price / avgBuyPrice) - 1) * 100
       const color = pnlColor(pct)
-      el.innerHTML = `<span style="color:${color};font-weight:600">${sign(pct)}${pct.toFixed(2)}%</span>`
+      el.innerHTML = `<span style="color:${color};font-weight:600">${sign(pct)}${pct.toFixed(1)}%</span>`
     })
 
     this._refreshPnlCharts(ticker)
@@ -262,7 +262,7 @@ export const HoldingsAnalysisPage = {
     const prices    = this._resolvedPrices
     const totalTickers = Object.keys(summary).length
 
-    const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const sign     = v => v > 0 ? '+' : ''
     const color    = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-main)'
     const dash     = '<span style="color:var(--text-muted)">—</span>'
@@ -326,7 +326,7 @@ export const HoldingsAnalysisPage = {
           if (pnlEl) pnlEl.innerHTML = `<span style="color:${color(diff)}; font-weight:700">${sign(diff)}${fmt(diff)}</span>`
           if (pctEl && investedVal > 0) {
             const pct = (currentVal / investedVal - 1) * 100
-            pctEl.innerHTML = `<span style="color:${color(pct)}; font-weight:600; font-size:0.85rem">${sign(pct)}${pct.toFixed(2)}%</span>`
+            pctEl.innerHTML = `<span style="color:${color(pct)}; font-weight:600; font-size:0.85rem">${sign(pct)}${pct.toFixed(1)}%</span>`
           }
         }
       }
@@ -456,7 +456,7 @@ export const HoldingsAnalysisPage = {
 
     this._holdingsSummary = data.holdingsSummary
 
-    const fmt    = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt    = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const hasUSD = Object.values(data.holdingsSummary).some(h => h.currency === 'USD')
     const skeleton = `<span class="cell-skeleton" style="width:80px;height:1.25rem;display:inline-block"></span>`
 

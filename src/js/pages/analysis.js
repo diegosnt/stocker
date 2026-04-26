@@ -24,6 +24,8 @@ export const AnalysisPage = {
   _lastValidHoldings: [],
   _validHistories: [],
   _validTickers: [],
+  _holdingsSortCol: 'marketValue',
+  _holdingsSortAsc: false,
 
   cleanup() {
     const charts = [
@@ -542,7 +544,7 @@ export const AnalysisPage = {
     holdings.forEach(h => { if (!byCurrency[h.currency]) byCurrency[h.currency] = []; byCurrency[h.currency].push(h) })
 
     let html = ''; let totalMarketValueAll = 0
-    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
     const sign = v => v > 0 ? '+' : ''
 
@@ -563,21 +565,24 @@ export const AnalysisPage = {
             <table class="holdings-table">
               <thead>
                 <tr>
-                  <th>Ticker</th>
-                  <th style="text-align:right">Cant.</th>
-                  <th style="text-align:right">Costo</th>
-                  <th style="text-align:right">Invertido</th>
-                  <th style="text-align:right">Precio</th>
-                  <th style="text-align:right">Valor</th>
-                  <th style="text-align:right">P&L $</th>
-                  <th style="text-align:right">P&L %</th>
-                  <th style="text-align:right">%</th>
-                  <th style="text-align:center">Señal</th>
+                  <th class="sortable" data-col="ticker">Ticker</th>
+                  <th class="sortable" data-col="quantity" style="text-align:right">Cant.</th>
+                  <th class="sortable" data-col="avg_buy_price" style="text-align:right">Costo</th>
+                  <th class="sortable" data-col="invested" style="text-align:right">Invertido</th>
+                  <th class="sortable" data-col="price" style="text-align:right">Precio</th>
+                  <th class="sortable" data-col="marketValue" style="text-align:right">Valor</th>
+                  <th class="sortable" data-col="pnl" style="text-align:right">P&L $</th>
+                  <th class="sortable" data-col="pnlPct" style="text-align:right">P&L %</th>
+                  <th class="sortable" data-col="weight" style="text-align:right">%</th>
                 </tr>
               </thead>
               <tbody>`
       
-      items.sort((a, b) => (b.total_quantity * (this._resolvedPrices?.[b.ticker] ?? b.avg_buy_price)) - (a.total_quantity * (this._resolvedPrices?.[a.ticker] ?? a.avg_buy_price)))
+      items.sort((a, b) => {
+        const valA = a.total_quantity * (this._resolvedPrices?.[a.ticker] ?? a.avg_buy_price)
+        const valB = b.total_quantity * (this._resolvedPrices?.[b.ticker] ?? b.avg_buy_price)
+        return valB - valA
+      })
       
       let desktopRows = ''
       let mobileCards = ''
@@ -595,24 +600,11 @@ export const AnalysisPage = {
         assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnlPct })
         typeGroups[type] = (typeGroups[type] || 0) + currentVal
 
-        // Signal: Technical zone (52w) + Markowitz rebalance
-        const buyZone = this._calcBuyZone(h.ticker)
-        const optW = analysis?.optimal?.weights?.[h.ticker] ?? null
-        const wDiff = optW !== null ? (optW - weight / 100) : null
-        let mrkLabel, mrkColor
-        if (wDiff === null)       { mrkLabel = '--';          mrkColor = 'var(--text-muted)' }
-        else if (wDiff > 0.05)   { mrkLabel = '↑ Comprar'; mrkColor = '#3b82f6' }
-        else if (wDiff < -0.05)  { mrkLabel = '↓ Vender';     mrkColor = '#f59e0b' }
-        else                      { mrkLabel = '✓ OK';          mrkColor = '#64748b' }
-
-        const techBadge = buyZone
-          ? `<span title="52s: $${buyZone.low52w.toFixed(2)} – $${buyZone.high52w.toFixed(2)} | MA50: $${buyZone.ma50.toFixed(2)}${buyZone.ma200 ? ' | MA200: $' + buyZone.ma200.toFixed(2) : ''} | Percentil: ${buyZone.percentile.toFixed(0)}%" style="display:inline-block;font-size:0.6rem;padding:0.15rem 0.35rem;border-radius:3px;background:${buyZone.color}20;color:${buyZone.color};border:1px solid ${buyZone.color}40;cursor:help;white-space:nowrap">${buyZone.label}</span>`
-          : ''
-        const mrkBadge = `<span style="display:inline-block;font-size:0.6rem;padding:0.15rem 0.35rem;border-radius:3px;background:${mrkColor}20;color:${mrkColor};border:1px solid ${mrkColor}40;white-space:nowrap">${mrkLabel}</span>`
-
         // Desktop row
         desktopRows += `
-          <tr>
+          <tr data-ticker="${h.ticker}" data-quantity="${h.total_quantity}" data-avg_buy_price="${h.avg_buy_price}" 
+              data-invested="${invested}" data-price="${price ?? 0}" data-marketValue="${currentVal}" 
+              data-pnl="${pnl}" data-pnlPct="${pnlPct}" data-weight="${weight}">
             <td><span class="ticker-chip">${h.ticker}</span></td>
             <td class="amount">${h.total_quantity.toLocaleString('es-AR')}</td>
             <td class="amount">${fmt(h.avg_buy_price)}</td>
@@ -620,9 +612,8 @@ export const AnalysisPage = {
             <td class="amount"><strong>${price ? fmt(price) : '--'}</strong></td>
             <td class="amount"><strong>${fmt(currentVal)}</strong></td>
             <td class="amount" style="color: ${pnlColor(pnl)}; font-weight: bold">${sign(pnl)}${fmt(pnl)}</td>
-            <td class="amount" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(2)}%</td>
+            <td class="amount" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(1)}%</td>
             <td class="amount" style="color: var(--text-muted); font-weight: 600">${weight.toFixed(1)}%</td>
-            <td style="text-align:center"><div style="display:flex;flex-direction:row;gap:0.2rem;align-items:center;justify-content:center;flex-wrap:wrap">${techBadge}${mrkBadge}</div></td>
           </tr>`
 
         // Mobile card (using same classes as dashboard)
@@ -659,18 +650,14 @@ export const AnalysisPage = {
               </div>
               <div class="dash-instrument-row">
                 <span class="dash-instrument-label">P&L %</span>
-                <span class="dash-instrument-value" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(2)}%</span>
-              </div>
-              <div class="dash-instrument-row">
-                <span class="dash-instrument-label">Señal</span>
-                <span class="dash-instrument-value" style="display:flex;gap:0.25rem;flex-wrap:wrap">${techBadge}${mrkBadge}</span>
+                <span class="dash-instrument-value" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(1)}%</span>
               </div>
             </div>
           </div>`
       })
 
       html += desktopRows
-      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(2)}%</td><td class="amount">100%</td><td></td></tr></tfoot></table></div>`
+      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(1)}%</td><td class="amount">100.0%</td></tr></tfoot></table></div>`
       
       // Mobile cards section
       html += `
@@ -683,13 +670,14 @@ export const AnalysisPage = {
             </div>
             <div class="dash-instrument-row" style="font-size: 0.75rem; color: ${pnlColor(totalMarket - totalInv)}">
               <span>P&L Total</span>
-              <span>${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)} (${((totalMarket / totalInv - 1) * 100).toFixed(2)}%)</span>
+              <span>${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)} (${((totalMarket / totalInv - 1) * 100).toFixed(1)}%)</span>
             </div>
           </div>
         </div>
       </div>`
     }
     tableContainer.innerHTML = html || '<div class="table-empty">No hay tenencias registradas.</div>'
+    this._bindHoldingsSortHeaders(tableContainer)
     this._bindMobileAccordion()
 
     // Renderizar gráficos si hay datos
@@ -728,33 +716,6 @@ export const AnalysisPage = {
       if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
       document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
-  },
-
-  _calcBuyZone(ticker) {
-    if (!this._validHistories?.length || !this._validTickers?.length) return null
-    const idx = this._validTickers.indexOf(ticker)
-    if (idx === -1) return null
-    const history = this._validHistories[idx]
-    if (!history || history.length < 10) return null
-
-    const prices = history.map(p => p.price)
-    const last252 = prices.slice(-252)
-    const high52w = Math.max(...last252)
-    const low52w = Math.min(...last252)
-    const currentPrice = prices[prices.length - 1]
-    const range = high52w - low52w
-    const percentile = range > 0 ? ((currentPrice - low52w) / range) * 100 : 50
-
-    const ma50 = prices.slice(-50).reduce((a, b) => a + b, 0) / Math.min(prices.length, 50)
-    const ma200Slice = prices.slice(-200)
-    const ma200 = ma200Slice.length >= 100 ? ma200Slice.reduce((a, b) => a + b, 0) / ma200Slice.length : null
-
-    let label, color
-    if (percentile < 30) { label = '↓ Bajo';    color = '#10b981' }
-    else if (percentile > 70) { label = '↑ Alto'; color = '#f59e0b' }
-    else                      { label = '→ Neutro';         color = '#64748b' }
-
-    return { percentile, high52w, low52w, ma50, ma200, label, color }
   },
 
   _renderTreemap(container, items) {
@@ -1127,12 +1088,12 @@ export const AnalysisPage = {
       },  _updateMetricsUI(analysis, benchmarkTicker) {
     const { beta, alpha, r2, vR, es, maxDrawdown } = analysis
     document.getElementById('capm-beta').textContent = beta.toFixed(2)
-    document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(0) + '%'
+    document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(1) + '%'
     document.getElementById('capm-alpha').textContent = (alpha > 0 ? '+' : '') + (alpha * 100).toFixed(1) + '%'
     document.getElementById('capm-alpha').style.color = alpha >= 0 ? '#10b981' : '#ef4444'
-    document.getElementById('analysis-var').textContent = (vR * 100).toFixed(2) + '%'
-    document.getElementById('analysis-es').textContent = (es * 100).toFixed(2) + '%'
-    document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(2) + '%'
+    document.getElementById('analysis-var').textContent = (vR * 100).toFixed(1) + '%'
+    document.getElementById('analysis-es').textContent = (es * 100).toFixed(1) + '%'
+    document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(1) + '%'
     const bD = document.getElementById('capm-beta-desc')
     if (bD) {
       bD.textContent = beta > 1.2 ? 'Agresivo' : (beta < 0.8 ? 'Defensivo' : 'Neutral')
@@ -1188,11 +1149,11 @@ export const AnalysisPage = {
     const es = sorted.slice(0, varIdx + 1).reduce((a, b) => a + b, 0) / (varIdx + 1)
 
     document.getElementById('capm-beta').textContent = beta.toFixed(2)
-    document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(0) + '%'
+    document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(1) + '%'
     document.getElementById('capm-alpha').textContent = (alpha > 0 ? '+' : '') + (alpha * 100).toFixed(1) + '%'
     document.getElementById('capm-alpha').style.color = alpha >= 0 ? '#10b981' : '#ef4444'
-    document.getElementById('analysis-var').textContent = (vR * 100).toFixed(2) + '%'
-    document.getElementById('analysis-es').textContent = (es * 100).toFixed(2) + '%'
+    document.getElementById('analysis-var').textContent = (vR * 100).toFixed(1) + '%'
+    document.getElementById('analysis-es').textContent = (es * 100).toFixed(1) + '%'
     const bD = document.getElementById('capm-beta-desc')
     bD.textContent = beta > 1.2 ? 'Agresivo' : (beta < 0.8 ? 'Defensivo' : 'Neutral')
     bD.style.color = beta > 1.2 ? '#ef4444' : (beta < 0.8 ? '#3b82f6' : 'var(--text-muted)')
@@ -1226,7 +1187,7 @@ export const AnalysisPage = {
       const dd = (cumulativeReturn - peak) / peak
       if (dd < maxDrawdown) maxDrawdown = dd
     }
-    document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(2) + '%'
+    document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(1) + '%'
   },
 
   _renderComparisonChart(holdings) {
@@ -1284,7 +1245,110 @@ export const AnalysisPage = {
     container.innerHTML = html + `</table>`
   },
 
-  _bindMobileAccordion() {
+  _renderTreemap(container, items) {
+    if (!container || !items || items.length === 0) return
+    
+    // Destruir instancia previa si existe antes de limpiar el contenedor
+    this._treemapChart = ChartManager.destroy(this._treemapChart)
+    
+    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    const canvas = container.querySelector('canvas')
+    
+    const getColor = (p) => {
+      if (p > 5) return '#065f46' 
+      if (p > 0) return '#10b981'
+      if (p < -5) return '#991b1b'
+      if (p < 0) return '#ef4444'
+      return '#64748b'
+    }
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+    const data = items.map(item => ({
+      ticker: item.ticker,
+      value: item.currentValue,
+      pct: item.pnlPct ?? 0,
+      color: getColor(item.pnlPct ?? 0)
+    })).filter(d => d.value > 0)
+
+    this._treemapChart = ChartManager.renderTreemapChart(canvas, data, {
+      instance: this._treemapChart,
+      formatter: (ctx) => {
+        const d = ctx.raw?._data || ctx.raw
+        if (!d || !d.ticker) return []
+        // Si el cuadro es muy chico, solo mostrar ticker
+        const area = ctx.element?.width * ctx.element?.height || 1000
+        if (area < 2500) return [d.ticker]
+        return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
+      },
+      chartOptions: {
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const d = ctx.raw?._data
+                if (!d) return ''
+                return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
+              }
+            }
+          }
+        }
+      }
+    })
+  },
+
+  _bindHoldingsSortHeaders(container) {
+    container.querySelectorAll('.holdings-table th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col
+        if (this._holdingsSortCol === col) {
+          this._holdingsSortAsc = !this._holdingsSortAsc
+        } else {
+          this._holdingsSortCol = col
+          // Columnas numéricas: desc por defecto; ticker: asc
+          this._holdingsSortAsc = (col === 'ticker')
+        }
+        this._updateHoldingsSortHeaders()
+        this._sortAllHoldingsTables()
+      })
+    })
+    this._updateHoldingsSortHeaders()
+    },
+
+    _updateHoldingsSortHeaders() {
+    document.querySelectorAll('.holdings-table th.sortable').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc')
+      if (th.dataset.col === this._holdingsSortCol) {
+        th.classList.add(this._holdingsSortAsc ? 'sort-asc' : 'sort-desc')
+      }
+    })
+    },
+
+    _sortAllHoldingsTables() {
+    if (!this._holdingsSortCol) return
+    document.querySelectorAll('.holdings-table tbody').forEach(tbody => {
+      this._sortHoldingsTbody(tbody)
+    })
+    },
+
+    _sortHoldingsTbody(tbody) {
+    const col  = this._holdingsSortCol
+    const asc  = this._holdingsSortAsc
+    const rows = [...tbody.querySelectorAll('tr')]
+
+    rows.sort((a, b) => {
+      if (col === 'ticker') {
+        const cmp = (a.dataset.ticker || '').localeCompare(b.dataset.ticker || '')
+        return asc ? cmp : -cmp
+      }
+      const va = parseFloat(a.getAttribute(`data-${col}`)) || 0
+      const vb = parseFloat(b.getAttribute(`data-${col}`)) || 0
+      return asc ? va - vb : vb - va
+    })
+
+    rows.forEach(row => tbody.appendChild(row))
+    },
+
+    _bindMobileAccordion() {
     document.querySelectorAll('.dash-instrument-card-header').forEach(header => {
       header.addEventListener('click', (e) => {
         const card = e.currentTarget.closest('.dash-instrument-card');
