@@ -223,8 +223,8 @@ app.get('/api/csrf-token', requireAuth, (req, res) => {
 })
 
 // ── Auth endpoints ──────────────────────────────────────────
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+const SUPABASE_URL = process.env.SUPABASE_URL || ''
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || ''
 
 app.get('/api/auth/session', requireAuth, async (req, res) => {
   // Si llegó acá es porque requireAuth validó la cookie o el token
@@ -424,14 +424,14 @@ function sanitize(v) {
 // Wrapper de fetch a Supabase REST. Lanza un error con { status, payload } si la respuesta no es ok.
 async function supabaseFetch(path, method, authHeader, body) {
   const headers = {
-    'apikey':        process.env.SUPABASE_ANON_KEY,
+    'apikey':        SUPABASE_ANON_KEY,
     'Authorization': authHeader ?? ''
   }
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
     headers['Prefer']       = 'return=representation'
   }
-  const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined
