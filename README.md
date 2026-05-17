@@ -67,8 +67,9 @@ Un solo comando levanta el servidor de la API y el entorno de desarrollo de Vite
 
 ```bash
 # 1. Preparar el entorno
-cp .env.example .env        # IMPORTANTE: Agregar prefijos VITE_ para el frontend
-                            # Ejemplo: VITE_SUPABASE_URL=...
+cp .env.example .env        # Completar SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET
+                            # No se necesitan prefijos VITE_ — el frontend obtiene la config
+                            # en runtime desde /api/config, no en tiempo de build.
 
 # 2. Instalar dependencias
 pnpm install
@@ -101,9 +102,18 @@ El proyecto está configurado para un despliegue **Híbrido**:
 2.  **Backend:** La carpeta `/api` se despliega como **Serverless Functions**.
 
 ### ⚠️ Configuración de Env Vars en Vercel
-Para que el frontend funcione en producción, **DEBÉS** duplicar las variables de Supabase con el prefijo `VITE_` en el dashboard de Vercel:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+
+El frontend **no usa variables `VITE_*`**. La config de Supabase se sirve en runtime desde `/api/config`, que lee directamente `process.env`. Solo necesitás configurar las variables del servidor (sin prefijo) en el dashboard de Vercel:
+
+| Variable | Descripción |
+|----------|-------------|
+| `SUPABASE_URL` | URL del proyecto Supabase |
+| `SUPABASE_ANON_KEY` | Clave pública anon |
+| `SUPABASE_JWT_SECRET` | Secret para validar JWTs |
+
+> **¿Por qué no `VITE_*`?** Las variables `VITE_*` se bakean en el bundle en tiempo de build — si no están disponibles en ese momento, el valor queda como `undefined` y todas las llamadas REST a Supabase fallan con `401 Invalid API key`. Con el enfoque actual, el cliente fetchea la config al arrancar y el problema no puede ocurrir.
+
+> **`dist/` está en `.gitignore`** — Vercel siempre buildea desde source. No commitear el build evita que un bundle local sobreescriba el build de Vercel.
 
 ---
 
