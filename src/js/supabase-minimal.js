@@ -3,7 +3,13 @@ let inMemoryAccessToken = null
 let inMemoryRefreshToken = null
 
 function nullClient() {
-  const chain = { then: (resolve) => Promise.resolve({ data: null, error: { message: 'Supabase no configurado' } }).then(resolve) }
+  const noopResult = { data: null, error: { message: 'Supabase no configurado' } }
+  const chain = new Proxy({}, {
+    get: (_, prop) =>
+      prop === 'then'    ? ((resolve) => Promise.resolve(noopResult).then(resolve)) :
+      prop === 'catch'   ? ((fn) => Promise.resolve(noopResult).catch(fn)) :
+      () => chain
+  })
   return {
     auth: {
       getSession:             () => Promise.resolve({ data: { session: null }, error: null }),
@@ -14,8 +20,8 @@ function nullClient() {
       setSession:             () => Promise.resolve({ data: { session: null }, error: { message: 'Supabase no configurado' } }),
       onAuthStateChange:      () => ({ data: { subscription: { unsubscribe: () => {} } } })
     },
-    from: () => ({ select: () => chain, insert: () => chain, update: () => chain, delete: () => chain }),
-    rpc:  chain
+    from: () => chain,
+    rpc:  () => chain
   }
 }
 
