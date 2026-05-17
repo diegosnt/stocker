@@ -182,6 +182,15 @@ prunePersistentCache()
 let _currentUserId = null
 
 async function initAuth() {
+  try {
+    const res = await fetch('/api/config')
+    const cfg = await res.json()
+    window.__SUPABASE_URL__      = cfg.supabaseUrl
+    window.__SUPABASE_ANON_KEY__ = cfg.supabaseAnonKey
+  } catch (e) {
+    console.warn('Could not load runtime config:', e)
+  }
+
   const { getSession, recoverSession, onAuthChange } = await import('./auth.js')
   
   // 1. Intentamos recuperar sesión desde la cookie del servidor (silencioso)

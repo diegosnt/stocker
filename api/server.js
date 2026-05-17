@@ -215,6 +215,14 @@ function requireAdmin(req, res, next) {
   next()
 }
 
+// ── GET /api/config ────────────────────────────────────────
+app.get('/api/config', (req, res) => {
+  res.json({
+    supabaseUrl:     process.env.SUPABASE_URL      || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ''
+  })
+})
+
 // ── GET /api/csrf-token ─────────────────────────────────────
 app.get('/api/csrf-token', requireAuth, (req, res) => {
   const token = csrfTokens.get(req.userId) || generateCsrfToken()
