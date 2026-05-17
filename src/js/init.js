@@ -198,16 +198,12 @@ async function initAuth() {
   }
 
   onAuthChange((session) => {
-    console.log('[auth] onAuthChange fired', { session: !!session, userId: session?.user?.id, _currentUserId })
     if (session) {
       if (_currentUserId !== session.user.id) {
         _currentUserId = session.user.id
         renderShell(session.user.email)
-      } else {
-        console.log('[auth] same user, skipping renderShell')
       }
     } else {
-      console.log('[auth] session null, mounting login')
       _currentUserId = null
       app.innerHTML = ''
       LoginPage.mount(app)
