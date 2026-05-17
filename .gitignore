@@ -1,6 +1,9 @@
 # ── Dependencias ──────────────────────────────────────────
 node_modules/
 
+# ── Build output ──────────────────────────────────────────
+dist/
+
 # ── Variables de entorno ───────────────────────────────────
 # Nunca subir claves al repositorio
 .env
