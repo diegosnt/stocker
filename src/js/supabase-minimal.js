@@ -185,8 +185,10 @@ export function createClient(supabaseUrl, supabaseAnonKey) {
     },
     onAuthStateChange(callback) {
       const handle = (e) => {
+        console.log('[supabase-minimal] supabase-auth event received', e.detail?.event, !!e.detail?.session)
         callback(e.detail?.event || 'SIGNED_OUT', e.detail?.session || null)
       }
+      console.log('[supabase-minimal] registering onAuthStateChange listener')
       window.addEventListener('supabase-auth', handle)
       return { data: { subscription: { unsubscribe: () => window.removeEventListener('supabase-auth', handle) } } }
     },

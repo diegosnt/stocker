@@ -78,9 +78,11 @@ export async function signIn(email, password) {
       refresh_token: data.refresh_token ?? null
     })
 
+    console.log('[auth] dispatching SIGNED_IN event', { userId: data.user?.id })
     window.dispatchEvent(new CustomEvent('supabase-auth', {
       detail: { event: 'SIGNED_IN', session: { user: data.user, access_token: data.access_token } }
     }))
+    console.log('[auth] event dispatched')
 
     fetchCsrfToken()
   }
