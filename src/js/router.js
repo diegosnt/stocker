@@ -27,23 +27,23 @@ export function start() {
   resolve()
 }
 
-function resolve() {
-  const hash = window.location.hash.replace('#', '') || 'operations'
+async function resolve() {
+  const hash = window.location.hash.replace('#', '') || 'dashboard'
   if (currentRoute === hash) return
 
   // Ejecutar cleanup de la ruta actual antes de navegar
   if (currentRoute && cleanups[currentRoute]) {
-    cleanups[currentRoute]()
+    await cleanups[currentRoute]()
   }
 
   currentRoute = hash
 
   const handler = routes[hash]
   if (handler) {
-    handler()
+    await handler()
   } else {
     // Ruta desconocida: ir a operaciones
-    navigate('operations')
+    navigate('dashboard')
   }
 
   // Actualizar sidebar link activo
@@ -53,5 +53,5 @@ function resolve() {
 }
 
 export function currentHash() {
-  return window.location.hash.replace('#', '') || 'operations'
+  return window.location.hash.replace('#', '') || 'dashboard'
 }

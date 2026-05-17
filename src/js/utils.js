@@ -18,6 +18,32 @@ export function setFieldError(fieldId, message) {
   el.addEventListener('change', clear, { once: true })
 }
 
+export function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+export function fmtDateShort(iso) {
+  if (!iso) return '—'
+  const datePart = iso.split('T')[0]
+  const [y, m, d] = datePart.split('-')
+  return d && m && y ? `${d}/${m}/${y}` : iso
+}
+
+export function buildPageRange(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
+  const pages = new Set([0, total - 1, current])
+  for (let i = Math.max(0, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i)
+  const sorted = [...pages].sort((a, b) => a - b)
+  const result = []
+  let prev = -1
+  for (const p of sorted) {
+    if (p - prev > 1) result.push('...')
+    result.push(p)
+    prev = p
+  }
+  return result
+}
+
 export function initDarkMode() {
   const isDark = localStorage.getItem('dark-mode') === 'true'
   if (isDark) document.body.classList.add('dark-mode')
@@ -38,12 +64,18 @@ export function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+const _dp = () => window.DOMPurify
+
 export function sanitize(str) {
-  return DOMPurify.sanitize(String(str), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+  const dp = _dp()
+  if (!dp) return String(str)
+  return dp.sanitize(String(str), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
 }
 
 export function sanitizeAttr(str) {
-  return DOMPurify.sanitize(String(str), { ALLOWED_TAGS: ['b', 'i', 'strong', 'em', 'br', 'span'], ALLOWED_ATTR: ['style', 'class'] })
+  const dp = _dp()
+  if (!dp) return String(str)
+  return dp.sanitize(String(str), { ALLOWED_TAGS: ['b', 'i', 'strong', 'em', 'br', 'span'], ALLOWED_ATTR: ['style', 'class'] })
 }
 
 export function confirmModal({ title, message, confirmLabel = 'Eliminar' }) {

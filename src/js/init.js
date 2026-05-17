@@ -1,23 +1,8 @@
-import { Chart, registerables } from 'chart.js'
-import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
-import DOMPurify from 'dompurify'
-
-Chart.register(...registerables, TreemapController, TreemapElement)
-window.Chart = Chart
-window.DOMPurify = DOMPurify
-
-import { onAuthChange, signOut } from './auth.js'
+import { signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
 import { initDarkMode, toggleDarkMode } from './utils.js'
 import { prunePersistentCache } from './cache.js'
-import { LoginPage }           from './pages/login.js'
-import { InstrumentTypesPage } from './pages/instrument-types.js'
-import { InstrumentsPage }     from './pages/instruments.js'
-import { AlycsPage }           from './pages/alycs.js'
-import { OperationsPage }      from './pages/operations.js'
-import { SettingsPage }        from './pages/settings.js'
-import { AnalysisPage }         from './pages/analysis.js'
-import { DashboardPage }        from './pages/dashboard.js'
+import { LoginPage } from './pages/login.js'
 
 const app = document.getElementById('app')
 
@@ -126,14 +111,42 @@ function renderShell(userEmail) {
   window.addEventListener('hashchange', updateActiveLink)
   updateActiveLink()
 
+  // Pre-cargar DOMPurify en background para cuando se necesite
+  if (!window.DOMPurify) {
+    import('dompurify').then(mod => { window.DOMPurify = mod.default }).catch(() => {})
+  }
+
+  const dyn = (loader) => {
+    let mod = null
+    return async () => {
+      if (!mod) mod = await loader()
+      return mod
+    }
+  }
+
+  const dashboard  = dyn(() => import('./pages/dashboard.js'))
+  const operations = dyn(() => import('./pages/operations.js'))
+  const analysis   = dyn(() => import('./pages/analysis.js'))
+  const instTypes  = dyn(() => import('./pages/instrument-types.js'))
+  const insts      = dyn(() => import('./pages/instruments.js'))
+  const alycs      = dyn(() => import('./pages/alycs.js'))
+  const settings   = dyn(() => import('./pages/settings.js'))
+
   // Registrar rutas
-  register('dashboard',         () => DashboardPage.render(), () => DashboardPage.cleanup?.())
-  register('operations',        () => OperationsPage.render())
-  register('analysis',          () => AnalysisPage.render(), () => AnalysisPage.cleanup?.())
-  register('instrument-types',  () => InstrumentTypesPage.render())
-  register('instruments',       () => InstrumentsPage.render())
-  register('alycs',             () => AlycsPage.render())
-  register('settings',         () => SettingsPage.render())
+  register('dashboard',         async () => (await dashboard()).DashboardPage.render(),
+                                async () => (await dashboard()).DashboardPage.cleanup?.())
+  register('operations',        async () => (await operations()).OperationsPage.render(),
+                                async () => (await operations()).OperationsPage.cleanup?.())
+  register('analysis',          async () => (await analysis()).AnalysisPage.render(),
+                                async () => (await analysis()).AnalysisPage.cleanup?.())
+  register('instrument-types',  async () => (await instTypes()).InstrumentTypesPage.render(),
+                                async () => (await instTypes()).InstrumentTypesPage.cleanup?.())
+  register('instruments',       async () => (await insts()).InstrumentsPage.render(),
+                                async () => (await insts()).InstrumentsPage.cleanup?.())
+  register('alycs',             async () => (await alycs()).AlycsPage.render(),
+                                async () => (await alycs()).AlycsPage.cleanup?.())
+  register('settings',         async () => (await settings()).SettingsPage.render(),
+                                async () => (await settings()).SettingsPage.cleanup?.())
 
   start()
 }

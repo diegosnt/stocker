@@ -161,6 +161,9 @@ export const SettingsPage = {
     } finally {
       btn.disabled = false
     }
+  },
+
+  cleanup() {
   }
 }
 

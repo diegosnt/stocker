@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError } from '../utils.js'
+import { esc, confirmModal, setFieldError, fmtDate } from '../utils.js'
 
 let _alycsData    = []
 let _alycSortCol  = 'name'
@@ -261,10 +261,12 @@ export const AlycsPage = {
     } catch (err) {
       showToast(err.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
     }
+  },
+
+  cleanup() {
+    _alycsData   = []
+    _alycSortCol = 'name'
+    _alycSortAsc = true
   }
 }
 
-
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}

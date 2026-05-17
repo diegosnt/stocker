@@ -4,7 +4,7 @@ Aplicación web moderna para el registro, seguimiento y análisis estratégico d
 
 ---
 
-## ⚡ Stack Tecnológico (Modernizado)
+## ⚡ Stack Tecnológico
 
 | Capa | Tecnología |
 |------|------------|
@@ -26,15 +26,29 @@ api/
   server.js                         ← Express API (Serverless en Vercel)
   logger.js                         ← Logger centralizado con Pino
   views/renderPage.js               ← Renderizador legacy (ahora index.html en raíz)
-src/                                ← ¡NUEVO! Corazón del Frontend procesado por Vite
-  css/                              ← Estilos optimizados
+src/                                ← Corazón del Frontend procesado por Vite
+  css/                              ← Estilos modulares con variables CSS
   js/
-    init.js                         ← Bootstrap, inyección de dependencias globales y Auth
-    router.js                       ← Hash router pro
+    init.js                         ← Bootstrap, lazy-loading de páginas y Auth
+    router.js                       ← Hash router con cleanup por ruta
     auth.js                         ← Lógica de sesión y tokens
     api-client.js                   ← Fetch autenticado con proxy a /api
+    cache.js                        ← Caché en memoria con invalidación por clave
+    chart-manager.js                ← Gestor centralizado de gráficos (Chart.js)
+    utils.js                        ← Helpers compartidos (formateo, sanitización, modales)
     analysis-worker.js              ← Web Worker: Optimización (Markowitz, HRP, Monte Carlo)
-    pages/                          ← Componentes de página
+    pages/
+      dashboard.js                  ← Panel principal con gráficos
+      operations.js                 ← CRUD de operaciones con filtros
+      operations/csv-import.js      ← Importación CSV extraída
+      analysis.js                   ← Análisis de cartera avanzado
+      analysis/correlation.js       ← Matriz de correlación
+      analysis/treemap.js           ← Treemap de tenencias
+      instruments.js                ← ABM de instrumentos
+      instrument-types.js           ← ABM de tipos de instrumento
+      alycs.js                      ← ABM de ALyCs
+      settings.js                   ← Configuración de usuario
+      login.js                      ← Pantalla de inicio de sesión
     vendor/                         ← Librerías estáticas manuales
 public/                             ← Assets estáticos puros (no procesados)
   img/                              ← Logos e iconos
@@ -49,7 +63,7 @@ vercel.json                         ← Configuración de despliegue híbrido (S
 
 ## 🚀 Puesta en Marcha (Entorno de Desarrollo)
 
-Ahora el proyecto corre con un solo comando que levanta tanto el servidor de la API como el entorno de desarrollo de Vite en paralelo.
+Un solo comando levanta el servidor de la API y el entorno de desarrollo de Vite en paralelo.
 
 ```bash
 # 1. Preparar el entorno
@@ -97,8 +111,34 @@ Para que el frontend funcione en producción, **DEBÉS** duplicar las variables 
 
 - **HMR (Hot Module Replacement):** Los cambios en JS/CSS se reflejan al instante sin recargar.
 - **Cache Busting:** Vite agrega hashes únicos a los archivos en cada build (`index-a1b2c3d4.js`), eliminando problemas de cache vieja.
-- **Inyección Global:** Librerías como `Chart.js` y `DOMPurify` se inyectan en `window` desde `init.js` para mantener compatibilidad con el código existente.
+- **Lazy-loading por ruta:** Cada página se carga con `import()` dinámico — las páginas no visitadas no entran al bundle inicial (~22 kB).
+- **Gestión centralizada de gráficos:** Chart.js se carga solo cuando una página con gráficos lo necesita, a través de `chart-manager.js`.
+- **DOMPurify lazy:** Se precarga en background post-auth; las funciones de sanitización en `utils.js` tienen fallback seguro si aún no está disponible.
 - **Web Workers:** El trabajador de análisis pesado se carga dinámicamente usando `new URL(..., import.meta.url)`.
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Completadas
+1. Eliminación de `holdings-analysis.js` (código muerto, 667 líneas)
+2. Consistencia en router — las 3 referencias default a `dashboard`
+3. CSS huérfano movido dentro de media query
+4. Eliminación de `renderer.js` (virtual DOM no utilizado, 132 líneas)
+5. Eliminación de `_performCAPM()` y `_calculateMDD()` (valores vienen del Worker)
+6. Code-splitting por ruta — Chart.js, Treemap y DOMPurify lazy-loaded
+7. Descomposición de archivos grandes — `operations/csv-import.js`, `analysis/correlation.js`, `analysis/treemap.js`
+8. Centralización de helpers duplicados — `fmtDate`, `fmtDateShort`, `buildPageRange` en `utils.js` (~39 líneas menos)
+9. Cleanup methods para las 7 páginas — timers cancelados, estado de módulo reseteado al navegar
+
+### 🔜 Pendientes
+10. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
+11. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
+12. Tests — agregar dependencias y primer test unitario
+13. Accesibilidad — roles ARIA, contraste, navegación por teclado
+14. Features — filtros combinados, exportación avanzada, vistas personalizadas
+15. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes
+16. Seguridad — Content-Security-Policy, validación del lado del servidor
 
 ---
 

@@ -5,6 +5,8 @@ import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager } from '../chart-manager.js'
 import { sanitize, sanitizeAttr } from '../utils.js'
+import { renderCorrelationHeatmap } from './analysis/correlation.js'
+import { renderTreemapChart } from './analysis/treemap.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -481,7 +483,7 @@ export const AnalysisPage = {
         } catch(e) { console.error('Error MonteCarlo:', e) }
       }
 
-      try { this._renderCorrelationHeatmap(validTickers, returnsMatrix) } catch(e) { console.error('Error Correlación:', e) }
+      try { renderCorrelationHeatmap(validTickers, returnsMatrix) } catch(e) { console.error('Error Correlación:', e) }
       
       await this._updateMarketPrices(validTickers)
       this._lastValidHoldings = validHoldings
@@ -708,7 +710,11 @@ export const AnalysisPage = {
         this._renderDonutChart(typeChartContainer, typeItems, totalMarketValueAll, '_typeChart')
       }
 
-      this._renderTreemap(document.getElementById('analysis-heatmap'), assetData.slice().sort((a, b) => b.currentValue - a.currentValue))
+      this._treemapChart = renderTreemapChart(
+        document.getElementById('analysis-heatmap'),
+        assetData.slice().sort((a, b) => b.currentValue - a.currentValue),
+        this._treemapChart
+      )
     } else {
       assetCard.style.display = 'none'
       typeCard.style.display = 'none'
@@ -716,57 +722,6 @@ export const AnalysisPage = {
       if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
       document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
-  },
-
-  _renderTreemap(container, items) {
-    if (!container || !items || items.length === 0) return
-    
-    // Destruir instancia previa si existe antes de limpiar el contenedor
-    this._treemapChart = ChartManager.destroy(this._treemapChart)
-    
-    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
-    const canvas = container.querySelector('canvas')
-    
-    const getColor = (p) => {
-      if (p > 5) return '#065f46' 
-      if (p > 0) return '#10b981'
-      if (p < -5) return '#991b1b'
-      if (p < 0) return '#ef4444'
-      return '#64748b'
-    }
-    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
-    const data = items.map(item => ({
-      ticker: item.ticker,
-      value: item.currentValue,
-      pct: item.pnlPct ?? 0,
-      color: getColor(item.pnlPct ?? 0)
-    })).filter(d => d.value > 0)
-
-    this._treemapChart = ChartManager.renderTreemapChart(canvas, data, {
-      instance: this._treemapChart,
-      formatter: (ctx) => {
-        const d = ctx.raw?._data || ctx.raw
-        if (!d || !d.ticker) return []
-        // Si el cuadro es muy chico, solo mostrar ticker
-        const area = ctx.element?.width * ctx.element?.height || 1000
-        if (area < 2500) return [d.ticker]
-        return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
-      },
-      chartOptions: {
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const d = ctx.raw?._data
-                if (!d) return ''
-                return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
-              }
-            }
-          }
-        }
-      }
-    })
   },
 
   async _renderActivityChart(alycId) {
@@ -1136,30 +1091,6 @@ export const AnalysisPage = {
     })
   },
 
-  _performCAPM(analysis, returnsMatrix, benchmarkReturns) {
-    const numDays = Math.min(returnsMatrix[0].length, benchmarkReturns.length), pDR = []
-    const currentWeights = Array.isArray(analysis.current.weights) ? analysis.current.weights : Object.values(analysis.current.weights)
-    for (let d = 0; d < numDays; d++) { let r = 0; currentWeights.forEach((w, i) => r += w * returnsMatrix[i][d]); pDR.push(r) }
-    const mR = benchmarkReturns.slice(0, numDays), mAvg = mR.reduce((a,b)=>a+b,0)/numDays, pAvg = pDR.reduce((a,b)=>a+b,0)/numDays
-    let cov = 0, vM = 0; for (let i = 0; i < numDays; i++) { cov += (pDR[i] - pAvg) * (mR[i] - mAvg); vM += Math.pow(mR[i] - mAvg, 2) }
-    const beta = vM === 0 ? 0 : cov / vM, r2 = vM === 0 ? 0 : Math.pow(cov, 2) / (vM * pDR.reduce((a, r) => a + Math.pow(r - pAvg, 2), 0))
-    const alpha = (pAvg * 252) - (beta * (mAvg * 252)), sorted = [...pDR].sort((a,b)=>a-b)
-    const varIdx = Math.floor(sorted.length * 0.05)
-    const vR = sorted[varIdx] || 0
-    const es = sorted.slice(0, varIdx + 1).reduce((a, b) => a + b, 0) / (varIdx + 1)
-
-    document.getElementById('capm-beta').textContent = beta.toFixed(2)
-    document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(1) + '%'
-    document.getElementById('capm-alpha').textContent = (alpha > 0 ? '+' : '') + (alpha * 100).toFixed(1) + '%'
-    document.getElementById('capm-alpha').style.color = alpha >= 0 ? '#10b981' : '#ef4444'
-    document.getElementById('analysis-var').textContent = (vR * 100).toFixed(1) + '%'
-    document.getElementById('analysis-es').textContent = (es * 100).toFixed(1) + '%'
-    const bD = document.getElementById('capm-beta-desc')
-    bD.textContent = beta > 1.2 ? 'Agresivo' : (beta < 0.8 ? 'Defensivo' : 'Neutral')
-    bD.style.color = beta > 1.2 ? '#ef4444' : (beta < 0.8 ? '#3b82f6' : 'var(--text-muted)')
-    return { beta, alpha, r2 }
-  },
-
   _renderStressTest(beta) {
     const scenarios = [
       { name: 'Crisis 2008', drop: -50 },
@@ -1173,21 +1104,6 @@ export const AnalysisPage = {
         <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">${(beta * s.drop).toFixed(1)}%</div>
         <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Mkt: ${s.drop}%</p>
       </div>`).join('')
-  },
-
-  _calculateMDD(analysis, returnsMatrix) {
-    const numDays = returnsMatrix[0].length
-    const currentWeights = Array.isArray(analysis.current.weights) ? analysis.current.weights : Object.values(analysis.current.weights)
-    let cumulativeReturn = 1, peak = 1, maxDrawdown = 0
-    for (let d = 0; d < numDays; d++) {
-      let dayReturn = 0
-      currentWeights.forEach((w, i) => dayReturn += w * returnsMatrix[i][d])
-      cumulativeReturn *= (1 + dayReturn)
-      if (cumulativeReturn > peak) peak = cumulativeReturn
-      const dd = (cumulativeReturn - peak) / peak
-      if (dd < maxDrawdown) maxDrawdown = dd
-    }
-    document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(1) + '%'
   },
 
   _renderComparisonChart(holdings) {
@@ -1217,82 +1133,6 @@ export const AnalysisPage = {
 
     this._compChart = ChartManager.renderComparisonChart(canvas, labels, investedData, currentData, {
       instance: this._compChart
-    })
-  },
-
-  _renderCorrelationHeatmap(tickers, returnsMatrix) {
-    const container = document.getElementById('correlation-matrix')
-    if (!container) return
-    const isMobile = window.innerWidth <= 768
-    const n = tickers.length, numDays = returnsMatrix[0].length
-    const stats = returnsMatrix.map(r => { const avg = r.reduce((a, b) => a + b, 0) / r.length; return { avg, std: Math.sqrt(r.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / r.length) } })
-    const fontSize = isMobile ? '0.5rem' : '0.6rem'
-    const cellPad = '2px 1px'
-    const shortTicker = t => t.length > 4 ? t.slice(0, 4) : t
-    const labelStyle = `padding:${cellPad}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:0`
-    let html = `<table style="width:100%; table-layout:fixed; font-size:${fontSize}; border-collapse:collapse"><tr><th style="${labelStyle}"></th>`
-    tickers.forEach(t => html += `<th style="${labelStyle}">${shortTicker(t)}</th>`)
-    for (let i = 0; i < n; i++) {
-      html += `<tr><td style="font-weight:bold; ${labelStyle}">${shortTicker(tickers[i])}</td>`
-      for (let j = 0; j < n; j++) {
-        let cov = 0; for (let d = 0; d < numDays; d++) cov += (returnsMatrix[i][d] - stats[i].avg) * (returnsMatrix[j][d] - stats[j].avg)
-        const corr = (stats[i].std * stats[j].std === 0) ? 0 : (cov / numDays) / (stats[i].std * stats[j].std)
-        const bg = corr > 0.5 ? `rgba(16, 185, 129, ${corr})` : (corr < -0.2 ? `rgba(239, 68, 68, ${Math.abs(corr)})` : 'transparent')
-        html += `<td style="background:${bg}; text-align:center; padding:${cellPad}">${corr.toFixed(2)}</td>`
-      }
-      html += `</tr>`
-    }
-    container.innerHTML = html + `</table>`
-  },
-
-  _renderTreemap(container, items) {
-    if (!container || !items || items.length === 0) return
-    
-    // Destruir instancia previa si existe antes de limpiar el contenedor
-    this._treemapChart = ChartManager.destroy(this._treemapChart)
-    
-    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
-    const canvas = container.querySelector('canvas')
-    
-    const getColor = (p) => {
-      if (p > 5) return '#065f46' 
-      if (p > 0) return '#10b981'
-      if (p < -5) return '#991b1b'
-      if (p < 0) return '#ef4444'
-      return '#64748b'
-    }
-    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
-    const data = items.map(item => ({
-      ticker: item.ticker,
-      value: item.currentValue,
-      pct: item.pnlPct ?? 0,
-      color: getColor(item.pnlPct ?? 0)
-    })).filter(d => d.value > 0)
-
-    this._treemapChart = ChartManager.renderTreemapChart(canvas, data, {
-      instance: this._treemapChart,
-      formatter: (ctx) => {
-        const d = ctx.raw?._data || ctx.raw
-        if (!d || !d.ticker) return []
-        // Si el cuadro es muy chico, solo mostrar ticker
-        const area = ctx.element?.width * ctx.element?.height || 1000
-        if (area < 2500) return [d.ticker]
-        return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
-      },
-      chartOptions: {
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const d = ctx.raw?._data
-                if (!d) return ''
-                return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
-              }
-            }
-          }
-        }
-      }
     })
   },
 

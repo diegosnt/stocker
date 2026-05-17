@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError } from '../utils.js'
+import { esc, confirmModal, setFieldError, fmtDate, buildPageRange } from '../utils.js'
 
 const PAGE_SIZE   = 10
 
@@ -212,7 +212,7 @@ export const InstrumentsPage = {
 
     const from  = _instrPage * PAGE_SIZE + 1
     const to    = Math.min((_instrPage + 1) * PAGE_SIZE, total)
-    const pages = _buildPageRange(_instrPage, totalPages)
+    const pages = buildPageRange(_instrPage, totalPages)
 
     const pageButtons = pages.map(p =>
       p === '...'
@@ -357,25 +357,13 @@ export const InstrumentsPage = {
     } catch (err) {
       showToast(err.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
     }
+  },
+
+  cleanup() {
+    _instrData    = []
+    _instrVisible = []
+    _instrPage    = 0
+    _instrSortCol = 'ticker'
+    _instrSortAsc = true
   }
-}
-
-
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function _buildPageRange(current, total) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
-  const pages = new Set([0, total - 1, current])
-  for (let i = Math.max(0, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i)
-  const sorted = [...pages].sort((a, b) => a - b)
-  const result = []
-  let prev = -1
-  for (const p of sorted) {
-    if (p - prev > 1) result.push('...')
-    result.push(p)
-    prev = p
-  }
-  return result
 }

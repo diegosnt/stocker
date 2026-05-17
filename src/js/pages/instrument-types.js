@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError } from '../utils.js'
+import { esc, confirmModal, setFieldError, fmtDate } from '../utils.js'
 
 let _tiposData = []
 
@@ -207,11 +207,10 @@ export const InstrumentTypesPage = {
       await this._loadList()
     } catch (err) {
       showToast(err.code === '23503' ? 'No se puede eliminar: tiene instrumentos asociados.' : 'Error al eliminar.', 'error')
-    }
   }
-}
+  },
 
-
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  cleanup() {
+    _tiposData = []
+  }
 }

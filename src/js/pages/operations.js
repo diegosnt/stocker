@@ -2,7 +2,8 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError } from '../utils.js'
+import { esc, confirmModal, setFieldError, fmtDateShort, buildPageRange } from '../utils.js'
+import { handleCsvImport } from './operations/csv-import.js'
 
 const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
 const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
@@ -153,7 +154,7 @@ export const OperationsPage = {
     inputCsv.addEventListener('change', async (e) => {
       const file = e.target.files[0]
       if (!file) return
-      await this._handleCsvImport(file)
+      await handleCsvImport(file, this)
       inputCsv.value = '' // Reset
     })
     this._bindSearch()
@@ -162,275 +163,7 @@ export const OperationsPage = {
     await Promise.all([this._loadAlycFilter(), this._loadInstrumentFilter(), this._loadList(0)])
   },
 
-  async _handleCsvImport(file) {
-    const text = await file.text()
-    const lines = text.split(/\r?\n/).filter(line => line.trim())
-    if (lines.length < 2) {
-      showToast('Archivo vacío o sin datos.', 'error')
-      return
-    }
 
-    // Cabecera: Alyc;Operacion;Fecha Operacion;Precio;Moneda;Especie;Cantidad
-    const headers = lines[0].split(';').map(h => h.trim().toLowerCase())
-    const rows = lines.slice(1)
-
-    const operations = rows.map(row => {
-      const cols = row.split(';').map(c => c.trim())
-      if (cols.length < 7) return null
-
-      // Mapear columnas a objeto
-      const raw = {}
-      headers.forEach((h, i) => raw[h] = cols[i])
-
-      // Normalizar datos
-      // Alyc;Operacion;Fecha Operacion;Precio;Moneda;Especie;Cantidad
-      const type = raw['operacion']?.toLowerCase() === 'compra' ? 'compra' : 'venta'
-      const alyc = raw['alyc']
-      const ticker = raw['especie']
-      
-      // Fecha: DD/MM/YY -> YYYY-MM-DD
-      let operated_at = ''
-      const dateParts = raw['fecha operacion']?.split('/')
-      if (dateParts?.length === 3) {
-        const [d, m, y] = dateParts
-        const fullYear = y.length === 2 ? `20${y}` : y
-        operated_at = `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-      }
-
-      // Precios y cantidades: 25.260,00 -> 25260.00 (soporta formato europeo y anglosajón)
-      const parseNum = (s) => {
-        if (!s) return 0
-        const cleaned = s.trim()
-        const hasComma = cleaned.includes(',')
-        const hasDot = cleaned.includes('.')
-        if (hasComma && hasDot) {
-          const lastComma = cleaned.lastIndexOf(',')
-          const lastDot = cleaned.lastIndexOf('.')
-          if (lastComma > lastDot) {
-            return parseFloat(cleaned.replace(/\./g, '').replace(',', '.'))
-          } else {
-            return parseFloat(cleaned.replace(/,/g, ''))
-          }
-        } else if (hasComma) {
-          return parseFloat(cleaned.replace(',', '.'))
-        } else if (hasDot) {
-          return parseFloat(cleaned.replace(/,/g, ''))
-        }
-        return parseFloat(cleaned) || 0
-      }
-      const price = parseNum(raw['precio'])
-      const quantity = parseNum(raw['cantidad'])
-
-      // Moneda: ARG -> ARS
-      let currency = raw['moneda']?.toUpperCase()
-      if (currency === 'ARG') currency = 'ARS'
-
-      return { type, alyc, ticker, operated_at, price, quantity, currency }
-    }).filter(op => op !== null)
-
-    if (operations.length === 0) {
-      showToast('No se encontraron registros válidos.', 'error')
-      return
-    }
-
-    try {
-      showToast(`Procesando ${operations.length} registros...`, 'info')
-      
-      let res
-      let allFailedEntities = []
-
-      try {
-        res = await apiRequest('POST', '/api/operations/bulk', { operations })
-        if (res.failed_entities) allFailedEntities = res.failed_entities
-      } catch (err) {
-        if (err.status === 409) {
-          const { duplicates, clean_ops, failed_entities } = err.response
-          if (failed_entities) allFailedEntities = failed_entities
-
-          // Mostramos el modal. selection será 'CANCEL_ALL' si aborta, o un array de dups seleccionados.
-          const selection = await this._showDuplicateSelectionModal(duplicates, clean_ops.length)
-          
-          if (selection === 'CANCEL_ALL') {
-            if (allFailedEntities.length > 0) await this._showFailedEntitiesModal(allFailedEntities)
-            showToast('Importación cancelada.', 'info')
-            return
-          }
-
-          const selectedDuplicates = Array.isArray(selection) ? selection : []
-          const finalOps = [...clean_ops, ...selectedDuplicates]
-          
-          if (finalOps.length === 0) {
-            if (allFailedEntities.length > 0) await this._showFailedEntitiesModal(allFailedEntities)
-            showToast('No se seleccionaron operaciones para importar.', 'info')
-            return
-          }
-          res = await apiRequest('POST', '/api/operations/bulk', { 
-            operations: finalOps, 
-            skip_duplicate_check: true 
-          })
-        } else {
-          throw err
-        }
-      }
-      
-      const { imported, skipped } = res
-      if (res.failed_entities && allFailedEntities.length === 0) {
-        allFailedEntities = res.failed_entities
-      }
-
-      let msg = `Importación finalizada: ${imported} importados, ${skipped} omitidos/duplicados.`
-      showToast(msg, allFailedEntities.length > 0 ? 'warning' : 'success')
-      if (imported > 0) cacheInvalidate('user_holdings')
-      
-      if (allFailedEntities.length > 0) {
-        await this._showFailedEntitiesModal(allFailedEntities)
-      }
-
-      await this._loadList(0)
-    } catch (err) {
-      console.error('Error en importación masiva:', err)
-      showToast('Error al procesar el archivo CSV.', 'error')
-    }
-  },
-
-  async _showFailedEntitiesModal(failedEntities) {
-    return new Promise(resolve => {
-      const overlay = document.createElement('div')
-      overlay.className = 'modal-overlay'
-      
-      const rowsHtml = failedEntities.map(op => `
-        <tr>
-          <td>${op.row || '—'}</td>
-          <td>${op.operated_at ? fmtDateShort(op.operated_at) : '—'}</td>
-          <td><span class="ticker-chip">${esc(op._raw?.ticker || '—')}</span></td>
-          <td>${esc(op._raw?.alyc || '—')}</td>
-          <td style="color: var(--color-danger)">${esc(op.error)}</td>
-        </tr>
-      `).join('')
-
-      overlay.innerHTML = `
-        <div class="modal-card modal-card-lg">
-          <div class="modal-header">
-            <h3 style="margin:0">Registros no importados</h3>
-            <button type="button" class="btn btn-sm btn-ghost" id="btn-failed-close">✕</button>
-          </div>
-          <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: #fff5f5; color: #c53030; font-size: 0.9rem">
-            Los siguientes <strong>${failedEntities.length}</strong> registros no pudieron cargarse porque los datos son incompletos o las entidades no existen. 
-            Por favor, verificá que los instrumentos y ALyCs estén creados en el sistema.
-          </div>
-          <div class="table-wrapper" style="max-height: 400px; overflow-y: auto">
-            <table class="ops-table">
-              <thead>
-                <tr>
-                  <th style="width:50px">Fila</th>
-                  <th>Fecha</th>
-                  <th>Ticker</th>
-                  <th>ALyC</th>
-                  <th>Motivo del error</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHtml}
-              </tbody>
-            </table>
-          </div>
-          <div class="form-actions" style="margin-top:0; padding:1.5rem">
-            <button class="btn btn-primary" id="btn-failed-ok">Entendido</button>
-          </div>
-        </div>`
-
-      document.body.appendChild(overlay)
-
-      const close = () => {
-        overlay.remove()
-        resolve()
-      }
-
-      overlay.querySelector('#btn-failed-close').addEventListener('click', close)
-      overlay.querySelector('#btn-failed-ok').addEventListener('click', close)
-    })
-  },
-
-  async _showDuplicateSelectionModal(duplicates, cleanCount = 0) {
-    return new Promise(resolve => {
-      const overlay = document.createElement('div')
-      overlay.className = 'modal-overlay'
-      
-      const rowsHtml = duplicates.map((op, idx) => `
-        <tr>
-          <td style="text-align:center"><input type="checkbox" class="dup-check" data-idx="${idx}"></td>
-          <td>${fmtDateShort(op.operated_at)}</td>
-          <td><span class="ticker-chip">${esc(op._raw?.ticker || '—')}</span></td>
-          <td>${esc(op._raw?.alyc || '—')}</td>
-          <td>${op.type.toUpperCase()}</td>
-          <td style="text-align:right">${op.quantity.toLocaleString('es-AR')}</td>
-          <td style="text-align:right">${op.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-          <td>${op.currency}</td>
-        </tr>
-      `).join('')
-
-      overlay.innerHTML = `
-        <div class="modal-card modal-card-lg">
-          <div class="modal-header">
-            <h3 style="margin:0">Duplicados detectados</h3>
-            <button type="button" class="btn btn-sm btn-ghost" id="btn-dup-close">✕</button>
-          </div>
-          <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-main); font-size: 0.9rem">
-            ${cleanCount > 0 ? `<div style="margin-bottom:0.5rem; color:var(--color-primary)"><strong>Hay ${cleanCount} registros nuevos listos para importar.</strong></div>` : ''}
-            Se encontraron <strong>${duplicates.length}</strong> operaciones que ya existen. 
-            Marcá las que quieras volver a importar, o dejá todo desmarcado para importar solo los registros nuevos.
-          </div>
-          <div class="table-wrapper" style="max-height: 400px; overflow-y: auto">
-            <table class="ops-table">
-              <thead>
-                <tr>
-                  <th style="width:40px; text-align:center"><input type="checkbox" id="dup-check-all"></th>
-                  <th>Fecha</th>
-                  <th>Ticker</th>
-                  <th>ALyC</th>
-                  <th>Tipo</th>
-                  <th style="text-align:right">Cant.</th>
-                  <th style="text-align:right">Precio</th>
-                  <th>Mon.</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHtml}
-              </tbody>
-            </table>
-          </div>
-          <div class="form-actions" style="margin-top:0; padding:1.5rem">
-            <button class="btn btn-primary" id="btn-dup-confirm">Confirmar y continuar</button>
-            <button class="btn btn-ghost" id="btn-dup-cancel">Abortar toda la importación</button>
-          </div>
-        </div>`
-
-      document.body.appendChild(overlay)
-
-      const close = (result) => {
-        overlay.remove()
-        resolve(result)
-      }
-
-      overlay.querySelector('#btn-dup-close').addEventListener('click', () => close('CANCEL_ALL'))
-      overlay.querySelector('#btn-dup-cancel').addEventListener('click', () => close('CANCEL_ALL'))
-      
-      const checkAll = overlay.querySelector('#dup-check-all')
-      const checks = overlay.querySelectorAll('.dup-check')
-      
-      checkAll.addEventListener('change', () => {
-        checks.forEach(c => c.checked = checkAll.checked)
-      })
-
-      overlay.querySelector('#btn-dup-confirm').addEventListener('click', () => {
-        const selected = []
-        checks.forEach(c => {
-          if (c.checked) selected.push(duplicates[parseInt(c.dataset.idx)])
-        })
-        close(selected)
-      })
-    })
-  },
 
   async _loadList(page = 0) {
     const tbody    = document.getElementById('ops-tbody')
@@ -664,7 +397,7 @@ export const OperationsPage = {
     const to   = Math.min((page + 1) * PAGE_SIZE, total)
 
     // Genera la secuencia de páginas a mostrar con elipsis cuando hay muchas
-    const pages = _buildPageRange(page, totalPages)
+    const pages = buildPageRange(page, totalPages)
 
     const pageButtons = pages.map(p =>
       p === '...'
@@ -1457,31 +1190,24 @@ export const OperationsPage = {
         btn.textContent = editing?._cloning ? 'Clonar operación' : editing ? 'Guardar cambios' : 'Registrar operación'
       }
     })
+  },
+
+  cleanup() {
+    if (state.searchTimer) {
+      clearTimeout(state.searchTimer)
+      state.searchTimer = null
+    }
+    state.editingOperation = null
+    state.pagination.currentPage = 0
+    state.pagination.requestId = null
+    Object.assign(state.filters, {
+      searchQuery: '',
+      alycFilter: '',
+      instrumentFilter: '',
+      typeFilter: '',
+      currencyFilter: '',
+      dateFrom: '',
+      dateTo: ''
+    })
   }
-}
-
-
-function fmtDateShort(iso) {
-  if (!iso) return '—'
-  const datePart = iso.split('T')[0]
-  const [y, m, d] = datePart.split('-')
-  return d && m && y ? `${d}/${m}/${y}` : iso
-}
-
-// Genera un rango de páginas con elipsis, ej: [0,1,'...',8,9,10,'...',19,20]
-function _buildPageRange(current, total) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
-
-  const pages = new Set([0, total - 1, current])
-  for (let i = Math.max(0, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i)
-
-  const sorted = [...pages].sort((a, b) => a - b)
-  const result = []
-  let prev = -1
-  for (const p of sorted) {
-    if (p - prev > 1) result.push('...')
-    result.push(p)
-    prev = p
-  }
-  return result
 }

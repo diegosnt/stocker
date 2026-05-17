@@ -1,3 +1,8 @@
+import { Chart, registerables } from 'chart.js'
+import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
+Chart.register(...registerables, TreemapController, TreemapElement)
+window.Chart = Chart
+
 /**
  * Gestor Centralizado de Gráficos (Basado en Chart.js)
  * Proporciona una interfaz única y consistente para todos los gráficos del proyecto.
