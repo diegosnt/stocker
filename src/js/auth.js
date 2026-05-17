@@ -71,21 +71,20 @@ export async function signIn(email, password) {
     method: 'POST',
     body: JSON.stringify({ email, password })
   })
-  
+
   if (data.access_token) {
-    // Al loguearnos, actualizamos la sesión de Supabase en memoria
     await supabase.auth.setSession({
       access_token: data.access_token,
-      refresh_token: null // La cookie HttpOnly maneja la persistencia
+      refresh_token: data.refresh_token ?? null
     })
-    
-    await fetchCsrfToken()
-    
+
     window.dispatchEvent(new CustomEvent('supabase-auth', {
       detail: { event: 'SIGNED_IN', session: { user: data.user, access_token: data.access_token } }
     }))
+
+    fetchCsrfToken()
   }
-  
+
   return data
 }
 
@@ -96,19 +95,18 @@ export async function signUp(email, password) {
   })
   
   if (data.access_token) {
-    // Actualizamos la sesión de Supabase en memoria
     await supabase.auth.setSession({
       access_token: data.access_token,
-      refresh_token: null // La cookie HttpOnly maneja la persistencia
+      refresh_token: data.refresh_token ?? null
     })
-
-    await fetchCsrfToken()
 
     window.dispatchEvent(new CustomEvent('supabase-auth', {
       detail: { event: 'SIGNED_IN', session: { user: data.user, access_token: data.access_token } }
     }))
+
+    fetchCsrfToken()
   }
-  
+
   return data
 }
 
