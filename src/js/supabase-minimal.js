@@ -2,7 +2,25 @@ let cachedSession = null
 let inMemoryAccessToken = null
 let inMemoryRefreshToken = null
 
+function nullClient() {
+  const chain = { then: (resolve) => Promise.resolve({ data: null, error: { message: 'Supabase no configurado' } }).then(resolve) }
+  return {
+    auth: {
+      getSession:             () => Promise.resolve({ data: { session: null }, error: null }),
+      signInWithPassword:     () => Promise.resolve({ data: null, error: { message: 'Supabase no configurado' } }),
+      signUp:                 () => Promise.resolve({ data: null, error: { message: 'Supabase no configurado' } }),
+      signOut:                () => Promise.resolve({ error: null }),
+      refreshSession:         () => Promise.resolve({ data: { session: null }, error: { message: 'Supabase no configurado' } }),
+      setSession:             () => Promise.resolve({ data: { session: null }, error: { message: 'Supabase no configurado' } }),
+      onAuthStateChange:      () => ({ data: { subscription: { unsubscribe: () => {} } } })
+    },
+    from: () => ({ select: () => chain, insert: () => chain, update: () => chain, delete: () => chain }),
+    rpc:  chain
+  }
+}
+
 export function createClient(supabaseUrl, supabaseAnonKey) {
+  if (!supabaseUrl || !supabaseAnonKey) return nullClient()
   const headers = {
     'apikey': supabaseAnonKey,
     'Authorization': `Bearer ${supabaseAnonKey}`,
