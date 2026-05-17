@@ -1,26 +1,28 @@
 import { supabase } from './supabase-client.js'
 
 let csrfToken = null
+let _refreshing = false
 
 async function ensureCsrfToken() {
   if (csrfToken) return csrfToken
-  
-  let session = (await supabase.auth.getSession())?.data?.session
-  if (!session?.access_token) {
-    try {
-      const { refreshSession } = await import('./auth.js')
-      const data = await refreshSession()
-      if (data && data.access_token) {
-        session = { access_token: data.access_token }
-      } else {
+  if (_refreshing) return null
+  _refreshing = true
+  try {
+    let session = (await supabase.auth.getSession())?.data?.session
+    if (!session?.access_token) {
+      try {
+        const { refreshSession } = await import('./auth.js')
+        const data = await refreshSession()
+        if (data && data.access_token) {
+          session = { access_token: data.access_token }
+        } else {
+          return null
+        }
+      } catch (e) {
         return null
       }
-    } catch (e) {
-      return null
     }
-  }
-  
-  try {
+    
     const res = await fetch('/api/csrf-token', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     })
@@ -30,6 +32,8 @@ async function ensureCsrfToken() {
     }
   } catch (e) {
     console.warn('Error fetching CSRF token:', e)
+  } finally {
+    _refreshing = false
   }
   return csrfToken
 }
