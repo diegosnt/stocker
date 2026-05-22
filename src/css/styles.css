@@ -1844,6 +1844,19 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
+.dash-alyc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .dash-alyc-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dash-kpi-column {
   display: grid;
   grid-template-columns: 1fr 1fr;

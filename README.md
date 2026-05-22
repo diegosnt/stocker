@@ -128,6 +128,51 @@ El frontend **no usa variables `VITE_*`**. La config de Supabase se sirve en run
 
 ---
 
+## 📥 Importación de Operaciones por CSV
+
+La pantalla de Operaciones permite importar un lote de operaciones desde un archivo `.csv` usando el botón **Importar CSV**.
+
+### Especificación del archivo
+
+| Propiedad | Valor |
+|-----------|-------|
+| Formato | CSV con separador **punto y coma** (`;`) |
+| Encoding | UTF-8 |
+| Primera fila | Encabezados (obligatorio) |
+| Mínimo | 1 fila de datos |
+
+### Columnas requeridas
+
+Los nombres de encabezado son **case-insensitive** y el orden de las columnas es libre, siempre que los nombres coincidan exactamente.
+
+| Columna | Descripción | Valores aceptados |
+|---------|-------------|-------------------|
+| `fecha operacion` | Fecha de la operación | `DD/MM/AAAA` o `DD/MM/AA` |
+| `operacion` | Tipo de operación | `compra` / `venta` (case-insensitive) |
+| `especie` | Ticker del instrumento | Debe existir en el sistema |
+| `alyc` | Nombre del ALyC | Debe existir en el sistema |
+| `precio` | Precio unitario | Número (`,` o `.` como decimal) |
+| `cantidad` | Cantidad de unidades | Número (`,` o `.` como decimal) |
+| `moneda` | Moneda de la operación | `ARS`, `USD` (también acepta `ARG` → normaliza a `ARS`) |
+
+### Comportamiento al importar
+
+- **Duplicados:** si se detectan operaciones ya existentes, se muestra un modal para elegir cuáles reimportar.
+- **Entidades no encontradas:** si el ticker o el ALyC no existen en el sistema, la fila se omite y se informa en un modal de errores al finalizar.
+- **Números:** se aceptan tanto `1.234,56` (formato europeo) como `1234.56` (formato anglosajón).
+
+### Ejemplo de archivo CSV
+
+```csv
+fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
+15/03/2024;compra;GGAL;IOL;450,50;100;ARS
+20/03/2024;venta;YPFD;PPI;25000;50;ARS
+05/04/2024;compra;BMA;Balanz;550,75;200;ARS
+10/04/2024;compra;AAPL;IOL;185.30;10;USD
+```
+
+---
+
 ## 🗺️ Roadmap
 
 ### ✅ Completadas

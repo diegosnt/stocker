@@ -1,7 +1,7 @@
 import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
-import { ChartManager } from '../chart-manager.js'
+import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
@@ -10,6 +10,7 @@ export const DashboardPage = {
   _typeChart: null,
   _heatmapChart: null,
   _compChart: null,
+  _alycChart: null,
   _resolvedPrices: {},
   _chartRendered: false,
   _chartsReady: false,
@@ -18,9 +19,10 @@ export const DashboardPage = {
     this._heatmapChart = ChartManager.destroy(this._heatmapChart)
     this._typeChart = ChartManager.destroy(this._typeChart)
     this._compChart = ChartManager.destroy(this._compChart)
+    this._alycChart = ChartManager.destroy(this._alycChart)
     this._chartRendered = false
     this._chartsReady = false
-    
+
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -57,13 +59,24 @@ export const DashboardPage = {
             <div class="skeleton" style="height: 40px; margin-bottom: 8px"></div>
           `).join('')}
         </div>
+      </div>
+
+      <div id="dash-alyc-section">
+        <div class="dash-alyc-row">
+          <div class="card skeleton" style="height: 280px"></div>
+          <div class="card skeleton" style="height: 280px"></div>
+        </div>
       </div>`
 
     renderIfChanged(content, skeletonHTML)
 
     try {
-      const data = await this._loadHoldings()
+      const [data, alycRows] = await Promise.all([
+        this._loadHoldings(),
+        this._loadHoldingsByAlyc()
+      ])
       this._renderDashboard(data)
+      this._renderAlycSection(alycRows)
       await this._updateMarketPrices(data.tickers)
     } catch (err) {
       console.error(err)
@@ -527,6 +540,105 @@ export const DashboardPage = {
           }
         }
       }
+    })
+  },
+
+  async _loadHoldingsByAlyc() {
+    const { data, error } = await supabase.rpc('get_user_holdings_by_alyc')
+    if (error) throw error
+    return data || []
+  },
+
+  _buildAlycData(rows) {
+    const alycSet = new Set()
+    const tickerMap = {}
+
+    for (const row of rows) {
+      alycSet.add(row.alyc_name)
+      if (!tickerMap[row.ticker]) {
+        tickerMap[row.ticker] = { total: 0, byAlyc: {} }
+      }
+      const invested = parseFloat(row.invested) || 0
+      tickerMap[row.ticker].total += invested
+      // Si ya hay una entrada para este (ticker, alyc) en otra moneda, sumamos
+      if (!tickerMap[row.ticker].byAlyc[row.alyc_name]) {
+        tickerMap[row.ticker].byAlyc[row.alyc_name] = { quantity: 0, currency: row.currency, invested: 0 }
+      }
+      tickerMap[row.ticker].byAlyc[row.alyc_name].quantity += parseFloat(row.total_quantity)
+      tickerMap[row.ticker].byAlyc[row.alyc_name].invested += invested
+    }
+
+    const alycNames = [...alycSet].sort()
+    const tickers = Object.keys(tickerMap).sort((a, b) => tickerMap[b].total - tickerMap[a].total)
+
+    return { alycNames, tickers, tickerMap }
+  },
+
+  _renderAlycSection(rows) {
+    const el = document.getElementById('dash-alyc-section')
+    if (!el) return
+
+    if (!rows || rows.length === 0) {
+      el.innerHTML = ''
+      return
+    }
+
+    const { alycNames, tickers, tickerMap } = this._buildAlycData(rows)
+    const fmtQty = v => v.toLocaleString('es-AR', { maximumFractionDigits: 4 })
+
+    const datasets = alycNames.map((alyc, i) => ({
+      label: alyc,
+      data: tickers.map(t => tickerMap[t].byAlyc[alyc]?.invested || 0),
+      backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      borderRadius: 4,
+      barThickness: 26
+    }))
+
+    const chartHeight = Math.max(220, tickers.length * 46 + 60)
+
+    const matrixRows = tickers.map(ticker => {
+      const cells = alycNames.map(alyc => {
+        const entry = tickerMap[ticker].byAlyc[alyc]
+        if (!entry) return `<td class="amount" style="color:var(--text-muted)">—</td>`
+        return `<td class="amount">${fmtQty(entry.quantity)} <span style="font-size:0.7rem;color:var(--text-muted)">${entry.currency}</span></td>`
+      }).join('')
+      return `<tr><td><span class="ticker-chip">${ticker}</span></td>${cells}</tr>`
+    }).join('')
+
+    el.innerHTML = `
+      <div class="dash-alyc-row">
+        <div class="card" style="min-height:${chartHeight}px">
+          <div class="chart-panel-title" style="margin-bottom:1rem">Distribución por ALyC</div>
+          <div style="height:${chartHeight}px; position:relative">
+            <canvas style="width:100%;height:100%"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="overflow:hidden">
+          <div class="chart-panel-title" style="margin-bottom:1rem">Posiciones por ALyC</div>
+          <div style="overflow-x:auto; overflow-y:auto; max-height:${chartHeight}px">
+            <table class="holdings-table">
+              <thead>
+                <tr>
+                  <th>Instrumento</th>
+                  ${alycNames.map(a => `<th style="text-align:right">${a}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>${matrixRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`
+
+    requestAnimationFrame(() => {
+      const canvas = el.querySelector('canvas')
+      if (!canvas) return
+      this._alycChart = ChartManager.renderStackedBarChart(
+        canvas,
+        tickers,
+        datasets,
+        { instance: this._alycChart }
+      )
     })
   },
 

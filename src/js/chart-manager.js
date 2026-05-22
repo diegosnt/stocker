@@ -640,6 +640,62 @@ export const ChartManager = {
     })
   },
 
+  renderStackedBarChart(canvas, labels, datasets, options = {}) {
+    if (!canvas || !datasets.length) return null
+
+    if (options.instance && options.instance.config.type === 'bar') {
+      options.instance.data.labels = labels
+      options.instance.data.datasets = datasets
+      options.instance.update()
+      return options.instance
+    }
+
+    const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
+    const textColor = getCSSVar('--text-muted') || '#64748b'
+
+    return new window.Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        ...baseOptions,
+        indexAxis: 'y',
+        scales: {
+          x: {
+            ...scales.x,
+            stacked: true,
+            grid: { display: false },
+            ticks: {
+              ...scales.x.ticks,
+              callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 })
+            }
+          },
+          y: {
+            ...scales.y,
+            stacked: true,
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          ...baseOptions.plugins,
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: textColor, boxWidth: 12, usePointStyle: true, pointStyle: 'circle' }
+          },
+          tooltip: {
+            ...baseOptions.plugins.tooltip,
+            filter: (item) => item.parsed.x > 0,
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+            }
+          }
+        },
+        ...options.chartOptions
+      }
+    })
+  },
+
   destroy(chart) {
     if (chart && typeof chart.destroy === 'function') {
       chart.destroy()
