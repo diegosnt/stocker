@@ -108,18 +108,14 @@ export const AnalysisPage = {
 
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
-        <div id="analysis-section-0" class="analysis-grid-top">
+        <div id="analysis-section-0" style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem">
+          <div id="asset-distribution-card" class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
+            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Activo</h3>
+            <div id="current-holdings-chart" style="height: 320px; position: relative; width: 100%"></div>
+          </div>
           <div class="card" style="margin-bottom: 0; padding: 1.25rem">
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual</h3>
             <div id="current-holdings-table" style="overflow-x: auto"></div>
-          </div>
-          <div class="card analysis-chart-top" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Activo</h3>
-            <div id="current-holdings-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
-          </div>
-          <div id="type-distribution-card" class="card analysis-chart-bottom" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Tipo</h3>
-            <div id="current-type-chart" style="flex: 1; display: flex; align-items: center; justify-content: center"></div>
           </div>
         </div>
 
@@ -541,7 +537,6 @@ export const AnalysisPage = {
   _renderCurrentHoldings(holdings, analysis = null) {
     const tableContainer = document.getElementById('current-holdings-table')
     const assetChartContainer = document.getElementById('current-holdings-chart')
-    const typeChartContainer = document.getElementById('current-type-chart')
     const byCurrency = {}
     holdings.forEach(h => { if (!byCurrency[h.currency]) byCurrency[h.currency] = []; byCurrency[h.currency].push(h) })
 
@@ -567,7 +562,7 @@ export const AnalysisPage = {
             <table class="holdings-table">
               <thead>
                 <tr>
-                  <th class="sortable" data-col="ticker">Ticker</th>
+                  <th class="sortable" data-col="ticker">Ticker / %</th>
                   <th class="sortable" data-col="quantity" style="text-align:right">Cant.</th>
                   <th class="sortable" data-col="avg_buy_price" style="text-align:right">Costo</th>
                   <th class="sortable" data-col="invested" style="text-align:right">Invertido</th>
@@ -575,7 +570,6 @@ export const AnalysisPage = {
                   <th class="sortable" data-col="marketValue" style="text-align:right">Valor</th>
                   <th class="sortable" data-col="pnl" style="text-align:right">P&L $</th>
                   <th class="sortable" data-col="pnlPct" style="text-align:right">P&L %</th>
-                  <th class="sortable" data-col="weight" style="text-align:right">%</th>
                 </tr>
               </thead>
               <tbody>`
@@ -588,7 +582,7 @@ export const AnalysisPage = {
       
       let desktopRows = ''
       let mobileCards = ''
-
+ 
       items.forEach(h => {
         const price = this._resolvedPrices?.[h.ticker] ?? null
         const currentVal = price ? h.total_quantity * price : (h.total_quantity * h.avg_buy_price)
@@ -597,17 +591,20 @@ export const AnalysisPage = {
         const pnlPct = (h.avg_buy_price > 0 && price) ? ((price / h.avg_buy_price) - 1) * 100 : 0
         const weight = (currentVal / totalMarket) * 100
         const type = h.instrument_type_name || 'Sin tipo'
-
+ 
         // Datos para gráficos
         assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnlPct })
         typeGroups[type] = (typeGroups[type] || 0) + currentVal
-
+ 
         // Desktop row
         desktopRows += `
           <tr data-ticker="${h.ticker}" data-quantity="${h.total_quantity}" data-avg_buy_price="${h.avg_buy_price}" 
               data-invested="${invested}" data-price="${price ?? 0}" data-marketValue="${currentVal}" 
               data-pnl="${pnl}" data-pnlPct="${pnlPct}" data-weight="${weight}">
-            <td><span class="ticker-chip">${h.ticker}</span></td>
+            <td>
+              <span class="ticker-chip">${h.ticker}</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-left: 0.45rem">${weight.toFixed(1)}%</span>
+            </td>
             <td class="amount">${h.total_quantity.toLocaleString('es-AR')}</td>
             <td class="amount">${fmt(h.avg_buy_price)}</td>
             <td class="amount">${fmt(invested)}</td>
@@ -615,9 +612,8 @@ export const AnalysisPage = {
             <td class="amount"><strong>${fmt(currentVal)}</strong></td>
             <td class="amount" style="color: ${pnlColor(pnl)}; font-weight: bold">${sign(pnl)}${fmt(pnl)}</td>
             <td class="amount" style="color: ${pnlColor(pnlPct)}; font-weight: bold">${sign(pnlPct)}${pnlPct.toFixed(1)}%</td>
-            <td class="amount" style="color: var(--text-muted); font-weight: 600">${weight.toFixed(1)}%</td>
           </tr>`
-
+ 
         // Mobile card (using same classes as dashboard)
         mobileCards += `
           <div class="dash-instrument-card collapsed">
@@ -657,9 +653,9 @@ export const AnalysisPage = {
             </div>
           </div>`
       })
-
+ 
       html += desktopRows
-      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(1)}%</td><td class="amount">100.0%</td></tr></tfoot></table></div>`
+      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(1)}%</td></tr></tfoot></table></div>`
       
       // Mobile cards section
       html += `
@@ -684,30 +680,15 @@ export const AnalysisPage = {
 
     // Renderizar gráficos si hay datos
     const numAssets = assetData.length
-    const numTypes = Object.keys(typeGroups).length
-    const section0 = document.getElementById('analysis-section-0')
-    const typeCard = document.getElementById('type-distribution-card')
-    const assetCard = assetChartContainer.parentElement
+    const assetCard = document.getElementById('asset-distribution-card')
 
     if (numAssets > 0) {
-      typeCard.style.display = numTypes > 1 ? 'flex' : 'none'
-
-      if (numAssets > 1 || numTypes > 1) {
-        assetCard.style.display = 'flex'
-        section0.style.gridTemplateColumns = ''
+      if (numAssets > 1) {
+        if (assetCard) assetCard.style.display = 'flex'
         const sortedAssets = assetData.sort((a, b) => b.currentValue - a.currentValue)
-        this._renderDonutChart(assetChartContainer, sortedAssets, totalMarketValueAll, '_assetChart')
+        this._renderAssetColumnChart(assetChartContainer, sortedAssets, totalMarketValueAll, '_assetChart')
       } else {
-        assetCard.style.display = 'none'
-        typeCard.style.display = 'none'
-        section0.style.gridTemplateColumns = '1fr'
-      }
-
-      if (numTypes > 1) {
-        const typeItems = Object.entries(typeGroups)
-          .map(([ticker, currentValue]) => ({ ticker, currentValue }))
-          .sort((a, b) => b.currentValue - a.currentValue)
-        this._renderDonutChart(typeChartContainer, typeItems, totalMarketValueAll, '_typeChart')
+        if (assetCard) assetCard.style.display = 'none'
       }
 
       this._treemapChart = renderTreemapChart(
@@ -716,9 +697,7 @@ export const AnalysisPage = {
         this._treemapChart
       )
     } else {
-      assetCard.style.display = 'none'
-      typeCard.style.display = 'none'
-      section0.style.gridTemplateColumns = '1fr'
+      if (assetCard) assetCard.style.display = 'none'
       if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
       document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
@@ -803,6 +782,18 @@ export const AnalysisPage = {
     const canvas = container.querySelector('canvas')
 
     this[chartKey] = ChartManager.renderPieChart(canvas, items)
+  },
+
+  _renderAssetColumnChart(container, items, total, chartKey) {
+    if (!container || !items || items.length === 0) return
+    this[chartKey] = ChartManager.destroy(this[chartKey])
+
+    container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    const canvas = container.querySelector('canvas')
+
+    this[chartKey] = ChartManager.renderVerticalBarChart(canvas, items, {
+      total: total
+    })
   },
 
   async _loadPdfLibraries() {

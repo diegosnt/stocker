@@ -71,6 +71,46 @@ const outlinedTextPlugin = {
   }
 }
 
+const barPercentageLabelsPlugin = {
+  id: 'barPercentageLabels',
+  afterDatasetsDraw(chart, args, options) {
+    if (chart.config.type !== 'bar') return
+    
+    const { ctx, data } = chart
+    const total = options.total || data.datasets[0].data.reduce((a, b) => a + b, 0)
+    if (!total) return
+    
+    chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
+      const value = data.datasets[0].data[index]
+      const pct = (value / total) * 100
+      const pctText = pct.toFixed(1) + '%'
+      
+      const { x, y } = datapoint
+      const isVertical = chart.config.options.indexAxis === 'x'
+      
+      ctx.save()
+      ctx.textAlign = 'center'
+      ctx.textBaseline = isVertical ? 'bottom' : 'middle'
+      
+      ctx.font = 'bold 11px Inter, sans-serif'
+      ctx.fillStyle = getCSSVar('--text-main') || '#ffffff'
+      
+      ctx.strokeStyle = getCSSVar('--bg-card') || '#1e293b'
+      ctx.lineWidth = 3.5
+      ctx.lineJoin = 'round'
+      
+      if (isVertical) {
+        ctx.strokeText(pctText, x, y - 6)
+        ctx.fillText(pctText, x, y - 6)
+      } else {
+        ctx.strokeText(pctText, x + 18, y)
+        ctx.fillText(pctText, x + 18, y)
+      }
+      ctx.restore()
+    })
+  }
+}
+
 // Configuración global dinámica según el tema
 const getBaseOptions = () => {
   return {
@@ -201,6 +241,90 @@ export const ChartManager = {
         },
         ...options.chartOptions
       }
+    })
+  },
+
+  renderVerticalBarChart(canvas, items, options = {}) {
+    if (!canvas) return null
+    const labels = items.map(item => item.label || item.ticker)
+    const data = items.map(item => item.value || item.currentValue)
+    const colors = options.colors || CHART_COLORS
+    const backgroundColor = items.map((_, i) => colors[i % colors.length])
+
+    if (options.instance && options.instance.config.type === 'bar' && options.instance.config.options.indexAxis === 'x') {
+      options.instance.data.labels = labels
+      options.instance.data.datasets[0].data = data
+      options.instance.data.datasets[0].backgroundColor = backgroundColor
+      if (options.instance.options.plugins) {
+        if (!options.instance.options.plugins.barPercentageLabels) {
+          options.instance.options.plugins.barPercentageLabels = {}
+        }
+        options.instance.options.plugins.barPercentageLabels.total = options.total
+      }
+      options.instance.update()
+      return options.instance
+    }
+
+    const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
+
+    return new window.Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: backgroundColor,
+          borderRadius: 4,
+          barThickness: options.barThickness || 24
+        }]
+      },
+      options: {
+        ...baseOptions,
+        indexAxis: 'x',
+        scales: {
+          x: {
+            ...scales.x,
+            grid: { display: false }
+          },
+          y: {
+            ...scales.y,
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: {
+              ...scales.y.ticks,
+              callback: v => {
+                if (options.isPercentage) return v.toFixed(0) + '%'
+                return '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 })
+              }
+            }
+          }
+        },
+        plugins: {
+          ...baseOptions.plugins,
+          barPercentageLabels: {
+            total: options.total
+          },
+          tooltip: {
+            ...baseOptions.plugins.tooltip,
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.parsed.y
+                if (options.isPercentage) {
+                  return ` Porcentaje: ${val.toFixed(1)}%`
+                }
+                const formatted = val.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+                if (options.total) {
+                  const pct = ((val / options.total) * 100).toFixed(1)
+                  return ` Valor: $${formatted} (${pct}%)`
+                }
+                return ` Valor: $${formatted}`
+              }
+            }
+          }
+        },
+        ...options.chartOptions
+      },
+      plugins: [barPercentageLabelsPlugin]
     })
   },
 
