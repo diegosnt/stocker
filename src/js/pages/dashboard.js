@@ -11,17 +11,23 @@ export const DashboardPage = {
   _heatmapChart: null,
   _compChart: null,
   _alycChart: null,
+  _assetChart: null,
+  _alycHoldingChart: null,
   _resolvedPrices: {},
   _chartRendered: false,
   _chartsReady: false,
+  _alycRows: null,
 
   cleanup() {
     this._heatmapChart = ChartManager.destroy(this._heatmapChart)
     this._typeChart = ChartManager.destroy(this._typeChart)
     this._compChart = ChartManager.destroy(this._compChart)
     this._alycChart = ChartManager.destroy(this._alycChart)
+    this._assetChart = ChartManager.destroy(this._assetChart)
+    this._alycHoldingChart = ChartManager.destroy(this._alycHoldingChart)
     this._chartRendered = false
     this._chartsReady = false
+    this._alycRows = null
 
     clearRenderCache(document.getElementById('page-content'))
   },
@@ -53,6 +59,10 @@ export const DashboardPage = {
           <div class="card skeleton" style="height: 360px"></div>
           <div class="card skeleton" style="height: 360px"></div>
         </div>
+        <div class="dash-charts-row">
+          <div class="card skeleton" style="height: 360px"></div>
+          <div class="card skeleton" style="height: 360px"></div>
+        </div>
         <div class="card">
           <div class="skeleton" style="height: 30px; width: 200px; margin-bottom: 1.5rem"></div>
           ${Array(5).fill(`
@@ -75,6 +85,7 @@ export const DashboardPage = {
         this._loadHoldings(),
         this._loadHoldingsByAlyc()
       ])
+      this._alycRows = alycRows
       this._renderDashboard(data)
       this._renderAlycSection(alycRows)
       await this._updateMarketPrices(data.tickers)
@@ -248,6 +259,18 @@ export const DashboardPage = {
       <div id="dash-charts-wrapper" style="display:none">
         <div class="dash-charts-row">
           <div class="card dash-chart-card">
+            <div class="chart-panel-title" style="margin-bottom:1rem">Tenencia por Activo (Mayor a Menor)</div>
+            <div id="dash-asset-chart" style="height: 300px; position: relative"></div>
+          </div>
+
+          <div class="card dash-chart-card">
+            <div class="chart-panel-title" style="margin-bottom:1rem">Tenencia por ALyC (Mayor a Menor)</div>
+            <div id="dash-alyc-holding-chart" style="height: 300px; position: relative"></div>
+          </div>
+        </div>
+
+        <div class="dash-charts-row">
+          <div class="card dash-chart-card">
             <div class="chart-panel-title" style="margin-bottom:1rem">Composición de Cartera por Tipo</div>
             <div id="dash-type-chart" style="height: 300px; position: relative"></div>
           </div>
@@ -362,6 +385,8 @@ export const DashboardPage = {
     requestAnimationFrame(() => {
       this._refreshHeatmap()
       this._refreshComparisonChart()
+      this._refreshAssetChart()
+      this._refreshAlycHoldingChart()
       this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
       this._chartsReady = true
       const wrapper = document.getElementById('dash-charts-wrapper')
@@ -400,6 +425,81 @@ export const DashboardPage = {
 
     this._compChart = ChartManager.renderComparisonChart(canvas, labels, investedData, currentData, {
       instance: this._compChart
+    })
+  },
+
+  _refreshAssetChart() {
+    const el = document.getElementById('dash-asset-chart')
+    if (!el || !this._summary) return
+
+    const items = Object.entries(this._summary).map(([ticker, h]) => {
+      const price = this._resolvedPrices?.[ticker] ?? h.avgBuyPrice
+      const value = h.quantity * price
+      return {
+        ticker,
+        label: `${ticker} (${h.currency})`,
+        value
+      }
+    }).filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+
+    if (!items.length) return
+
+    if (!el.querySelector('canvas')) {
+      el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    }
+    const canvas = el.querySelector('canvas')
+
+    const total = items.reduce((sum, item) => sum + item.value, 0)
+
+    this._assetChart = ChartManager.renderVerticalBarChart(canvas, items, {
+      instance: this._assetChart,
+      total,
+      isPercentage: false
+    })
+  },
+
+  _refreshAlycHoldingChart() {
+    const el = document.getElementById('dash-alyc-holding-chart')
+    if (!el || !this._alycRows) return
+
+    const alycTotals = {}
+    for (const row of this._alycRows) {
+      const qty = parseFloat(row.total_quantity) || 0
+      if (qty <= 0) continue
+
+      const ticker = row.ticker
+      const price = this._resolvedPrices?.[ticker] ?? null
+      
+      let currentValue = 0
+      if (price !== null) {
+        currentValue = qty * price
+      } else {
+        currentValue = parseFloat(row.invested) || 0
+      }
+
+      alycTotals[row.alyc_name] = (alycTotals[row.alyc_name] || 0) + currentValue
+    }
+
+    const items = Object.entries(alycTotals).map(([alycName, value]) => ({
+      label: alycName,
+      value
+    })).filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+
+    if (!items.length) return
+
+    if (!el.querySelector('canvas')) {
+      el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
+    }
+    const canvas = el.querySelector('canvas')
+
+    const total = items.reduce((sum, item) => sum + item.value, 0)
+
+    this._alycHoldingChart = ChartManager.renderVerticalBarChart(canvas, items, {
+      instance: this._alycHoldingChart,
+      total,
+      isPercentage: false
     })
   },
 
@@ -450,6 +550,8 @@ export const DashboardPage = {
     if (this._chartsReady) {
       this._refreshHeatmap()
       this._refreshComparisonChart()
+      this._refreshAssetChart()
+      this._refreshAlycHoldingChart()
     }
     this._updatePnlKpis()
     if (['marketPrice', 'marketValue', 'pnl', 'pnlPct'].includes(this._sortCol)) {
