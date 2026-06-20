@@ -257,6 +257,11 @@ export const DashboardPage = {
     // ── Contenido Principal (Gráficos y Tabla) ───────────────
     mainEl.innerHTML = `
       <div id="dash-charts-wrapper" style="display:none">
+        <div class="card dash-chart-card" style="width:100%">
+          <div class="chart-panel-title" style="margin-bottom:0.75rem">Comparativa: Inversión vs Valor Actual ($)</div>
+          <div id="dash-comparison-chart" style="height: 300px; position: relative"></div>
+        </div>
+
         <div class="dash-charts-row">
           <div class="card dash-chart-card">
             <div class="chart-panel-title" style="margin-bottom:1rem">Tenencia por Activo (Mayor a Menor)</div>
@@ -266,18 +271,6 @@ export const DashboardPage = {
           <div class="card dash-chart-card">
             <div class="chart-panel-title" style="margin-bottom:1rem">Tenencia por ALyC (Mayor a Menor)</div>
             <div id="dash-alyc-holding-chart" style="height: 300px; position: relative"></div>
-          </div>
-        </div>
-
-        <div class="dash-charts-row">
-          <div class="card dash-chart-card">
-            <div class="chart-panel-title" style="margin-bottom:1rem">Composición de Cartera por Tipo</div>
-            <div id="dash-type-chart" style="height: 300px; position: relative"></div>
-          </div>
-
-          <div class="card dash-chart-card">
-            <div class="chart-panel-title" style="margin-bottom:0.75rem">Comparativa: Inversión vs Valor Actual ($)</div>
-            <div id="dash-comparison-chart" style="height: 300px; position: relative"></div>
           </div>
         </div>
 
@@ -387,7 +380,6 @@ export const DashboardPage = {
       this._refreshComparisonChart()
       this._refreshAssetChart()
       this._refreshAlycHoldingChart()
-      this._renderPieChart(document.getElementById('dash-type-chart'), typeItems, totalInvested)
       this._chartsReady = true
       const wrapper = document.getElementById('dash-charts-wrapper')
       if (wrapper) wrapper.style.display = ''
@@ -412,7 +404,7 @@ export const DashboardPage = {
       grouped[label].current += current
     })
 
-    const labels = Object.keys(grouped).sort()
+    const labels = Object.keys(grouped).sort((a, b) => grouped[b].current - grouped[a].current)
     const investedData = labels.map(l => grouped[l].invested)
     const currentData = labels.map(l => grouped[l].current)
 

@@ -680,13 +680,44 @@ export const ChartManager = {
 
   renderComparisonChart(canvas, labels, investedData, currentData, options = {}) {
     if (!canvas || !investedData) return null
-    const currentColors = currentData.map((val, i) => val >= investedData[i] ? '#10b981' : '#ef4444')
+
+    const INSTRUMENT_PALETTE = [
+      '#4f46e6', '#f59e0b', '#8b5cf6', '#ec4899',
+      '#06b6d4', '#f97316', '#6366f1', '#0ea5e9',
+      '#d946ef', '#a78bfa'
+    ]
+
+    const createStripePattern = (color) => {
+      const size = 8
+      const c = document.createElement('canvas')
+      c.width = size
+      c.height = size
+      const ctx = c.getContext('2d')
+      ctx.fillStyle = color + '28'
+      ctx.fillRect(0, 0, size, size)
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2
+      ctx.lineCap = 'square'
+      for (let i = -size; i <= size * 2; i += 4) {
+        ctx.beginPath()
+        ctx.moveTo(i, 0)
+        ctx.lineTo(i + size, size)
+        ctx.stroke()
+      }
+      return ctx.createPattern(c, 'repeat')
+    }
+
+    const investedColors = labels.map((_, i) => INSTRUMENT_PALETTE[i % INSTRUMENT_PALETTE.length])
+    const currentPatterns = currentData.map((val, i) =>
+      createStripePattern(val >= investedData[i] ? '#10b981' : '#ef4444')
+    )
 
     if (options.instance && options.instance.config.type === 'bar') {
       options.instance.data.labels = labels
       options.instance.data.datasets[0].data = investedData
+      options.instance.data.datasets[0].backgroundColor = investedColors
       options.instance.data.datasets[1].data = currentData
-      options.instance.data.datasets[1].backgroundColor = currentColors
+      options.instance.data.datasets[1].backgroundColor = currentPatterns
       options.instance.update()
       return options.instance
     }
@@ -694,7 +725,7 @@ export const ChartManager = {
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
-    
+
     return new window.Chart(canvas, {
       type: 'bar',
       data: {
@@ -703,18 +734,18 @@ export const ChartManager = {
           {
             label: 'Capital Invertido',
             data: investedData,
-            backgroundColor: '#8b5cf6',
+            backgroundColor: investedColors,
             borderRadius: 4,
-            barPercentage: 0.8,
-            categoryPercentage: 0.7
+            barPercentage: 0.5,
+            categoryPercentage: 0.6
           },
           {
             label: 'Valor de Mercado',
             data: currentData,
-            backgroundColor: currentColors,
+            backgroundColor: currentPatterns,
             borderRadius: 4,
-            barPercentage: 0.8,
-            categoryPercentage: 0.7
+            barPercentage: 0.5,
+            categoryPercentage: 0.6
           }
         ]
       },

@@ -109,10 +109,33 @@ export const AnalysisPage = {
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
         <div id="analysis-section-0" style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem">
-          <div id="asset-distribution-card" class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-muted)">Distribución por Activo</h3>
-            <div id="current-holdings-chart" style="height: 320px; position: relative; width: 100%"></div>
+          <div class="analysis-grid-two" style="margin-bottom: 0">
+            <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem">
+                <h3 style="font-size: 0.95rem; margin: 0">Comparativa: Inversión vs Valor Actual ($)</h3>
+                <button id="btn-refresh-comp" class="btn btn-sm btn-ghost btn-icon-only" title="Actualizar precios y gráfico" style="padding: 0; width: 24px; height: 24px; min-width: 24px; min-height: 24px; opacity: 0.8; background: none; border: none; cursor: pointer; color: var(--text-muted); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                </button>
+              </div>
+              <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+                Capital invertido frente a valoración de mercado actual por activo.
+              </p>
+              <div style="flex: 1; min-height: 340px; position: relative">
+                <canvas id="comparison-chart"></canvas>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
+              <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Mapa de Calor (Peso vs P&L %)</h3>
+              <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+                El tamaño representa el peso en cartera y el color el rendimiento.
+              </p>
+              <div id="analysis-heatmap" style="flex: 1; min-height: 340px; position: relative">
+                <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; width: 100%">Calculando mapa...</div>
+              </div>
+            </div>
           </div>
+
           <div class="card" style="margin-bottom: 0; padding: 1.25rem">
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual</h3>
             <div id="current-holdings-table" style="overflow-x: auto"></div>
@@ -125,33 +148,6 @@ export const AnalysisPage = {
           <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">Frecuencia de compras y ventas por mes.</p>
           <div id="activity-chart-container" style="height: 200px; position: relative">
             <div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding-top:2rem">Cargando actividad...</div>
-          </div>
-        </div>
-
-        <!-- SECCIÓN 0.5: Comparativa y Mapa de Calor -->
-        <div class="analysis-grid-two">
-          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem">
-              <h3 style="font-size: 0.95rem; margin: 0">Comparativa: Inversión vs Valor Actual ($)</h3>
-              <button id="btn-refresh-comp" class="btn btn-sm btn-ghost btn-icon-only" title="Actualizar precios y gráfico" style="padding: 0; width: 24px; height: 24px; min-width: 24px; min-height: 24px; opacity: 0.8; background: none; border: none; cursor: pointer; color: var(--text-muted); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-              </button>
-            </div>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
-              Capital invertido frente a valoración de mercado actual por activo.
-            </p>
-            <div style="flex: 1; min-height: 220px; position: relative">
-              <canvas id="comparison-chart"></canvas>
-            </div>
-          </div>
-          <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Mapa de Calor (Peso vs P&L %)</h3>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
-              El tamaño representa el peso en cartera y el color el rendimiento.
-            </p>
-            <div id="analysis-heatmap" style="flex: 1; min-height: 220px; position: relative">
-              <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; width: 100%">Calculando mapa...</div>
-            </div>
           </div>
         </div>
 
@@ -562,7 +558,8 @@ export const AnalysisPage = {
             <table class="holdings-table">
               <thead>
                 <tr>
-                  <th class="sortable" data-col="ticker">Ticker / %</th>
+                  <th class="sortable" data-col="ticker">Ticker</th>
+                  <th class="sortable" data-col="weight" style="text-align:right">Peso %</th>
                   <th class="sortable" data-col="quantity" style="text-align:right">Cant.</th>
                   <th class="sortable" data-col="avg_buy_price" style="text-align:right">Costo</th>
                   <th class="sortable" data-col="invested" style="text-align:right">Invertido</th>
@@ -601,10 +598,8 @@ export const AnalysisPage = {
           <tr data-ticker="${h.ticker}" data-quantity="${h.total_quantity}" data-avg_buy_price="${h.avg_buy_price}" 
               data-invested="${invested}" data-price="${price ?? 0}" data-marketValue="${currentVal}" 
               data-pnl="${pnl}" data-pnlPct="${pnlPct}" data-weight="${weight}">
-            <td>
-              <span class="ticker-chip">${h.ticker}</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-left: 0.45rem">${weight.toFixed(1)}%</span>
-            </td>
+            <td><span class="ticker-chip">${h.ticker}</span></td>
+            <td class="amount" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600">${weight.toFixed(1)}%</td>
             <td class="amount">${h.total_quantity.toLocaleString('es-AR')}</td>
             <td class="amount">${fmt(h.avg_buy_price)}</td>
             <td class="amount">${fmt(invested)}</td>
@@ -1118,7 +1113,7 @@ export const AnalysisPage = {
       grouped[label].current += current
     })
 
-    const labels = Object.keys(grouped).sort()
+    const labels = Object.keys(grouped).sort((a, b) => grouped[b].current - grouped[a].current)
     const investedData = labels.map(l => grouped[l].invested)
     const currentData = labels.map(l => grouped[l].current)
 
