@@ -185,15 +185,26 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 7. Descomposición de archivos grandes — `operations/csv-import.js`, `analysis/correlation.js`, `analysis/treemap.js`
 8. Centralización de helpers duplicados — `fmtDate`, `fmtDateShort`, `buildPageRange` en `utils.js` (~39 líneas menos)
 9. Cleanup methods para las 7 páginas — timers cancelados, estado de módulo reseteado al navegar
+10. Ganancias Realizadas en el Dashboard — nueva tarjeta colapsable usando `get_user_realized_pnl()` (P&L realizado con costo promedio ponderado); requiere aplicar el RPC en Supabase (`supabase/rpc_get_user_realized_pnl.sql`)
 
 ### 🔜 Pendientes
-10. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
-11. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
-12. Tests — agregar dependencias y primer test unitario
-13. Accesibilidad — roles ARIA, contraste, navegación por teclado
-14. Features — filtros combinados, exportación avanzada, vistas personalizadas
-15. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes
-16. Seguridad — Content-Security-Policy, validación del lado del servidor
+11. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
+12. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
+13. Tests — agregar dependencias y primer test unitario
+14. Accesibilidad — roles ARIA, contraste, navegación por teclado
+15. Features — filtros combinados, exportación avanzada, vistas personalizadas
+16. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes
+17. Seguridad — Content-Security-Policy, validación del lado del servidor
+17. Exponer `get_user_realized_pnl()` en el frontend — el RPC de P&L realizado (costo promedio ponderado) ya existe en `supabase/rpc_get_user_realized_pnl.sql` y no se usa en ninguna página
+18. Agregar `aria-label` a botones icon-only en `instruments.js`, `instrument-types.js`, `alycs.js`, `dashboard.js` y `settings.js`
+19. Límite/expiración activa en `quoteCache` (`api/server.js`) — hoy es un `Map` sin tope que crece indefinidamente en memoria
+20. Unificar skeleton loaders (ya existen en `dashboard.js`/`operations.js`) en `instruments.js`, `instrument-types.js`, `alycs.js`, `analysis.js` y `settings.js`
+21. Alertas de concentración de riesgo (ej. "40% en un solo ticker") usando los pesos % que ya se calculan en Dashboard/Análisis
+22. Responsive mobile (tabla → tarjetas apiladas) en `instruments.js`, `instrument-types.js`, `alycs.js` y `operations.js` — hoy dependen solo de scroll horizontal
+23. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
+24. Comparación de rendimiento/composición entre ALyCs — el análisis hoy es de a un ALyC por vez
+25. Distribución global por tipo de instrumento (no solo dentro de un ALyC) — agregación adicional sobre `get_user_holdings_global`
+26. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`
 
 ---
 

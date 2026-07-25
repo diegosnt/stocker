@@ -76,18 +76,22 @@ export const DashboardPage = {
           <div class="card skeleton" style="height: 280px"></div>
           <div class="card skeleton" style="height: 280px"></div>
         </div>
-      </div>`
+      </div>
+
+      <div id="dash-realized-pnl-section"></div>`
 
     renderIfChanged(content, skeletonHTML)
 
     try {
-      const [data, alycRows] = await Promise.all([
+      const [data, alycRows, realizedPnl] = await Promise.all([
         this._loadHoldings(),
-        this._loadHoldingsByAlyc()
+        this._loadHoldingsByAlyc(),
+        this._loadRealizedPnl()
       ])
       this._alycRows = alycRows
       this._renderDashboard(data)
       this._renderAlycSection(alycRows)
+      this._renderRealizedPnlSection(realizedPnl)
       await this._updateMarketPrices(data.tickers)
     } catch (err) {
       console.error(err)
@@ -128,6 +132,15 @@ export const DashboardPage = {
     items.sort((a, b) => b.invested - a.invested)
     const tickers = items.map(h => h.ticker)
     return { items, totalARS, totalUSD, tickers, summary }
+  },
+
+  async _loadRealizedPnl() {
+    const { data, error } = await supabase.rpc('get_user_realized_pnl')
+    if (error) {
+      console.error('[Dashboard] get_user_realized_pnl no disponible:', error)
+      return []
+    }
+    return data || []
   },
 
   async _updateMarketPrices(tickers) {
@@ -733,6 +746,112 @@ export const DashboardPage = {
         datasets,
         { instance: this._alycChart }
       )
+    })
+  },
+
+  _renderRealizedPnlSection(rows) {
+    const el = document.getElementById('dash-realized-pnl-section')
+    if (!el) return
+
+    if (!rows || rows.length === 0) {
+      el.innerHTML = ''
+      return
+    }
+
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const sign = v => v > 0 ? '+' : ''
+
+    const items = rows.map(r => ({
+      ticker: r.ticker,
+      name: r.instrument_name,
+      currency: r.currency,
+      soldQty: parseFloat(r.total_sold_qty),
+      sellCount: Number(r.sell_count),
+      pnl: parseFloat(r.realized_pnl)
+    })).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))
+
+    const totalsByCurrency = {}
+    items.forEach(it => { totalsByCurrency[it.currency] = (totalsByCurrency[it.currency] || 0) + it.pnl })
+
+    const desktopRows = items.map(it => `
+      <tr>
+        <td><span class="ticker-chip" title="${it.name}">${it.ticker}</span></td>
+        <td style="font-size:0.8rem;color:var(--text-muted)">${it.currency}</td>
+        <td class="amount">${it.soldQty.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
+        <td class="amount">${it.sellCount}</td>
+        <td class="amount" style="color:${pnlColor(it.pnl)};font-weight:bold">${sign(it.pnl)}${fmt(it.pnl)}</td>
+      </tr>`).join('')
+
+    const totalRows = Object.entries(totalsByCurrency).map(([curr, total]) => `
+      <tr style="background-color: var(--bg-main); font-weight: 800">
+        <td colspan="4">TOTAL ${curr}</td>
+        <td class="amount" style="color:${pnlColor(total)}">${sign(total)}${fmt(total)}</td>
+      </tr>`).join('')
+
+    const mobileCards = items.map(it => `
+      <div class="dash-instrument-card collapsed">
+        <div class="dash-instrument-card-header">
+          <span class="ticker-chip" title="${it.name}">${it.ticker}</span>
+          <span class="dash-instrument-meta">
+            <span class="meta-qty">${it.soldQty.toLocaleString('es-AR')}</span>
+            <span class="meta-type">${it.currency}</span>
+          </span>
+        </div>
+        <div class="dash-instrument-card-body">
+          <div class="dash-instrument-row">
+            <span class="dash-instrument-label">Ventas</span>
+            <span class="dash-instrument-value">${it.sellCount}</span>
+          </div>
+          <div class="dash-instrument-row">
+            <span class="dash-instrument-label">P&amp;L Realizado</span>
+            <span class="dash-instrument-value" style="color:${pnlColor(it.pnl)};font-weight:bold">${sign(it.pnl)}${fmt(it.pnl)}</span>
+          </div>
+        </div>
+      </div>`).join('')
+
+    el.innerHTML = `
+      <div class="card" style="margin-top: 1.5rem">
+        <div class="alyc-card-header" id="dash-realized-pnl-header" style="cursor:pointer;margin-bottom:0">
+          <h3 style="margin:0;font-size:1rem">Ganancias Realizadas</h3>
+          <span class="alyc-chevron" id="dash-realized-pnl-chevron">▾</span>
+        </div>
+        <div id="dash-realized-pnl-body" style="margin-top:1rem">
+          <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+            P&amp;L de ventas ya concretadas, con costo promedio ponderado (no incluye tenencia actual).
+          </p>
+          <div class="table-wrapper desktop-only">
+            <table class="holdings-table">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Moneda</th>
+                  <th style="text-align:right">Cant. Vendida</th>
+                  <th style="text-align:right">Ventas</th>
+                  <th style="text-align:right">P&amp;L Realizado</th>
+                </tr>
+              </thead>
+              <tbody>${desktopRows}</tbody>
+              <tfoot>${totalRows}</tfoot>
+            </table>
+          </div>
+          <div class="mobile-only dash-instruments-cards">${mobileCards}</div>
+        </div>
+      </div>`
+
+    const header  = document.getElementById('dash-realized-pnl-header')
+    const body    = document.getElementById('dash-realized-pnl-body')
+    const chevron = document.getElementById('dash-realized-pnl-chevron')
+    header.addEventListener('click', () => {
+      const collapsed = body.style.display === 'none'
+      body.style.display = collapsed ? '' : 'none'
+      chevron.style.transform = collapsed ? '' : 'rotate(-90deg)'
+    })
+
+    el.querySelectorAll('.dash-instrument-card-header').forEach(cardHeader => {
+      cardHeader.addEventListener('click', (e) => {
+        e.currentTarget.closest('.dash-instrument-card')?.classList.toggle('collapsed')
+      })
     })
   },
 
