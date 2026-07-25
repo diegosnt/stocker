@@ -53,6 +53,7 @@ let darkModeTimeout = null
 
 export function toggleDarkMode() {
   const isDark = document.body.classList.toggle('dark-mode')
+  document.dispatchEvent(new CustomEvent('darkmodechange', { detail: { isDark } }))
   if (darkModeTimeout) clearTimeout(darkModeTimeout)
   darkModeTimeout = setTimeout(() => {
     localStorage.setItem('dark-mode', isDark)

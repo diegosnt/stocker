@@ -52,6 +52,10 @@ export const AnalysisPage = {
     this._activityChart = null
     this._validHistories = []
     this._validTickers = []
+    if (this._themeChangeHandler) {
+      document.removeEventListener('darkmodechange', this._themeChangeHandler)
+      this._themeChangeHandler = null
+    }
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -109,6 +113,48 @@ export const AnalysisPage = {
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
         <div id="analysis-section-0" style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem">
+          <div class="kpi-grid" id="analysis-totals-cards" style="margin-bottom: 0">
+            <div class="kpi-card kpi-card--modern">
+              <div class="kpi-icon-circle" style="background: rgba(79, 70, 230, 0.1); color: #4f46e6">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="kpi-content">
+                <div class="kpi-label">Total Invertido</div>
+                <div class="kpi-value" id="totals-invested">--</div>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-card--modern">
+              <div class="kpi-icon-circle" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </div>
+              <div class="kpi-content">
+                <div class="kpi-label">Total Valor Mercado</div>
+                <div class="kpi-value" id="totals-market">--</div>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-card--modern">
+              <div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: #10b981">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              </div>
+              <div class="kpi-content">
+                <div class="kpi-label">Total P&amp;L $</div>
+                <div class="kpi-value" id="totals-pnl">--</div>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-card--modern">
+              <div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="kpi-content">
+                <div class="kpi-label">Total P&amp;L %</div>
+                <div class="kpi-value" id="totals-pnlpct">--</div>
+              </div>
+            </div>
+          </div>
+
           <div class="analysis-grid-two" style="margin-bottom: 0">
             <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem">
@@ -137,7 +183,9 @@ export const AnalysisPage = {
           </div>
 
           <div class="card" style="margin-bottom: 0; padding: 1.25rem">
-            <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual</h3>
+            <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual
+              <span id="current-holdings-alyc-name" style="font-size: 1.20rem; font-weight: bold; color: var(--text-muted); margin-left: 0.5rem"></span>
+            </h3>
             <div id="current-holdings-table" style="overflow-x: auto"></div>
           </div>
         </div>
@@ -317,7 +365,7 @@ export const AnalysisPage = {
         this._activeBenchmark = btn.dataset.ticker
         document.querySelectorAll('.btn-benchmark-quick').forEach(b => b.classList.remove('btn-primary'))
         btn.classList.add('btn-primary')
-        
+
         if (this._activeAlycId) {
           const activeBtn = Array.from(document.querySelectorAll('#analysis-alyc-buttons button'))
             .find(b => b.textContent === this._activeAlycName)
@@ -325,6 +373,16 @@ export const AnalysisPage = {
         }
       }
     })
+
+    // Redibuja el gráfico de comparación al cambiar de tema (los colores de texto quedan fijos al crear el chart)
+    if (this._themeChangeHandler) document.removeEventListener('darkmodechange', this._themeChangeHandler)
+    this._themeChangeHandler = () => {
+      if (this._lastValidHoldings?.length) {
+        if (this._compChart) { this._compChart.destroy(); this._compChart = null }
+        this._renderComparisonChart(this._lastValidHoldings)
+      }
+    }
+    document.addEventListener('darkmodechange', this._themeChangeHandler)
   },
 
   async _fetchHistory(ticker) {
@@ -363,6 +421,9 @@ export const AnalysisPage = {
   async _runAnalysis(alycId, activeBtn) {
     if (!alycId) return
     this._activeAlycId = alycId
+
+    const alycNameSpan = document.getElementById('current-holdings-alyc-name')
+    if (alycNameSpan) alycNameSpan.textContent = this._activeAlycName ? `- ${this._activeAlycName}` : ''
 
     // Update active button state
     document.querySelectorAll('#analysis-alyc-buttons button').forEach(b => {
@@ -543,12 +604,14 @@ export const AnalysisPage = {
 
     const typeGroups = {}
     const assetData = []
+    const totalsByCurrency = {}
 
     for (const [curr, items] of Object.entries(byCurrency)) {
       const totalInv = items.reduce((acc, h) => acc + (h.total_quantity * h.avg_buy_price), 0)
       const totalMarket = items.reduce((acc, h) => acc + (h.total_quantity * (this._resolvedPrices?.[h.ticker] ?? h.avg_buy_price)), 0)
       totalMarketValueAll += totalMarket
-      
+      totalsByCurrency[curr] = { totalInv, totalMarket }
+
       html += `
         <div class="currency-group" style="margin-bottom: 1.5rem">
           <h4 style="font-size: 0.9rem; color: var(--color-primary); margin-bottom: 0.75rem">Tenencia en ${curr}</h4>
@@ -650,7 +713,7 @@ export const AnalysisPage = {
       })
  
       html += desktopRows
-      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(1)}%</td></tr></tfoot></table></div>`
+      html += `</tbody><tfoot><tr style="background-color: var(--bg-main); font-weight: 800"><td colspan="3">TOTAL ${curr}</td><td></td><td class="amount">${fmt(totalInv)}</td><td></td><td class="amount">${fmt(totalMarket)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${sign(totalMarket - totalInv)}${fmt(totalMarket - totalInv)}</td><td class="amount" style="color: ${pnlColor(totalMarket - totalInv)}">${((totalMarket / totalInv - 1) * 100).toFixed(1)}%</td></tr></tfoot></table></div>`
       
       // Mobile cards section
       html += `
@@ -672,6 +735,7 @@ export const AnalysisPage = {
     tableContainer.innerHTML = html || '<div class="table-empty">No hay tenencias registradas.</div>'
     this._bindHoldingsSortHeaders(tableContainer)
     this._bindMobileAccordion()
+    this._renderTotalsCards(totalsByCurrency)
 
     // Renderizar gráficos si hay datos
     const numAssets = assetData.length
@@ -696,6 +760,49 @@ export const AnalysisPage = {
       if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
       document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
+  },
+
+  _renderTotalsCards(totalsByCurrency) {
+    const investedEl = document.getElementById('totals-invested')
+    const marketEl = document.getElementById('totals-market')
+    const pnlEl = document.getElementById('totals-pnl')
+    const pnlPctEl = document.getElementById('totals-pnlpct')
+    if (!investedEl || !marketEl || !pnlEl || !pnlPctEl) return
+
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const sign = v => v > 0 ? '+' : ''
+
+    const currencies = Object.keys(totalsByCurrency)
+    if (currencies.length === 0) {
+      investedEl.textContent = '--'
+      marketEl.textContent = '--'
+      pnlEl.textContent = '--'
+      pnlPctEl.textContent = '--'
+      return
+    }
+
+    const multi = currencies.length > 1
+    const line = (curr, text, color) => `
+      <div style="${multi ? 'font-size: 0.95rem;' : ''} ${color ? `color: ${color};` : ''}">
+        ${multi ? `<span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; margin-right: 0.35rem">${curr}</span>` : ''}${text}
+      </div>`
+
+    investedEl.innerHTML = currencies.map(curr => line(curr, fmt(totalsByCurrency[curr].totalInv))).join('')
+    marketEl.innerHTML = currencies.map(curr => line(curr, fmt(totalsByCurrency[curr].totalMarket))).join('')
+
+    pnlEl.innerHTML = currencies.map(curr => {
+      const { totalInv, totalMarket } = totalsByCurrency[curr]
+      const pnl = totalMarket - totalInv
+      return line(curr, `${sign(pnl)}${fmt(pnl)}`, pnlColor(pnl))
+    }).join('')
+
+    pnlPctEl.innerHTML = currencies.map(curr => {
+      const { totalInv, totalMarket } = totalsByCurrency[curr]
+      const pnl = totalMarket - totalInv
+      const pct = totalInv > 0 ? ((totalMarket / totalInv - 1) * 100) : 0
+      return line(curr, `${sign(pct)}${pct.toFixed(1)}%`, pnlColor(pnl))
+    }).join('')
   },
 
   async _renderActivityChart(alycId) {

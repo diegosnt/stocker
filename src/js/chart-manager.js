@@ -681,35 +681,10 @@ export const ChartManager = {
   renderComparisonChart(canvas, labels, investedData, currentData, options = {}) {
     if (!canvas || !investedData) return null
 
-    const INSTRUMENT_PALETTE = [
-      '#4f46e6', '#f59e0b', '#8b5cf6', '#ec4899',
-      '#06b6d4', '#f97316', '#6366f1', '#0ea5e9',
-      '#d946ef', '#a78bfa'
-    ]
-
-    const createStripePattern = (color) => {
-      const size = 8
-      const c = document.createElement('canvas')
-      c.width = size
-      c.height = size
-      const ctx = c.getContext('2d')
-      ctx.fillStyle = color + '28'
-      ctx.fillRect(0, 0, size, size)
-      ctx.strokeStyle = color
-      ctx.lineWidth = 2
-      ctx.lineCap = 'square'
-      for (let i = -size; i <= size * 2; i += 4) {
-        ctx.beginPath()
-        ctx.moveTo(i, 0)
-        ctx.lineTo(i + size, size)
-        ctx.stroke()
-      }
-      return ctx.createPattern(c, 'repeat')
-    }
-
-    const investedColors = labels.map((_, i) => INSTRUMENT_PALETTE[i % INSTRUMENT_PALETTE.length])
-    const currentPatterns = currentData.map((val, i) =>
-      createStripePattern(val >= investedData[i] ? '#10b981' : '#ef4444')
+    const INVESTED_COLOR = '#4f46e6'
+    const investedColors = labels.map(() => INVESTED_COLOR)
+    const currentColors = currentData.map((val, i) =>
+      val >= investedData[i] ? '#10b981' : '#ef4444'
     )
 
     if (options.instance && options.instance.config.type === 'bar') {
@@ -717,7 +692,7 @@ export const ChartManager = {
       options.instance.data.datasets[0].data = investedData
       options.instance.data.datasets[0].backgroundColor = investedColors
       options.instance.data.datasets[1].data = currentData
-      options.instance.data.datasets[1].backgroundColor = currentPatterns
+      options.instance.data.datasets[1].backgroundColor = currentColors
       options.instance.update()
       return options.instance
     }
@@ -742,7 +717,7 @@ export const ChartManager = {
           {
             label: 'Valor de Mercado',
             data: currentData,
-            backgroundColor: currentPatterns,
+            backgroundColor: currentColors,
             borderRadius: 4,
             barPercentage: 0.5,
             categoryPercentage: 0.6
@@ -769,7 +744,22 @@ export const ChartManager = {
           legend: {
             display: true,
             position: 'top',
-            labels: { color: textColor, boxWidth: 12, usePointStyle: true, pointStyle: 'circle' }
+            labels: {
+              color: textColor,
+              boxWidth: 12,
+              usePointStyle: true,
+              pointStyle: 'circle',
+              generateLabels: (chart) => [
+                { text: 'Capital Invertido', fillStyle: INVESTED_COLOR, strokeStyle: INVESTED_COLOR, fontColor: textColor, pointStyle: 'circle', datasetIndex: 0, hidden: !chart.isDatasetVisible(0) },
+                { text: 'Valor de Mercado +', fillStyle: '#10b981', strokeStyle: '#10b981', fontColor: textColor, pointStyle: 'circle', datasetIndex: 1, hidden: !chart.isDatasetVisible(1) },
+                { text: 'Valor de Mercado -', fillStyle: '#ef4444', strokeStyle: '#ef4444', fontColor: textColor, pointStyle: 'circle', datasetIndex: 1, hidden: !chart.isDatasetVisible(1) }
+              ]
+            },
+            onClick: (e, legendItem, legend) => {
+              const chart = legend.chart
+              const index = legendItem.datasetIndex
+              chart.isDatasetVisible(index) ? chart.hide(index) : chart.show(index)
+            }
           },
           tooltip: {
             ...baseOptions.plugins.tooltip,
