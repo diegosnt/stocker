@@ -40,12 +40,12 @@ export const AlycsPage = {
         </form>
       </div>
 
-      <div class="card">
+      <div class="card" id="alyc-list-card">
         <div class="table-card-header">
           <h3>ALyCs registradas</h3>
           <input type="search" id="alyc-search" class="search-input" placeholder="Buscar por nombre, CUIT o sitio web...">
         </div>
-        <div class="table-wrapper">
+        <div class="table-wrapper desktop-only">
           <table>
             <thead>
               <tr>
@@ -61,6 +61,7 @@ export const AlycsPage = {
             </tbody>
           </table>
         </div>
+        <div id="alyc-mobile-cards" class="mobile-only"></div>
       </div>`
 
     await this._loadList()
@@ -85,11 +86,14 @@ export const AlycsPage = {
   },
 
   _renderRows(data) {
-    const tbody = document.getElementById('alyc-tbody')
-    if (!tbody) return
+    const tbody      = document.getElementById('alyc-tbody')
+    const mobileList = document.getElementById('alyc-mobile-cards')
+    const listCard    = document.getElementById('alyc-list-card')
+    if (!tbody || !mobileList) return
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No hay ALyCs registradas. Agregá una arriba.</td></tr>`
+      tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">No hay ALyCs registradas. Agregá una arriba.</td></tr>`
+      mobileList.innerHTML = `<p class="table-empty">No hay ALyCs registradas. Agregá una arriba.</p>`
       return
     }
 
@@ -113,13 +117,41 @@ export const AlycsPage = {
         </td>
       </tr>`).join('')
 
-    tbody.querySelectorAll('.btn-edit').forEach(btn => {
+    mobileList.innerHTML = data.map(a => `
+      <div class="mobile-card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; margin-bottom:0.4rem">
+          <strong>${esc(a.name)}</strong>
+          <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap">${fmtDate(a.created_at)}</span>
+        </div>
+        <div class="dash-instrument-row">
+          <span class="dash-instrument-label">CUIT</span>
+          <span class="dash-instrument-value">${a.cuit ? esc(a.cuit) : '—'}</span>
+        </div>
+        <div class="dash-instrument-row">
+          <span class="dash-instrument-label">Sitio web</span>
+          <span class="dash-instrument-value">${a.website
+            ? `<a href="${esc(a.website)}" target="_blank" rel="noopener">${esc(a.website)}</a>`
+            : '—'}</span>
+        </div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.6rem">
+          <button class="btn btn-sm btn-ghost btn-edit"
+            data-id="${a.id}" data-name="${esc(a.name)}"
+            data-cuit="${esc(a.cuit || '')}" data-website="${esc(a.website || '')}" style="flex:1">
+            Editar
+          </button>
+          <button class="btn btn-sm btn-danger btn-delete" data-id="${a.id}" data-name="${esc(a.name)}" style="flex:1">
+            Eliminar
+          </button>
+        </div>
+      </div>`).join('')
+
+    listCard.querySelectorAll('.btn-edit').forEach(btn => {
       btn.addEventListener('click', () => this._startEdit({
         id: btn.dataset.id, name: btn.dataset.name,
         cuit: btn.dataset.cuit, website: btn.dataset.website
       }))
     })
-    tbody.querySelectorAll('.btn-delete').forEach(btn => {
+    listCard.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', () => this._delete(btn.dataset.id, btn.dataset.name))
     })
   },

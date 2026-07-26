@@ -34,12 +34,12 @@ export const InstrumentTypesPage = {
         </form>
       </div>
 
-      <div class="card">
+      <div class="card" id="tipos-list-card">
         <div class="table-card-header">
           <h3>Tipos registrados</h3>
           <input type="search" id="tipos-search" class="search-input" placeholder="Buscar por nombre o descripción...">
         </div>
-        <div class="table-wrapper">
+        <div class="table-wrapper desktop-only">
           <table>
             <thead>
               <tr>
@@ -54,6 +54,7 @@ export const InstrumentTypesPage = {
             </tbody>
           </table>
         </div>
+        <div id="tipos-mobile-cards" class="mobile-only"></div>
       </div>`
 
     await this._loadList()
@@ -80,11 +81,14 @@ export const InstrumentTypesPage = {
   },
 
   _renderRows(data) {
-    const tbody = document.getElementById('tipos-tbody')
-    if (!tbody) return
+    const tbody      = document.getElementById('tipos-tbody')
+    const mobileList = document.getElementById('tipos-mobile-cards')
+    const listCard    = document.getElementById('tipos-list-card')
+    if (!tbody || !mobileList) return
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No hay tipos registrados. Agregá uno arriba.</td></tr>`
+      tbody.innerHTML      = `<tr><td colspan="4" class="table-empty">No hay tipos registrados. Agregá uno arriba.</td></tr>`
+      mobileList.innerHTML = `<p class="table-empty">No hay tipos registrados. Agregá uno arriba.</p>`
       return
     }
 
@@ -104,12 +108,33 @@ export const InstrumentTypesPage = {
         </td>
       </tr>`).join('')
 
-    tbody.querySelectorAll('.btn-edit').forEach(btn => {
+    mobileList.innerHTML = data.map(t => `
+      <div class="mobile-card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; margin-bottom:0.4rem">
+          <strong>${esc(t.name)}</strong>
+          <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap">${fmtDate(t.created_at)}</span>
+        </div>
+        <div class="dash-instrument-row">
+          <span class="dash-instrument-label">Descripción</span>
+          <span class="dash-instrument-value">${t.description ? esc(t.description) : '—'}</span>
+        </div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.6rem">
+          <button class="btn btn-sm btn-ghost btn-edit"
+            data-id="${t.id}" data-name="${esc(t.name)}" data-desc="${esc(t.description || '')}" style="flex:1">
+            Editar
+          </button>
+          <button class="btn btn-sm btn-danger btn-delete" data-id="${t.id}" data-name="${esc(t.name)}" style="flex:1">
+            Eliminar
+          </button>
+        </div>
+      </div>`).join('')
+
+    listCard.querySelectorAll('.btn-edit').forEach(btn => {
       btn.addEventListener('click', () => this._startEdit({
         id: btn.dataset.id, name: btn.dataset.name, description: btn.dataset.desc
       }))
     })
-    tbody.querySelectorAll('.btn-delete').forEach(btn => {
+    listCard.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', () => this._delete(btn.dataset.id, btn.dataset.name))
     })
   },

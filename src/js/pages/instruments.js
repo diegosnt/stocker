@@ -46,12 +46,12 @@ export const InstrumentsPage = {
         </form>
       </div>
 
-      <div class="card">
+      <div class="card" id="inst-list-card">
         <div class="table-card-header">
           <h3>Instrumentos registrados</h3>
           <input type="search" id="inst-search" class="search-input" placeholder="Buscar por ticker, nombre o tipo...">
         </div>
-        <div class="table-wrapper">
+        <div class="table-wrapper desktop-only">
           <table>
             <thead>
               <tr>
@@ -67,6 +67,7 @@ export const InstrumentsPage = {
             </tbody>
           </table>
         </div>
+        <div id="inst-mobile-cards" class="mobile-only"></div>
         <div id="inst-pagination"></div>
       </div>`
 
@@ -158,11 +159,14 @@ export const InstrumentsPage = {
   },
 
   _renderRows() {
-    const tbody = document.getElementById('inst-tbody')
-    if (!tbody) return
+    const tbody      = document.getElementById('inst-tbody')
+    const mobileList = document.getElementById('inst-mobile-cards')
+    const listCard    = document.getElementById('inst-list-card')
+    if (!tbody || !mobileList) return
 
     if (!_instrVisible.length) {
-      tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No hay instrumentos. Agregá uno arriba.</td></tr>`
+      tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">No hay instrumentos. Agregá uno arriba.</td></tr>`
+      mobileList.innerHTML = `<p class="table-empty">No hay instrumentos. Agregá uno arriba.</p>`
       this._renderPagination()
       return
     }
@@ -188,13 +192,39 @@ export const InstrumentsPage = {
         </td>
       </tr>`).join('')
 
-    tbody.querySelectorAll('.btn-edit').forEach(btn => {
+    mobileList.innerHTML = page.map(i => `
+      <div class="mobile-card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; margin-bottom:0.4rem">
+          <span class="ticker-chip">${esc(i.ticker)}</span>
+          <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap">${fmtDate(i.created_at)}</span>
+        </div>
+        <div class="dash-instrument-row">
+          <span class="dash-instrument-label">Nombre</span>
+          <span class="dash-instrument-value">${esc(i.name)}</span>
+        </div>
+        <div class="dash-instrument-row">
+          <span class="dash-instrument-label">Tipo</span>
+          <span class="dash-instrument-value">${i.instrument_types ? esc(i.instrument_types.name) : '—'}</span>
+        </div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.6rem">
+          <button class="btn btn-sm btn-ghost btn-edit"
+            data-id="${i.id}" data-ticker="${esc(i.ticker)}" data-name="${esc(i.name)}"
+            data-type-id="${i.instrument_type_id}" style="flex:1">
+            Editar
+          </button>
+          <button class="btn btn-sm btn-danger btn-delete" data-id="${i.id}" data-name="${esc(i.ticker)}" style="flex:1">
+            Eliminar
+          </button>
+        </div>
+      </div>`).join('')
+
+    listCard.querySelectorAll('.btn-edit').forEach(btn => {
       btn.addEventListener('click', () => this._startEdit({
         id: btn.dataset.id, ticker: btn.dataset.ticker,
         name: btn.dataset.name, instrument_type_id: btn.dataset.typeId
       }))
     })
-    tbody.querySelectorAll('.btn-delete').forEach(btn => {
+    listCard.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', () => this._delete(btn.dataset.id, btn.dataset.name))
     })
 
