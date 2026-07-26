@@ -2,7 +2,8 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError, fmtDate } from '../utils.js'
+import { esc, setFieldError, fmtDate, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
+import { deleteWithConfirm } from '../crud-helpers.js'
 
 let _tiposData = []
 
@@ -214,34 +215,28 @@ export const InstrumentTypesPage = {
   },
 
   _cancelEdit(confirmed = false) {
-    if (!confirmed) {
-      const form    = document.getElementById('form-tipo')
-      const isDirty = document.getElementById('tipo-name').value.trim() !== (form.dataset.originalName || '') ||
-                      document.getElementById('tipo-desc').value.trim() !== (form.dataset.originalDesc || '')
-      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
-    }
-    document.getElementById('tipo-form-title').textContent        = 'Nuevo Tipo'
-    document.getElementById('form-tipo').reset()
-    document.getElementById('btn-tipo-submit').textContent        = '+ Agregar'
-    document.getElementById('btn-tipo-cancel-edit').style.display = 'none'
-    delete document.getElementById('form-tipo').dataset.editId
+    const form = document.getElementById('form-tipo')
+    if (!confirmed && !confirmDiscardIfDirty([
+      { inputId: 'tipo-name', form, datasetKey: 'originalName' },
+      { inputId: 'tipo-desc', form, datasetKey: 'originalDesc' }
+    ])) return
+
+    resetEditForm({
+      formId: 'form-tipo', titleId: 'tipo-form-title', submitId: 'btn-tipo-submit', cancelId: 'btn-tipo-cancel-edit',
+      defaultTitle: 'Nuevo Tipo'
+    })
   },
 
   async _delete(id, name) {
-    const ok = await confirmModal({
+    await deleteWithConfirm({
       title: `Eliminar tipo "${name}"`,
-      message: 'Esta acción no se puede deshacer. Si tiene instrumentos asociados no se podrá eliminar.'
+      message: 'Esta acción no se puede deshacer. Si tiene instrumentos asociados no se podrá eliminar.',
+      endpoint: `/api/instrument-types/${id}`,
+      cacheKey: 'instrument_types',
+      successMessage: `Tipo "${name}" eliminado.`,
+      conflictMessage: 'No se puede eliminar: tiene instrumentos asociados.',
+      onDone: () => this._loadList()
     })
-    if (!ok) return
-
-    try {
-      await apiRequest('DELETE', `/api/instrument-types/${id}`)
-      cacheInvalidate('instrument_types')
-      showToast(`Tipo "${name}" eliminado.`, 'success')
-      await this._loadList()
-    } catch (err) {
-      showToast(err.code === '23503' ? 'No se puede eliminar: tiene instrumentos asociados.' : 'Error al eliminar.', 'error')
-  }
   },
 
   cleanup() {

@@ -2,7 +2,8 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError, fmtDate } from '../utils.js'
+import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
+import { deleteWithConfirm } from '../crud-helpers.js'
 
 let _alycsData    = []
 let _alycSortCol  = 'name'
@@ -194,28 +195,18 @@ export const AlycsPage = {
   },
 
   _bindSortHeaders() {
-    document.querySelectorAll('th[data-col]').forEach(th => {
-      if (!th.closest('table')?.querySelector('#alyc-tbody')) return
-      th.addEventListener('click', () => {
-        const col = th.dataset.col
+    bindSortableHeaders('alyc-tbody', {
+      getCol: () => _alycSortCol,
+      getAsc: () => _alycSortAsc,
+      onChange: col => {
         if (_alycSortCol === col) { _alycSortAsc = !_alycSortAsc }
         else { _alycSortCol = col; _alycSortAsc = col !== 'created_at' }
-        this._updateSortHeaders()
         const q = document.getElementById('alyc-search')?.value.trim().toLowerCase() || ''
         const visible = q
           ? _alycsData.filter(a => a.name.toLowerCase().includes(q) || (a.cuit || '').toLowerCase().includes(q) || (a.website || '').toLowerCase().includes(q))
           : _alycsData
         this._renderRows(this._sorted(visible))
-      })
-    })
-    this._updateSortHeaders()
-  },
-
-  _updateSortHeaders() {
-    document.querySelectorAll('th[data-col]').forEach(th => {
-      if (!th.closest('table')?.querySelector('#alyc-tbody')) return
-      th.classList.remove('sort-asc', 'sort-desc')
-      if (th.dataset.col === _alycSortCol) th.classList.add(_alycSortAsc ? 'sort-asc' : 'sort-desc')
+      }
     })
   },
 
@@ -274,35 +265,29 @@ export const AlycsPage = {
   },
 
   _cancelEdit(confirmed = false) {
-    if (!confirmed) {
-      const form    = document.getElementById('form-alyc')
-      const isDirty = document.getElementById('alyc-name').value.trim()    !== (form.dataset.originalName    || '') ||
-                      document.getElementById('alyc-cuit').value.trim()    !== (form.dataset.originalCuit    || '') ||
-                      document.getElementById('alyc-website').value.trim() !== (form.dataset.originalWebsite || '')
-      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
-    }
-    document.getElementById('alyc-form-title').textContent          = 'Nueva ALyC'
-    document.getElementById('form-alyc').reset()
-    document.getElementById('btn-alyc-submit').textContent          = '+ Agregar'
-    document.getElementById('btn-alyc-cancel-edit').style.display   = 'none'
-    delete document.getElementById('form-alyc').dataset.editId
+    const form = document.getElementById('form-alyc')
+    if (!confirmed && !confirmDiscardIfDirty([
+      { inputId: 'alyc-name', form, datasetKey: 'originalName' },
+      { inputId: 'alyc-cuit', form, datasetKey: 'originalCuit' },
+      { inputId: 'alyc-website', form, datasetKey: 'originalWebsite' }
+    ])) return
+
+    resetEditForm({
+      formId: 'form-alyc', titleId: 'alyc-form-title', submitId: 'btn-alyc-submit', cancelId: 'btn-alyc-cancel-edit',
+      defaultTitle: 'Nueva ALyC'
+    })
   },
 
   async _delete(id, name) {
-    const ok = await confirmModal({
+    await deleteWithConfirm({
       title: `Eliminar "${name}"`,
-      message: 'Esta acción no se puede deshacer. No se puede eliminar si tiene operaciones registradas.'
+      message: 'Esta acción no se puede deshacer. No se puede eliminar si tiene operaciones registradas.',
+      endpoint: `/api/alycs/${id}`,
+      cacheKey: 'alycs',
+      successMessage: `ALyC "${name}" eliminada.`,
+      conflictMessage: 'No se puede eliminar: tiene operaciones asociadas.',
+      onDone: () => this._loadList()
     })
-    if (!ok) return
-
-    try {
-      await apiRequest('DELETE', `/api/alycs/${id}`)
-      cacheInvalidate('alycs')
-      showToast(`ALyC "${name}" eliminada.`, 'success')
-      await this._loadList()
-    } catch (err) {
-      showToast(err.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
-    }
   },
 
   cleanup() {

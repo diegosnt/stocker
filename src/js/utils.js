@@ -133,3 +133,45 @@ export function confirmModal({ title, message, confirmLabel = 'Eliminar' }) {
     overlay.querySelector('#modal-cancel').focus()
   })
 }
+
+// Bindea el click de columnas ordenables (th[data-col]) de UNA tabla, identificada por
+// el id de su tbody. El caller es dueño del estado de orden; onChange recibe la columna
+// clickeada y es responsable de actualizar ese estado y volver a renderizar las filas.
+export function bindSortableHeaders(tbodyId, { getCol, getAsc, onChange }) {
+  const headers = [...document.querySelectorAll('th[data-col]')]
+    .filter(th => th.closest('table')?.querySelector(`#${tbodyId}`))
+
+  const updateClasses = () => {
+    headers.forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc')
+      if (th.dataset.col === getCol()) th.classList.add(getAsc() ? 'sort-asc' : 'sort-desc')
+    })
+  }
+
+  headers.forEach(th => {
+    th.addEventListener('click', () => {
+      onChange(th.dataset.col)
+      updateClasses()
+    })
+  })
+  updateClasses()
+}
+
+// Compara los valores actuales de un form contra los que tenía al empezar a editar
+// (guardados en form.dataset). Si hay cambios sin guardar, confirma con el usuario
+// antes de descartarlos. Devuelve true si está OK seguir (no dirty, o confirmado).
+export function confirmDiscardIfDirty(fields) {
+  const isDirty = fields.some(({ inputId, form, datasetKey }) =>
+    document.getElementById(inputId).value.trim() !== (form.dataset[datasetKey] || ''))
+  return !isDirty || confirm('Tenés cambios sin guardar. ¿Descartarlos?')
+}
+
+// Vuelve un formulario de alta/edición a su estado "Nuevo" — mismo patrón repetido
+// en instrument-types.js, instruments.js y alycs.js al cancelar una edición.
+export function resetEditForm({ formId, titleId, submitId, cancelId, defaultTitle, defaultSubmitLabel = '+ Agregar' }) {
+  document.getElementById(titleId).textContent = defaultTitle
+  document.getElementById(formId).reset()
+  document.getElementById(submitId).textContent = defaultSubmitLabel
+  document.getElementById(cancelId).style.display = 'none'
+  delete document.getElementById(formId).dataset.editId
+}

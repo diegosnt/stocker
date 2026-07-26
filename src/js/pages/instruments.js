@@ -2,7 +2,8 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError, fmtDate, buildPageRange } from '../utils.js'
+import { esc, setFieldError, fmtDate, buildPageRange, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
+import { deleteWithConfirm } from '../crud-helpers.js'
 
 const PAGE_SIZE   = 10
 
@@ -140,14 +141,12 @@ export const InstrumentsPage = {
   },
 
   _bindSortHeaders() {
-    document.querySelectorAll('#inst-tbody').forEach(() => {})  // ensure DOM ready
-    document.querySelectorAll('th[data-col]').forEach(th => {
-      if (!th.closest('table')?.querySelector('#inst-tbody')) return
-      th.addEventListener('click', () => {
-        const col = th.dataset.col
+    bindSortableHeaders('inst-tbody', {
+      getCol: () => _instrSortCol,
+      getAsc: () => _instrSortAsc,
+      onChange: col => {
         if (_instrSortCol === col) { _instrSortAsc = !_instrSortAsc }
         else { _instrSortCol = col; _instrSortAsc = col !== 'created_at' }
-        this._updateSortHeaders()
         const q = document.getElementById('inst-search')?.value.trim().toLowerCase() || ''
         const filtered = q
           ? _instrData.filter(i => i.ticker.toLowerCase().includes(q) || i.name.toLowerCase().includes(q) || (i.instrument_types?.name || '').toLowerCase().includes(q))
@@ -155,16 +154,7 @@ export const InstrumentsPage = {
         _instrPage    = 0
         _instrVisible = this._sorted(filtered)
         this._renderRows()
-      })
-    })
-    this._updateSortHeaders()
-  },
-
-  _updateSortHeaders() {
-    document.querySelectorAll('th[data-col]').forEach(th => {
-      if (!th.closest('table')?.querySelector('#inst-tbody')) return
-      th.classList.remove('sort-asc', 'sort-desc')
-      if (th.dataset.col === _instrSortCol) th.classList.add(_instrSortAsc ? 'sort-asc' : 'sort-desc')
+      }
     })
   },
 
@@ -367,36 +357,30 @@ export const InstrumentsPage = {
   },
 
   _cancelEdit(confirmed = false) {
-    if (!confirmed) {
-      const form    = document.getElementById('form-instrumento')
-      const isDirty = document.getElementById('inst-ticker').value.trim() !== (form.dataset.originalTicker || '') ||
-                      document.getElementById('inst-name').value.trim()   !== (form.dataset.originalName   || '') ||
-                      document.getElementById('inst-type').value          !== (form.dataset.originalTypeId || '')
-      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
-    }
-    document.getElementById('inst-form-title').textContent          = 'Nuevo Instrumento'
-    document.getElementById('form-instrumento').reset()
-    document.getElementById('btn-inst-submit').textContent          = '+ Agregar'
-    document.getElementById('btn-inst-cancel-edit').style.display   = 'none'
-    delete document.getElementById('form-instrumento').dataset.editId
+    const form = document.getElementById('form-instrumento')
+    if (!confirmed && !confirmDiscardIfDirty([
+      { inputId: 'inst-ticker', form, datasetKey: 'originalTicker' },
+      { inputId: 'inst-name', form, datasetKey: 'originalName' },
+      { inputId: 'inst-type', form, datasetKey: 'originalTypeId' }
+    ])) return
+
+    resetEditForm({
+      formId: 'form-instrumento', titleId: 'inst-form-title', submitId: 'btn-inst-submit', cancelId: 'btn-inst-cancel-edit',
+      defaultTitle: 'Nuevo Instrumento'
+    })
     this._loadTypes()
   },
 
   async _delete(id, ticker) {
-    const ok = await confirmModal({
+    await deleteWithConfirm({
       title: `Eliminar "${ticker}"`,
-      message: 'Esta acción no se puede deshacer. No se puede eliminar si tiene operaciones registradas.'
+      message: 'Esta acción no se puede deshacer. No se puede eliminar si tiene operaciones registradas.',
+      endpoint: `/api/instruments/${id}`,
+      cacheKey: 'instruments',
+      successMessage: `Instrumento "${ticker}" eliminado.`,
+      conflictMessage: 'No se puede eliminar: tiene operaciones asociadas.',
+      onDone: () => this._loadList()
     })
-    if (!ok) return
-
-    try {
-      await apiRequest('DELETE', `/api/instruments/${id}`)
-      cacheInvalidate('instruments')
-      showToast(`Instrumento "${ticker}" eliminado.`, 'success')
-      await this._loadList()
-    } catch (err) {
-      showToast(err.code === '23503' ? 'No se puede eliminar: tiene operaciones asociadas.' : 'Error al eliminar.', 'error')
-    }
   },
 
   cleanup() {
