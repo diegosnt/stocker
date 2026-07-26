@@ -1127,8 +1127,11 @@ app.get('/api/history/:ticker', requireAuth, async (req, res) => {
 
     console.log(`[Backend Debug] Ticker: ${ticker} | Global: ${globalData.length} pts | Local: ${localData.length} pts`)
 
-    // El que tenga más historia gana
-    let history = globalData.length >= localData.length ? globalData : localData
+    // Preferir el símbolo local (ej. CEDEAR en ARS) cuando existe: el subyacente
+    // en USA casi siempre tiene más historia, pero cotiza en otra moneda y otra
+    // escala de precio — "el que tenga más historia gana" elegía sistemáticamente
+    // el subyacente para CEDEARs, mezclando precios en USD con operaciones en ARS.
+    let history = localData.length > 0 ? localData : globalData
 
     if (history.length === 0) {
       return res.status(404).json({ error: 'No se encontró historial' })

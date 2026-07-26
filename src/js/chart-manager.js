@@ -852,6 +852,74 @@ export const ChartManager = {
     })
   },
 
+  renderEquityCurveChart(canvas, dates, series, options = {}) {
+    if (!canvas || !dates || !series) return null
+
+    if (options.instance && options.instance.config.type === 'line') {
+      options.instance.data.labels = dates
+      series.forEach((s, i) => {
+        if (options.instance.data.datasets[i]) options.instance.data.datasets[i].data = s.data
+      })
+      options.instance.update()
+      return options.instance
+    }
+
+    const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
+    const textColor = getCSSVar('--text-muted') || '#64748b'
+
+    const datasets = series.map(s => ({
+      label: s.label,
+      data: s.data,
+      borderColor: s.color,
+      backgroundColor: s.color + '22',
+      borderWidth: 2,
+      borderDash: s.dashed ? [5, 5] : [],
+      pointRadius: 0,
+      pointHitRadius: 8,
+      fill: s.fill ? 'origin' : false,
+      tension: 0.15
+    }))
+
+    return new window.Chart(canvas, {
+      type: 'line',
+      data: { labels: dates, datasets },
+      options: {
+        ...baseOptions,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            ...scales.x,
+            grid: { display: false },
+            ticks: { ...scales.x.ticks, maxTicksLimit: 8, autoSkip: true, maxRotation: 0 }
+          },
+          y: {
+            ...scales.y,
+            ticks: {
+              ...scales.y.ticks,
+              callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 })
+            }
+          }
+        },
+        plugins: {
+          ...baseOptions.plugins,
+          legend: {
+            display: series.length > 1,
+            position: 'top',
+            labels: { color: textColor, boxWidth: 12, usePointStyle: true, pointStyle: 'circle' }
+          },
+          tooltip: {
+            ...baseOptions.plugins.tooltip,
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+            }
+          }
+        },
+        ...options.chartOptions
+      }
+    })
+  },
+
   destroy(chart) {
     if (chart && typeof chart.destroy === 'function') {
       chart.destroy()

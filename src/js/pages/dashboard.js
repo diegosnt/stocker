@@ -4,8 +4,10 @@ import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { getConcentrationAlert, renderRiskAlerts, esc } from '../utils.js'
+import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equity-curve.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
+const HISTORY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 horas
 
 export const DashboardPage = {
   _typeChart: null,
@@ -15,6 +17,8 @@ export const DashboardPage = {
   _alycPerfChart: null,
   _assetChart: null,
   _alycHoldingChart: null,
+  _equityCharts: {},
+  _equityRange: '1y',
   _resolvedPrices: {},
   _chartRendered: false,
   _chartsReady: false,
@@ -28,6 +32,9 @@ export const DashboardPage = {
     this._alycPerfChart = ChartManager.destroy(this._alycPerfChart)
     this._assetChart = ChartManager.destroy(this._assetChart)
     this._alycHoldingChart = ChartManager.destroy(this._alycHoldingChart)
+    Object.keys(this._equityCharts).forEach(curr => { this._equityCharts[curr] = ChartManager.destroy(this._equityCharts[curr]) })
+    this._equityCharts = {}
+    this._equityRange = '1y'
     this._chartRendered = false
     this._chartsReady = false
     this._alycRows = null
@@ -59,6 +66,21 @@ export const DashboardPage = {
 
       <div id="dash-risk-alerts"></div>
 
+      <div class="card" id="dash-equity-section">
+        <div class="chart-panel-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem">
+          <span>Evolución del Patrimonio</span>
+          <div id="dash-equity-range" style="display:flex; gap:0.5rem; flex-wrap:wrap">
+            <button class="btn-alyc dash-equity-range-btn" data-range="6mo">6M</button>
+            <button class="btn-alyc dash-equity-range-btn btn-primary" data-range="1y">1A</button>
+            <button class="btn-alyc dash-equity-range-btn" data-range="5y">5A</button>
+            <button class="btn-alyc dash-equity-range-btn" data-range="max">Todo</button>
+          </div>
+        </div>
+        <div id="dash-equity-charts">
+          <div class="skeleton" style="height:280px"></div>
+        </div>
+      </div>
+
       <div id="dash-content">
         <div class="dash-charts-row">
           <div class="card skeleton" style="height: 360px"></div>
@@ -86,6 +108,8 @@ export const DashboardPage = {
       <div id="dash-realized-pnl-section"></div>`
 
     renderIfChanged(content, skeletonHTML)
+    this._bindEquityRangeButtons()
+    this._loadEquityCurve(this._equityRange) // no bloqueante: puede tardar varios segundos (historial por ticker)
 
     try {
       const [data, alycRows, realizedPnl] = await Promise.all([
@@ -146,6 +170,103 @@ export const DashboardPage = {
       return []
     }
     return data || []
+  },
+
+  _bindEquityRangeButtons() {
+    document.querySelectorAll('.dash-equity-range-btn').forEach(btn => {
+      btn.onclick = () => {
+        if (btn.dataset.range === this._equityRange) return
+        document.querySelectorAll('.dash-equity-range-btn').forEach(b => b.classList.remove('btn-primary'))
+        btn.classList.add('btn-primary')
+        this._equityRange = btn.dataset.range
+        this._loadEquityCurve(this._equityRange)
+      }
+    })
+  },
+
+  async _fetchHistoryForRange(ticker, range) {
+    const cacheKey = `history_${ticker}_${range}`
+    const cached = cacheGet(cacheKey, { persistent: true })
+    if (cached) return cached
+    try {
+      const data = await apiRequest('GET', `/api/history/${encodeURIComponent(ticker)}?range=${range}`)
+      cacheSet(cacheKey, data, { persistent: true, ttlMs: HISTORY_CACHE_TTL })
+      return data
+    } catch {
+      return []
+    }
+  },
+
+  async _loadEquityCurve(range) {
+    const container = document.getElementById('dash-equity-charts')
+    if (!container) return
+    container.innerHTML = `<div class="skeleton" style="height:280px"></div>`
+
+    try {
+      const { data: operations, error } = await supabase
+        .from('operations_search')
+        .select('type, quantity, price, currency, operated_at, instrument_ticker')
+        .order('operated_at', { ascending: true })
+      if (error) throw error
+
+      if (!operations || operations.length === 0) {
+        container.innerHTML = `<p class="table-empty">No tenés operaciones registradas.</p>`
+        return
+      }
+
+      const byCurrency = groupOperationsByCurrency(operations)
+      const seriesByCurrency = {}
+
+      for (const currency of Object.keys(byCurrency)) {
+        const ops = byCurrency[currency]
+        const tickers = [...new Set(ops.map(o => o.instrument_ticker))]
+        const histories = {}
+        await Promise.all(tickers.map(async ticker => {
+          histories[ticker] = await this._fetchHistoryForRange(ticker, range)
+        }))
+        seriesByCurrency[currency] = computeEquitySeries(ops, histories)
+      }
+
+      this._renderEquityCurve(seriesByCurrency)
+    } catch (err) {
+      console.error('[Dashboard] Error al cargar evolución del patrimonio:', err)
+      container.innerHTML = `<p class="table-empty">Error al cargar la evolución del patrimonio.</p>`
+    }
+  },
+
+  _renderEquityCurve(seriesByCurrency) {
+    const container = document.getElementById('dash-equity-charts')
+    if (!container) return
+
+    const currencies = Object.keys(seriesByCurrency).filter(c => seriesByCurrency[c].dates.length > 0)
+    if (currencies.length === 0) {
+      container.innerHTML = `<p class="table-empty">No hay suficientes datos de precios para reconstruir la evolución en este rango.</p>`
+      return
+    }
+
+    container.innerHTML = `
+      <div class="${currencies.length > 1 ? 'dash-alyc-row' : ''}">
+        ${currencies.map(curr => `
+          <div class="card" style="margin-bottom:0">
+            <div style="height:260px; position:relative">
+              <canvas id="dash-equity-canvas-${curr}" style="width:100%;height:100%"></canvas>
+            </div>
+          </div>
+        `).join('')}
+      </div>`
+
+    requestAnimationFrame(() => {
+      currencies.forEach(curr => {
+        const { dates, portfolioValue } = seriesByCurrency[curr]
+        const canvas = document.getElementById(`dash-equity-canvas-${curr}`)
+        if (!canvas) return
+
+        this._equityCharts[curr] = ChartManager.destroy(this._equityCharts[curr])
+        this._equityCharts[curr] = ChartManager.renderEquityCurveChart(canvas, dates, [
+          { label: `Valor de Cartera (${curr})`, data: portfolioValue, color: '#10b981', fill: true }
+        ])
+      })
+    })
   },
 
   async _updateMarketPrices(tickers) {

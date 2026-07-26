@@ -39,6 +39,7 @@ src/                                ← Corazón del Frontend procesado por Vite
     analysis-worker.js              ← Web Worker: Optimización (Markowitz, HRP, Monte Carlo)
     pages/
       dashboard.js                  ← Panel principal con gráficos
+      dashboard/equity-curve.js     ← Cálculo puro de la evolución del patrimonio (testeado)
       operations.js                 ← CRUD de operaciones con filtros
       operations/csv-import.js      ← Importación CSV extraída
       analysis.js                   ← Análisis de cartera avanzado
@@ -196,9 +197,9 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 16. Unificar skeleton loaders — `instrument-types.js`, `instruments.js` y `alycs.js` usaban un `<span class="spinner">` genérico en vez de skeleton (y las tarjetas mobile no tenían ningún estado de carga); `settings.js` también pasó de spinner+texto a skeleton con la forma real de cada `setting-row`. `analysis.js` quedó afuera a propósito: su loading principal cubre un cálculo compuesto y de duración variable (Monte Carlo, backtesting, Worker), donde un spinner comunica mejor que un skeleton con forma fija
 17. Tests — se agregó **Vitest** (comparte config con Vite vía `vite.config.js`, cero configuración extra) con `pnpm test` / `pnpm test:watch`. Primer archivo: `src/js/utils.test.js` (15 tests) cubriendo `esc`, `fmtDateShort`, `buildPageRange` y `getConcentrationAlert` — funciones puras sin DOM, elegidas a propósito como punto de partida
 18. Comparación de rendimiento/composición entre ALyCs — la composición (distribución + posiciones por ALyC) ya existía en el Dashboard; lo que faltaba era **rendimiento**. Se agregó una tarjeta "Rendimiento por ALyC" (gráfico de barras P&L % + tabla Invertido/Valor Actual/P&L $/P&L %), reutilizando `get_user_holdings_by_alyc` y los precios ya resueltos — sin queries nuevas
+19. Evolución histórica del patrimonio total (equity curve) — nueva tarjeta "Evolución del Patrimonio" en el Dashboard con selector de rango (6M/1A/5A/Todo) y una curva por moneda (ARS/USD, sin mezclar). Reconstruye día a día, a partir de `operations_search` + historial de precios por ticker (`/api/history/:ticker?range=`), el valor de cartera y el capital invertido (costo promedio ponderado, mismo método que `get_user_realized_pnl`), con forward-fill de precios entre fechas sin cotización. Lógica pura en `src/js/pages/dashboard/equity-curve.js`, con 7 tests unitarios (`equity-curve.test.js`) cubriendo compra simple, recompra con recálculo de costo promedio, venta total, forward-fill y fallback a costo cuando todavía no hay precio de mercado. No bloquea el resto del Dashboard: se carga en paralelo y de forma no bloqueante porque puede tardar varios segundos (un request de historial por ticker)
 
 ### 🔜 Pendientes — ordenados de mayor a menor prioridad
-19. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
 20. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`
 21. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
 22. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
