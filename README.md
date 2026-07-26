@@ -92,6 +92,8 @@ pnpm dev
 | `pnpm dev:server` | Solo levanta el servidor de Express (Backend). |
 | `pnpm dev:client` | Solo levanta el entorno de Vite (Frontend). |
 | `pnpm start` | Corre el servidor de producción. |
+| `pnpm test` | Corre la suite de tests una vez (Vitest). |
+| `pnpm test:watch` | Corre los tests en modo watch. |
 
 ---
 
@@ -192,9 +194,9 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 14. Seguridad — verificado en `api/server.js`: CSP real con nonce por request, CSRF en todas las mutaciones, rate limiting por tipo de endpoint, JWT verificado con `jose`, y validación server-side por campo (tipos, longitudes, regex, UUID/fecha/positivos) + `sanitize()` antes de insertar. Ya estaba hecho, el ítem quedó desactualizado. Gap menor conocido y aceptado: `styleSrcAttr: 'unsafe-inline'` (refactor grande, riesgo bajo, no priorizado)
 15. `aria-label` en botones icon-only — el ítem apuntaba a archivos que en realidad no tienen botones icon-only (`instruments.js`, `instrument-types.js`, `alycs.js`, `dashboard.js`, `settings.js` ya usan texto visible). Se corrigieron los 10 botones reales sin label en todo el proyecto: navbar global (`init.js` — tema/recargar/salir), `login.js` (tema), `analysis.js` (toggle config + refresh comparativa) y 5 botones de cerrar modal (✕) en `operations.js`/`operations/csv-import.js`
 16. Unificar skeleton loaders — `instrument-types.js`, `instruments.js` y `alycs.js` usaban un `<span class="spinner">` genérico en vez de skeleton (y las tarjetas mobile no tenían ningún estado de carga); `settings.js` también pasó de spinner+texto a skeleton con la forma real de cada `setting-row`. `analysis.js` quedó afuera a propósito: su loading principal cubre un cálculo compuesto y de duración variable (Monte Carlo, backtesting, Worker), donde un spinner comunica mejor que un skeleton con forma fija
+17. Tests — se agregó **Vitest** (comparte config con Vite vía `vite.config.js`, cero configuración extra) con `pnpm test` / `pnpm test:watch`. Primer archivo: `src/js/utils.test.js` (15 tests) cubriendo `esc`, `fmtDateShort`, `buildPageRange` y `getConcentrationAlert` — funciones puras sin DOM, elegidas a propósito como punto de partida
 
 ### 🔜 Pendientes — ordenados de mayor a menor prioridad
-17. Tests — agregar dependencias y primer test unitario *(red de seguridad para seguir iterando)*
 18. Comparación de rendimiento/composición entre ALyCs — el análisis hoy es de a un ALyC por vez
 19. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
 20. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`

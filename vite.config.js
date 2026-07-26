@@ -1,8 +1,13 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   // Vite asume que 'public' es la carpeta de estáticos por defecto.
-  
+
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
+
   server: {
     proxy: {
       '/api': {
