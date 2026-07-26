@@ -1,7 +1,10 @@
 import { Chart, registerables } from 'chart.js'
 import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
 Chart.register(...registerables, TreemapController, TreemapElement)
-window.Chart = Chart
+
+// Re-exportado para que otros módulos (ej. analysis.js) usen la misma instancia
+// ya registrada con todos los controllers, sin depender de `window`.
+export { Chart }
 
 /**
  * Gestor Centralizado de Gráficos (Basado en Chart.js)
@@ -167,7 +170,7 @@ export const ChartManager = {
     const isDoughnut = options.type !== 'pie'
     const baseOptions = getBaseOptions()
     
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: isDoughnut ? 'doughnut' : 'pie',
       data: {
         labels: labels,
@@ -209,7 +212,7 @@ export const ChartManager = {
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
 
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'bar',
       data: {
         labels: labels,
@@ -279,7 +282,7 @@ export const ChartManager = {
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
 
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'bar',
       data: {
         labels: labels,
@@ -349,7 +352,7 @@ export const ChartManager = {
     }
 
     const baseOptions = getBaseOptions()
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'treemap',
       data: {
         datasets: [{
@@ -402,7 +405,7 @@ export const ChartManager = {
     const textColor = getCSSVar('--text-muted') || '#64748b'
     const gridColor = getCSSVar('--border') ? getCSSVar('--border') + '44' : 'rgba(255, 255, 255, 0.05)'
     
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'scatter',
       data: {
         datasets: [
@@ -503,7 +506,7 @@ export const ChartManager = {
       }
     })
 
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'line',
       data: {
         labels: Array.from({ length: datasets[0].data.length }, (_, i) => `D${i}`),
@@ -557,7 +560,7 @@ export const ChartManager = {
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'line',
       data: {
         labels: Array.from({ length: portfolioData.length }, (_, i) => i),
@@ -648,7 +651,7 @@ export const ChartManager = {
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'bar',
       data: {
         labels: labels,
@@ -712,7 +715,7 @@ export const ChartManager = {
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
 
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'bar',
       data: {
         labels,
@@ -810,7 +813,7 @@ export const ChartManager = {
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
 
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'bar',
       data: { labels, datasets },
       options: {
@@ -881,7 +884,7 @@ export const ChartManager = {
       tension: 0.15
     }))
 
-    return new window.Chart(canvas, {
+    return new Chart(canvas, {
       type: 'line',
       data: { labels: dates, datasets },
       options: {

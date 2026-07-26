@@ -87,7 +87,11 @@ export function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-const _dp = () => window.DOMPurify
+// DOMPurify se precarga en background (ver init.js) y se registra acá vía
+// setDOMPurify, en vez de depender de un global en `window`.
+let _domPurify = null
+export function setDOMPurify(instance) { _domPurify = instance }
+const _dp = () => _domPurify
 
 export function sanitize(str) {
   const dp = _dp()

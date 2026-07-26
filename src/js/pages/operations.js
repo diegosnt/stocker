@@ -10,6 +10,7 @@ const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="
 const ICON_CLONE  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
 
 const PAGE_SIZE = 10
+const FILTERS_STORAGE_KEY = 'stocker_operations_filters'
 
 const state = {
   editingOperation: null,
@@ -51,6 +52,24 @@ const setSort = (col, asc) => {
   state.sorting.ascending = asc
 }
 
+// Recuerda la última combinación de filtros usada, para restaurarla la próxima
+// vez que se entra a la página (se pierde al navegar por el reset en cleanup()).
+const persistFilters = () => {
+  try {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(state.filters))
+  } catch { /* localStorage lleno o deshabilitado: no bloquea la app */ }
+}
+const loadPersistedFilters = () => {
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    for (const key of Object.keys(state.filters)) {
+      if (typeof saved[key] === 'string') state.filters[key] = saved[key]
+    }
+  } catch { /* dato corrupto: seguimos con los filtros default */ }
+}
+
 export const OperationsPage = {
   async render() {
     await this._renderList()
@@ -59,6 +78,7 @@ export const OperationsPage = {
   // ── Listado ──────────────────────────────────────────────
   async _renderList() {
     state.pagination.currentPage = 0
+    loadPersistedFilters()
     const content = document.getElementById('page-content')
     content.innerHTML = `
       <div class="page-header">
@@ -169,6 +189,8 @@ export const OperationsPage = {
     const tbody    = document.getElementById('ops-tbody')
     const opsCards = document.getElementById('ops-cards')
     if (!tbody) return
+
+    persistFilters()
 
     // Cancelar request anterior si existe
     if (state.abortController) {

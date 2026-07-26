@@ -1,6 +1,6 @@
 import { signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
-import { initDarkMode, toggleDarkMode } from './utils.js'
+import { initDarkMode, toggleDarkMode, setDOMPurify } from './utils.js'
 import { prunePersistentCache } from './cache.js'
 import { LoginPage } from './pages/login.js'
 
@@ -8,6 +8,7 @@ const app = document.getElementById('app')
 
 // ── Toast ──────────────────────────────────────────────────
 let toastContainer = null
+let domPurifyLoading = false
 
 export function showToast(msg, type = 'info') {
   if (!toastContainer) {
@@ -112,8 +113,9 @@ function renderShell(userEmail) {
   updateActiveLink()
 
   // Pre-cargar DOMPurify en background para cuando se necesite
-  if (!window.DOMPurify) {
-    import('dompurify').then(mod => { window.DOMPurify = mod.default }).catch(() => {})
+  if (!domPurifyLoading) {
+    domPurifyLoading = true
+    import('dompurify').then(mod => setDOMPurify(mod.default)).catch(() => {})
   }
 
   const dyn = (loader) => {

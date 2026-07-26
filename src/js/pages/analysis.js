@@ -3,7 +3,7 @@ import { apiRequest } from '../api-client.js'
 import { showToast } from '../init.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
-import { ChartManager } from '../chart-manager.js'
+import { ChartManager, Chart } from '../chart-manager.js'
 import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts } from '../utils.js'
 import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
@@ -867,7 +867,7 @@ export const AnalysisPage = {
 
       if (this._activityChart) { this._activityChart.destroy(); this._activityChart = null }
 
-      this._activityChart = new window.Chart(canvas, {
+      this._activityChart = new Chart(canvas, {
         type: 'bar',
         data: {
           labels,
