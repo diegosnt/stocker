@@ -57,11 +57,21 @@ export const AlycsPage = {
               </tr>
             </thead>
             <tbody id="alyc-tbody">
-              <tr><td colspan="5" class="table-empty"><span class="spinner"></span></td></tr>
+              ${Array(4).fill(`
+                <tr>
+                  <td><div class="skeleton" style="height:14px; width:120px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:100px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:140px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:80px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:110px"></div></td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         </div>
-        <div id="alyc-mobile-cards" class="mobile-only"></div>
+        <div id="alyc-mobile-cards" class="mobile-only">
+          ${Array(3).fill(`<div class="mobile-card skeleton" style="height:110px"></div>`).join('')}
+        </div>
       </div>`
 
     await this._loadList()

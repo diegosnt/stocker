@@ -63,11 +63,21 @@ export const InstrumentsPage = {
               </tr>
             </thead>
             <tbody id="inst-tbody">
-              <tr><td colspan="5" class="table-empty"><span class="spinner"></span></td></tr>
+              ${Array(6).fill(`
+                <tr>
+                  <td><div class="skeleton" style="height:14px; width:70px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:160px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:100px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:80px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:110px"></div></td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         </div>
-        <div id="inst-mobile-cards" class="mobile-only"></div>
+        <div id="inst-mobile-cards" class="mobile-only">
+          ${Array(3).fill(`<div class="mobile-card skeleton" style="height:110px"></div>`).join('')}
+        </div>
         <div id="inst-pagination"></div>
       </div>`
 

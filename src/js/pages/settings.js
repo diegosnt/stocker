@@ -13,8 +13,12 @@ export const SettingsPage = {
       <div class="settings-grid">
         <div class="card">
           <h3>Acceso</h3>
-          <div id="settings-loading" class="settings-loading">
-            <span class="spinner"></span> Cargando...
+          <div id="settings-loading" class="setting-row">
+            <div class="setting-info">
+              <div class="skeleton" style="height:14px; width:180px; margin-bottom:0.4rem"></div>
+              <div class="skeleton" style="height:12px; width:260px"></div>
+            </div>
+            <div class="skeleton" style="height:32px; width:100px; flex-shrink:0"></div>
           </div>
           <div id="settings-content" style="display:none">
             <div class="setting-row">
@@ -30,8 +34,12 @@ export const SettingsPage = {
 
         <div class="card">
           <h3>Interfaz</h3>
-          <div id="badge-loading" class="settings-loading">
-            <span class="spinner"></span> Cargando...
+          <div id="badge-loading" class="setting-row">
+            <div class="setting-info">
+              <div class="skeleton" style="height:14px; width:220px; margin-bottom:0.4rem"></div>
+              <div class="skeleton" style="height:12px; width:260px"></div>
+            </div>
+            <div class="skeleton" style="height:32px; width:100px; flex-shrink:0"></div>
           </div>
           <div id="badge-content" style="display:none">
             <div class="setting-row">

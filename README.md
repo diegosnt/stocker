@@ -191,19 +191,21 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 13. Responsive mobile (tabla → tarjetas apiladas) en `instruments.js`, `instrument-types.js` y `alycs.js` (`operations.js` ya lo tenía resuelto)
 14. Seguridad — verificado en `api/server.js`: CSP real con nonce por request, CSRF en todas las mutaciones, rate limiting por tipo de endpoint, JWT verificado con `jose`, y validación server-side por campo (tipos, longitudes, regex, UUID/fecha/positivos) + `sanitize()` antes de insertar. Ya estaba hecho, el ítem quedó desactualizado. Gap menor conocido y aceptado: `styleSrcAttr: 'unsafe-inline'` (refactor grande, riesgo bajo, no priorizado)
 15. `aria-label` en botones icon-only — el ítem apuntaba a archivos que en realidad no tienen botones icon-only (`instruments.js`, `instrument-types.js`, `alycs.js`, `dashboard.js`, `settings.js` ya usan texto visible). Se corrigieron los 10 botones reales sin label en todo el proyecto: navbar global (`init.js` — tema/recargar/salir), `login.js` (tema), `analysis.js` (toggle config + refresh comparativa) y 5 botones de cerrar modal (✕) en `operations.js`/`operations/csv-import.js`
+16. Unificar skeleton loaders — `instrument-types.js`, `instruments.js` y `alycs.js` usaban un `<span class="spinner">` genérico en vez de skeleton (y las tarjetas mobile no tenían ningún estado de carga); `settings.js` también pasó de spinner+texto a skeleton con la forma real de cada `setting-row`. `analysis.js` quedó afuera a propósito: su loading principal cubre un cálculo compuesto y de duración variable (Monte Carlo, backtesting, Worker), donde un spinner comunica mejor que un skeleton con forma fija
 
 ### 🔜 Pendientes — ordenados de mayor a menor prioridad
-16. Distribución global por tipo de instrumento (no solo dentro de un ALyC) — agregación adicional sobre `get_user_holdings_global`, sin queries nuevas
-17. Unificar skeleton loaders (ya existen en `dashboard.js`/`operations.js`) en `instruments.js`, `instrument-types.js`, `alycs.js`, `analysis.js` y `settings.js`
-18. Tests — agregar dependencias y primer test unitario *(red de seguridad para seguir iterando)*
-19. Comparación de rendimiento/composición entre ALyCs — el análisis hoy es de a un ALyC por vez
-20. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
-21. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`
-22. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
-23. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
-24. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes *(no urgente con el volumen de datos actual)*
-25. Features — filtros combinados, exportación avanzada, vistas personalizadas *(vago, definir alcance antes de estimar)*
-26. Accesibilidad general — roles ARIA, contraste, navegación por teclado *(gran parte ya cubierta por el #15)*
+17. Tests — agregar dependencias y primer test unitario *(red de seguridad para seguir iterando)*
+18. Comparación de rendimiento/composición entre ALyCs — el análisis hoy es de a un ALyC por vez
+19. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
+20. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`
+21. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
+22. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
+23. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes *(no urgente con el volumen de datos actual)*
+24. Features — filtros combinados, exportación avanzada, vistas personalizadas *(vago, definir alcance antes de estimar)*
+25. Accesibilidad general — roles ARIA, contraste, navegación por teclado *(gran parte ya cubierta por el #15)*
+
+### ❌ Descartados
+- Distribución global por tipo de instrumento — sin sentido si operás un solo tipo de instrumento (ej. solo CEDEARs): siempre mostraría 100% en una categoría, cero información útil. Mismo motivo por el que se sacó la alerta de concentración por tipo (ver #12).
 
 ---
 

@@ -50,11 +50,20 @@ export const InstrumentTypesPage = {
               </tr>
             </thead>
             <tbody id="tipos-tbody">
-              <tr><td colspan="4" class="table-empty"><span class="spinner"></span></td></tr>
+              ${Array(4).fill(`
+                <tr>
+                  <td><div class="skeleton" style="height:14px; width:100px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:180px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:80px"></div></td>
+                  <td><div class="skeleton" style="height:14px; width:110px"></div></td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         </div>
-        <div id="tipos-mobile-cards" class="mobile-only"></div>
+        <div id="tipos-mobile-cards" class="mobile-only">
+          ${Array(3).fill(`<div class="mobile-card skeleton" style="height:96px"></div>`).join('')}
+        </div>
       </div>`
 
     await this._loadList()
