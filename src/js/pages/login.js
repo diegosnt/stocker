@@ -11,7 +11,7 @@ export const LoginPage = {
       <div class="login-wrapper">
         <div class="login-card">
           <div class="login-card-header">
-            <button class="login-dark-mode-toggle" id="login-theme-toggle" title="Cambiar tema">
+            <button class="login-dark-mode-toggle" id="login-theme-toggle" title="Cambiar tema" aria-label="Cambiar tema">
               ${SUN_SVG}${MOON_SVG}
             </button>
             <img class="login-logo" src="/img/logo.svg" alt="Stocker">

@@ -692,7 +692,7 @@ export const OperationsPage = {
       <div class="modal-card modal-card-lg">
         <div class="modal-header">
           <h3 style="margin:0">${editing?._cloning ? 'Clonar Operación' : editing ? 'Editar Operación' : 'Nueva Operación'}</h3>
-          <button type="button" class="btn btn-sm btn-ghost" id="btn-op-close">✕</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-op-close" aria-label="Cerrar">✕</button>
         </div>
         <form id="form-op" novalidate>
           <div class="form-row">
@@ -975,7 +975,7 @@ export const OperationsPage = {
       <div class="modal-card">
         <div class="modal-header">
           <h3 style="margin:0">Nuevo Instrumento</h3>
-          <button type="button" class="btn btn-sm btn-ghost" id="modal-close">✕</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="modal-close" aria-label="Cerrar">✕</button>
         </div>
         <form id="modal-inst-form" novalidate>
           <div class="form-group">
@@ -1049,7 +1049,7 @@ export const OperationsPage = {
       <div class="modal-card">
         <div class="modal-header">
           <h3 style="margin:0">Nueva ALyC</h3>
-          <button type="button" class="btn btn-sm btn-ghost" id="modal-alyc-close">✕</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="modal-alyc-close" aria-label="Cerrar">✕</button>
         </div>
         <form id="modal-alyc-form" novalidate>
           <div class="form-group">

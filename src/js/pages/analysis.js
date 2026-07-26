@@ -70,7 +70,7 @@ export const AnalysisPage = {
       <div class="card" id="analysis-control-card" style="margin-bottom: 2rem">
         <div class="analysis-config-header" id="analysis-config-header">
           <h3 id="analysis-config-title">Configuración de Análisis</h3>
-          <button class="analysis-config-toggle" title="Expandir / Contraer">
+          <button class="analysis-config-toggle" title="Expandir / Contraer" aria-label="Expandir o contraer configuración de análisis">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
         </div>
@@ -161,7 +161,7 @@ export const AnalysisPage = {
             <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem">
                 <h3 style="font-size: 0.95rem; margin: 0">Comparativa: Inversión vs Valor Actual ($)</h3>
-                <button id="btn-refresh-comp" class="btn btn-sm btn-ghost btn-icon-only" title="Actualizar precios y gráfico" style="padding: 0; width: 24px; height: 24px; min-width: 24px; min-height: 24px; opacity: 0.8; background: none; border: none; cursor: pointer; color: var(--text-muted); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)">
+                <button id="btn-refresh-comp" class="btn btn-sm btn-ghost btn-icon-only" title="Actualizar precios y gráfico" aria-label="Actualizar precios y gráfico" style="padding: 0; width: 24px; height: 24px; min-width: 24px; min-height: 24px; opacity: 0.8; background: none; border: none; cursor: pointer; color: var(--text-muted); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)">
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                 </button>
               </div>

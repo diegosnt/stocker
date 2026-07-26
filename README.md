@@ -187,23 +187,23 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 9. Cleanup methods para las 7 páginas — timers cancelados, estado de módulo reseteado al navegar
 10. Ganancias Realizadas en el Dashboard — nueva tarjeta colapsable usando `get_user_realized_pnl()` (P&L realizado con costo promedio ponderado); requiere aplicar el RPC en Supabase (`supabase/rpc_get_user_realized_pnl.sql`)
 11. Límite/expiración activa en `quoteCache` (`api/server.js`) — barrido periódico de entradas vencidas + tope de 500 tickers para evitar crecimiento indefinido en memoria
+12. Alertas de concentración de riesgo — aviso si un solo ticker supera el 25%/40% de la cartera (Dashboard y Análisis, por ALyC)
+13. Responsive mobile (tabla → tarjetas apiladas) en `instruments.js`, `instrument-types.js` y `alycs.js` (`operations.js` ya lo tenía resuelto)
+14. Seguridad — verificado en `api/server.js`: CSP real con nonce por request, CSRF en todas las mutaciones, rate limiting por tipo de endpoint, JWT verificado con `jose`, y validación server-side por campo (tipos, longitudes, regex, UUID/fecha/positivos) + `sanitize()` antes de insertar. Ya estaba hecho, el ítem quedó desactualizado. Gap menor conocido y aceptado: `styleSrcAttr: 'unsafe-inline'` (refactor grande, riesgo bajo, no priorizado)
+15. `aria-label` en botones icon-only — el ítem apuntaba a archivos que en realidad no tienen botones icon-only (`instruments.js`, `instrument-types.js`, `alycs.js`, `dashboard.js`, `settings.js` ya usan texto visible). Se corrigieron los 10 botones reales sin label en todo el proyecto: navbar global (`init.js` — tema/recargar/salir), `login.js` (tema), `analysis.js` (toggle config + refresh comparativa) y 5 botones de cerrar modal (✕) en `operations.js`/`operations/csv-import.js`
 
-### 🔜 Pendientes
-12. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
-13. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
-14. Tests — agregar dependencias y primer test unitario
-15. Accesibilidad — roles ARIA, contraste, navegación por teclado
-16. Features — filtros combinados, exportación avanzada, vistas personalizadas
-17. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes
-18. Seguridad — Content-Security-Policy, validación del lado del servidor
-19. Agregar `aria-label` a botones icon-only en `instruments.js`, `instrument-types.js`, `alycs.js`, `dashboard.js` y `settings.js`
-20. Unificar skeleton loaders (ya existen en `dashboard.js`/`operations.js`) en `instruments.js`, `instrument-types.js`, `alycs.js`, `analysis.js` y `settings.js`
-21. Alertas de concentración de riesgo (ej. "40% en un solo ticker") usando los pesos % que ya se calculan en Dashboard/Análisis
-22. Responsive mobile (tabla → tarjetas apiladas) en `instruments.js`, `instrument-types.js`, `alycs.js` y `operations.js` — hoy dependen solo de scroll horizontal
-23. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
-24. Comparación de rendimiento/composición entre ALyCs — el análisis hoy es de a un ALyC por vez
-25. Distribución global por tipo de instrumento (no solo dentro de un ALyC) — agregación adicional sobre `get_user_holdings_global`
-26. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`
+### 🔜 Pendientes — ordenados de mayor a menor prioridad
+16. Distribución global por tipo de instrumento (no solo dentro de un ALyC) — agregación adicional sobre `get_user_holdings_global`, sin queries nuevas
+17. Unificar skeleton loaders (ya existen en `dashboard.js`/`operations.js`) en `instruments.js`, `instrument-types.js`, `alycs.js`, `analysis.js` y `settings.js`
+18. Tests — agregar dependencias y primer test unitario *(red de seguridad para seguir iterando)*
+19. Comparación de rendimiento/composición entre ALyCs — el análisis hoy es de a un ALyC por vez
+20. Evolución histórica del patrimonio total en el tiempo (equity curve) — no existe hoy, solo snapshots puntuales y simulaciones sintéticas
+21. Factory reutilizable de tabla CRUD simple — fuerte duplicación entre `instrument-types.js`, `alycs.js` e `instruments.js`
+22. Estado mutable centralizado — las 6 páginas con estado usan `let`/objetos sueltos sin patrón común
+23. Eliminar `window.Chart` y `window.DOMPurify` — ya no son necesarios como globales
+24. Performance — virtual scrolling en tablas grandes, lazy loading de imágenes *(no urgente con el volumen de datos actual)*
+25. Features — filtros combinados, exportación avanzada, vistas personalizadas *(vago, definir alcance antes de estimar)*
+26. Accesibilidad general — roles ARIA, contraste, navegación por teclado *(gran parte ya cubierta por el #15)*
 
 ---
 

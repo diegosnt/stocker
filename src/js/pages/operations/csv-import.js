@@ -22,7 +22,7 @@ export async function showFailedEntitiesModal(failedEntities) {
       <div class="modal-card modal-card-lg">
         <div class="modal-header">
           <h3 style="margin:0">Registros no importados</h3>
-          <button type="button" class="btn btn-sm btn-ghost" id="btn-failed-close">✕</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-failed-close" aria-label="Cerrar">✕</button>
         </div>
         <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: #fff5f5; color: #c53030; font-size: 0.9rem">
           Los siguientes <strong>${failedEntities.length}</strong> registros no pudieron cargarse porque los datos son incompletos o las entidades no existen. 
@@ -83,7 +83,7 @@ export async function showDuplicateSelectionModal(duplicates, cleanCount = 0) {
       <div class="modal-card modal-card-lg">
         <div class="modal-header">
           <h3 style="margin:0">Duplicados detectados</h3>
-          <button type="button" class="btn btn-sm btn-ghost" id="btn-dup-close">✕</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-dup-close" aria-label="Cerrar">✕</button>
         </div>
         <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-main); font-size: 0.9rem">
           ${cleanCount > 0 ? `<div style="margin-bottom:0.5rem; color:var(--color-primary)"><strong>Hay ${cleanCount} registros nuevos listos para importar.</strong></div>` : ''}
