@@ -3,7 +3,7 @@ import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
-import { getConcentrationAlert, renderRiskAlerts } from '../utils.js'
+import { getConcentrationAlert, renderRiskAlerts, esc } from '../utils.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 
@@ -12,6 +12,7 @@ export const DashboardPage = {
   _heatmapChart: null,
   _compChart: null,
   _alycChart: null,
+  _alycPerfChart: null,
   _assetChart: null,
   _alycHoldingChart: null,
   _resolvedPrices: {},
@@ -24,6 +25,7 @@ export const DashboardPage = {
     this._typeChart = ChartManager.destroy(this._typeChart)
     this._compChart = ChartManager.destroy(this._compChart)
     this._alycChart = ChartManager.destroy(this._alycChart)
+    this._alycPerfChart = ChartManager.destroy(this._alycPerfChart)
     this._assetChart = ChartManager.destroy(this._assetChart)
     this._alycHoldingChart = ChartManager.destroy(this._alycHoldingChart)
     this._chartRendered = false
@@ -571,6 +573,7 @@ export const DashboardPage = {
       this._refreshComparisonChart()
       this._refreshAssetChart()
       this._refreshAlycHoldingChart()
+      this._refreshAlycPerformance()
     }
     this._updatePnlKpis()
     if (['marketPrice', 'marketValue', 'pnl', 'pnlPct'].includes(this._sortCol)) {
@@ -726,12 +729,15 @@ export const DashboardPage = {
       return `<tr><td><span class="ticker-chip">${ticker}</span></td>${cells}</tr>`
     }).join('')
 
+    const alycCurrencyCount = new Set(rows.map(r => `${r.alyc_name}|${r.currency}`)).size
+    const perfChartHeight = Math.max(160, alycCurrencyCount * 44 + 60)
+
     el.innerHTML = `
       <div class="dash-alyc-row">
         <div class="card" style="min-height:${chartHeight}px">
           <div class="chart-panel-title" style="margin-bottom:1rem">Distribución por ALyC</div>
           <div style="height:${chartHeight}px; position:relative">
-            <canvas style="width:100%;height:100%"></canvas>
+            <canvas id="dash-alyc-dist-canvas" style="width:100%;height:100%"></canvas>
           </div>
         </div>
 
@@ -749,10 +755,31 @@ export const DashboardPage = {
             </table>
           </div>
         </div>
+      </div>
+
+      <div class="card" style="margin-top: 1rem; display:flex; flex-direction:column; gap:1rem">
+        <div class="chart-panel-title" style="margin-bottom:0">Rendimiento por ALyC</div>
+        <div style="height:${perfChartHeight}px; position:relative">
+          <canvas id="dash-alyc-perf-canvas" style="width:100%;height:100%"></canvas>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="holdings-table">
+            <thead>
+              <tr>
+                <th>ALyC</th>
+                <th style="text-align:right">Invertido</th>
+                <th style="text-align:right">Valor Actual</th>
+                <th style="text-align:right">P&amp;L $</th>
+                <th style="text-align:right">P&amp;L %</th>
+              </tr>
+            </thead>
+            <tbody id="dash-alyc-perf-tbody"></tbody>
+          </table>
+        </div>
       </div>`
 
     requestAnimationFrame(() => {
-      const canvas = el.querySelector('canvas')
+      const canvas = document.getElementById('dash-alyc-dist-canvas')
       if (!canvas) return
       this._alycChart = ChartManager.renderStackedBarChart(
         canvas,
@@ -760,7 +787,54 @@ export const DashboardPage = {
         datasets,
         { instance: this._alycChart }
       )
+      this._refreshAlycPerformance()
     })
+  },
+
+  _computeAlycPerformance(rows) {
+    const groups = {}
+    for (const row of rows) {
+      const key = `${row.alyc_name}|${row.currency}`
+      if (!groups[key]) groups[key] = { alyc: row.alyc_name, currency: row.currency, invested: 0, market: 0 }
+      const qty      = parseFloat(row.total_quantity) || 0
+      const avgPrice = parseFloat(row.avg_buy_price) || 0
+      const price    = this._resolvedPrices?.[row.ticker] ?? avgPrice
+      groups[key].invested += qty * avgPrice
+      groups[key].market   += qty * price
+    }
+    return Object.values(groups)
+      .map(g => ({ ...g, pnl: g.market - g.invested, pnlPct: g.invested > 0 ? (g.market / g.invested - 1) * 100 : 0 }))
+      .sort((a, b) => b.invested - a.invested)
+  },
+
+  _refreshAlycPerformance() {
+    if (!this._alycRows) return
+    const canvas = document.getElementById('dash-alyc-perf-canvas')
+    const tbody  = document.getElementById('dash-alyc-perf-tbody')
+    if (!canvas || !tbody) return
+
+    const perf   = this._computeAlycPerformance(this._alycRows)
+    const fmt    = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const sign   = v => v > 0 ? '+' : ''
+    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+
+    const items = perf.map(p => ({
+      label: `${p.alyc} (${p.currency})`,
+      value: p.pnlPct
+    }))
+    this._alycPerfChart = ChartManager.renderBarChart(canvas, items, {
+      instance: this._alycPerfChart,
+      tooltipFormatter: v => ` P&L: ${sign(v)}${v.toFixed(1)}%`
+    })
+
+    tbody.innerHTML = perf.map(p => `
+      <tr>
+        <td><strong>${esc(p.alyc)}</strong> <span style="font-size:0.7rem;color:var(--text-muted)">${p.currency}</span></td>
+        <td class="amount">${fmt(p.invested)}</td>
+        <td class="amount">${fmt(p.market)}</td>
+        <td class="amount" style="color:${pnlColor(p.pnl)}">${sign(p.pnl)}${fmt(p.pnl)}</td>
+        <td class="amount" style="color:${pnlColor(p.pnlPct)}">${sign(p.pnlPct)}${p.pnlPct.toFixed(1)}%</td>
+      </tr>`).join('')
   },
 
   _renderRealizedPnlSection(rows) {

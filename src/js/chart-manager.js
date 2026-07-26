@@ -239,6 +239,17 @@ export const ChartManager = {
             grid: { display: false }
           }
         },
+        plugins: {
+          ...baseOptions.plugins,
+          tooltip: {
+            ...baseOptions.plugins.tooltip,
+            callbacks: {
+              label: ctx => options.tooltipFormatter
+                ? options.tooltipFormatter(ctx.parsed.x)
+                : ` ${ctx.parsed.x}`
+            }
+          }
+        },
         ...options.chartOptions
       }
     })
