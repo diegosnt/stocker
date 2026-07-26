@@ -211,6 +211,18 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 - Distribución global por tipo de instrumento — sin sentido si operás un solo tipo de instrumento (ej. solo CEDEARs): siempre mostraría 100% en una categoría, cero información útil. Mismo motivo por el que se sacó la alerta de concentración por tipo (ver #12).
 - Performance (virtual scrolling / lazy loading de imágenes) — verificado, no hay nada real para resolver: solo hay 2 `<img>` en todo el proyecto (el mismo logo SVG, contenido crítico above-the-fold que no debe lazy-loadearse), y la única tabla que puede crecer sin límite (`operations.js`) ya tiene paginación. El resto de las tablas están acotadas por naturaleza (catálogos chicos o cantidad de tickers distintos, no historial transaccional)
 
+## 🔍 Segunda ronda (auditoría posterior al roadmap original)
+
+### ✅ Completadas
+26. **Bug de integridad de datos — importación CSV** (crítico): cualquier fila donde la columna "operacion" no fuera exactamente "compra" (typo, celda vacía, columna corrida) se guardaba **silenciosamente como "venta"**, sin avisar — podía corromper holdings, P&L y la evolución del patrimonio sin que el usuario se entere. El endpoint `/api/operations/bulk` tampoco validaba `type` (a diferencia del endpoint simple `/api/operations`, que sí lo hace). Fix en dos capas: **(1)** el parseo de CSV (extraído a `src/js/pages/operations/csv-parser.js`, módulo puro y testeado — 8 tests nuevos) ahora rechaza explícitamente cualquier valor que no sea "compra"/"venta" y lo reporta en el modal de "Registros no importados" en vez de adivinar; **(2)** `api/server.js` valida `type` por fila en el bulk endpoint como defensa en profundidad. De paso se corrigió un bug de acumulación en `csv-import.js`: `allFailedEntities` se *reemplazaba* en vez de *concatenarse* en 3 lugares, perdiendo errores previos (incluidos los nuevos de validación local) cuando había reintentos por duplicados
+
+### 🔜 Pendientes
+27. Exponer `role` del usuario en `/api/auth/session` (ya se calcula en cada request vía `requireAuth`, cero queries nuevas) y ocultar/gatear la página de Configuración en el frontend para no-admins — hoy cualquier usuario ve los toggles y le falla el guardado sin explicación
+28. Guard de request obsoleta en `_loadEquityCurve` (`dashboard.js`) — si cambiás de rango rápido (6M→5A), no hay cancelación de la request anterior; puede terminar mostrando datos de un rango distinto al botón marcado activo. `operations.js` ya resuelve esto mismo con `state.abortController`/`requestId`, no se reusó ese patrón acá
+29. Actualizar `dompurify` a la última versión — no explotable con la configuración actual (`ALLOWED_TAGS`/`ALLOWED_ATTR` explícitos, sin las opciones vulnerables), pero mala higiene mantener desactualizada la defensa XSS del cliente en una app financiera
+30. CAGR (retorno anualizado) y drawdown máximo real, calculables directo de `computeEquitySeries` sin fetch nuevo — mostrarlos como dato junto a la curva de patrimonio
+31. Posible inconsistencia de fuente de verdad para "admin": `requireAdmin` en `api/server.js` usa la tabla `user_roles`, pero la policy RLS de `app_settings` en `schema.sql` chequea un claim JWT (`user_metadata.role`) que el trigger de `fix-user-roles.sql` nunca setea. Hoy queda enmascarado porque todo pasa por la API Express; solo importa si algún día se llama a Supabase directo desde el cliente para `app_settings`
+
 ---
 
 *Stocker Intelligence — Potenciado por Vite.*

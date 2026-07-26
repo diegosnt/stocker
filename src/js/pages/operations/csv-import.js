@@ -2,6 +2,7 @@ import { showToast } from '../../init.js'
 import { apiRequest } from '../../api-client.js'
 import { invalidate as cacheInvalidate } from '../../cache.js'
 import { esc, fmtDateShort } from '../../utils.js'
+import { parseCsvRow } from './csv-parser.js'
 
 export async function showFailedEntitiesModal(failedEntities) {
   return new Promise(resolve => {
@@ -153,56 +154,21 @@ export async function handleCsvImport(file, ops) {
   const headers = lines[0].split(';').map(h => h.trim().toLowerCase())
   const rows = lines.slice(1)
 
-  const operations = rows.map(row => {
-    const cols = row.split(';').map(c => c.trim())
-    if (cols.length < 7) return null
+  const localFailedEntities = []
 
-    const raw = {}
-    headers.forEach((h, i) => raw[h] = cols[i])
-
-    const type = raw['operacion']?.toLowerCase() === 'compra' ? 'compra' : 'venta'
-    const alyc = raw['alyc']
-    const ticker = raw['especie']
-
-    let operated_at = ''
-    const dateParts = raw['fecha operacion']?.split('/')
-    if (dateParts?.length === 3) {
-      const [d, m, y] = dateParts
-      const fullYear = y.length === 2 ? `20${y}` : y
-      operated_at = `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-    }
-
-    const parseNum = (s) => {
-      if (!s) return 0
-      const cleaned = s.trim()
-      const hasComma = cleaned.includes(',')
-      const hasDot = cleaned.includes('.')
-      if (hasComma && hasDot) {
-        const lastComma = cleaned.lastIndexOf(',')
-        const lastDot = cleaned.lastIndexOf('.')
-        if (lastComma > lastDot) {
-          return parseFloat(cleaned.replace(/\./g, '').replace(',', '.'))
-        } else {
-          return parseFloat(cleaned.replace(/,/g, ''))
-        }
-      } else if (hasComma) {
-        return parseFloat(cleaned.replace(',', '.'))
-      } else if (hasDot) {
-        return parseFloat(cleaned.replace(/,/g, ''))
-      }
-      return parseFloat(cleaned) || 0
-    }
-    const price = parseNum(raw['precio'])
-    const quantity = parseNum(raw['cantidad'])
-
-    let currency = raw['moneda']?.toUpperCase()
-    if (currency === 'ARG') currency = 'ARS'
-
-    return { type, alyc, ticker, operated_at, price, quantity, currency }
+  const operations = rows.map((row, idx) => {
+    const { op, failure } = parseCsvRow(row, idx + 2, headers)
+    if (failure) { localFailedEntities.push(failure); return null }
+    return op
   }).filter(op => op !== null)
 
   if (operations.length === 0) {
-    showToast('No se encontraron registros válidos.', 'error')
+    if (localFailedEntities.length > 0) {
+      showToast('Ningún registro pudo importarse. Revisá los errores.', 'error')
+      await showFailedEntitiesModal(localFailedEntities)
+    } else {
+      showToast('No se encontraron registros válidos.', 'error')
+    }
     return
   }
 
@@ -210,15 +176,14 @@ export async function handleCsvImport(file, ops) {
     showToast(`Procesando ${operations.length} registros...`, 'info')
 
     let res
-    let allFailedEntities = []
+    let allFailedEntities = [...localFailedEntities]
 
     try {
       res = await apiRequest('POST', '/api/operations/bulk', { operations })
-      if (res.failed_entities) allFailedEntities = res.failed_entities
     } catch (err) {
       if (err.status === 409) {
         const { duplicates, clean_ops, failed_entities } = err.response
-        if (failed_entities) allFailedEntities = failed_entities
+        if (failed_entities) allFailedEntities = [...allFailedEntities, ...failed_entities]
 
         const selection = await showDuplicateSelectionModal(duplicates, clean_ops.length)
 
@@ -246,9 +211,7 @@ export async function handleCsvImport(file, ops) {
     }
 
     const { imported, skipped } = res
-    if (res.failed_entities && allFailedEntities.length === 0) {
-      allFailedEntities = res.failed_entities
-    }
+    if (res.failed_entities) allFailedEntities = [...allFailedEntities, ...res.failed_entities]
 
     let msg = `Importación finalizada: ${imported} importados, ${skipped} omitidos/duplicados.`
     showToast(msg, allFailedEntities.length > 0 ? 'warning' : 'success')

@@ -631,10 +631,19 @@ app.post('/api/operations/bulk', mutationLimiter, requireAuth, requireCsrf, asyn
         continue
       }
 
+      if (op.type !== 'compra' && op.type !== 'venta') {
+        results.failed_entities.push({
+          row: rowNum, operated_at: op.operated_at, _raw: meta,
+          error: `Tipo de operación inválido: "${op.type ?? ''}"`
+        })
+        results.skipped++
+        continue
+      }
+
       if (!isDate(op.operated_at) || !isPositive(op.quantity) || !isPositive(op.price)) {
-        results.failed_entities.push({ 
-          row: rowNum, operated_at: op.operated_at, _raw: meta, 
-          error: 'Datos numéricos o de fecha inválidos' 
+        results.failed_entities.push({
+          row: rowNum, operated_at: op.operated_at, _raw: meta,
+          error: 'Datos numéricos o de fecha inválidos'
         })
         results.skipped++
         continue
