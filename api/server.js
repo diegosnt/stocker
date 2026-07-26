@@ -1018,7 +1018,23 @@ const TICKER_RE  = /^[A-Za-z0-9.\-^=]{1,20}$/
 
 // Rate limit solo sobre llamadas reales a Finance (cache miss), no sobre hits de cache
 const QUOTE_TTL      = 5 * 60 * 1000  // 5 minutos en ms
+const QUOTE_CACHE_MAX = 500            // tope de tickers distintos en cache
 const quoteCache     = new Map()       // ticker → { price, currency, expiresAt }
+
+// Limpieza periódica: sin esto, quoteCache crece indefinidamente en procesos
+// long-lived (fuera de Vercel serverless, donde cada invocación arranca en frío).
+setInterval(() => {
+  const now = Date.now()
+  for (const [ticker, entry] of quoteCache) {
+    if (entry.expiresAt <= now) quoteCache.delete(ticker)
+  }
+  if (quoteCache.size > QUOTE_CACHE_MAX) {
+    const excess = quoteCache.size - QUOTE_CACHE_MAX
+    for (const ticker of [...quoteCache.keys()].slice(0, excess)) {
+      quoteCache.delete(ticker)
+    }
+  }
+}, QUOTE_TTL).unref()
 
 // ==============================================================
 // NOTA: El rate limiting ahora usa express-rate-limit (middleware)

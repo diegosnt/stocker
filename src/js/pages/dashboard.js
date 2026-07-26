@@ -3,6 +3,7 @@ import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
+import { getConcentrationAlert, renderRiskAlerts } from '../utils.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 
@@ -53,6 +54,8 @@ export const DashboardPage = {
           </div>
         `).join('')}
       </div>
+
+      <div id="dash-risk-alerts"></div>
 
       <div id="dash-content">
         <div class="dash-charts-row">
@@ -251,6 +254,7 @@ export const DashboardPage = {
     `
 
     if (!data.items.length) {
+      document.getElementById('dash-risk-alerts').innerHTML = ''
       mainEl.innerHTML = `
         <div class="card">
           <p class="table-empty">No tenés operaciones registradas.</p>
@@ -266,6 +270,16 @@ export const DashboardPage = {
     const typeItems = Object.entries(byType)
       .map(([ticker, currentValue]) => ({ ticker, currentValue }))
       .sort((a, b) => b.currentValue - a.currentValue)
+
+    const riskAlerts = [
+      getConcentrationAlert(
+        data.items.map(h => ({ label: h.ticker, weight: (h.invested / totalInvested) * 100 })),
+        { subject: 'tu cartera', thresholdWarning: 25, thresholdDanger: 40 }
+      )
+    ].filter(Boolean)
+    document.getElementById('dash-risk-alerts').innerHTML = riskAlerts.length
+      ? `<div class="risk-alerts">${renderRiskAlerts(riskAlerts)}</div>`
+      : ''
 
     // ── Contenido Principal (Gráficos y Tabla) ───────────────
     mainEl.innerHTML = `

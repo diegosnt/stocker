@@ -4,7 +4,7 @@ import { showToast } from '../init.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager } from '../chart-manager.js'
-import { sanitize, sanitizeAttr } from '../utils.js'
+import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts } from '../utils.js'
 import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
 
@@ -113,6 +113,8 @@ export const AnalysisPage = {
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
         <div id="analysis-section-0" style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem">
+          <div id="analysis-risk-alerts"></div>
+
           <div class="kpi-grid" id="analysis-totals-cards" style="margin-bottom: 0">
             <div class="kpi-card kpi-card--modern">
               <div class="kpi-icon-circle" style="background: rgba(79, 70, 230, 0.1); color: #4f46e6">
@@ -736,6 +738,7 @@ export const AnalysisPage = {
     this._bindHoldingsSortHeaders(tableContainer)
     this._bindMobileAccordion()
     this._renderTotalsCards(totalsByCurrency)
+    this._renderRiskAlerts(assetData, totalMarketValueAll)
 
     // Renderizar gráficos si hay datos
     const numAssets = assetData.length
@@ -760,6 +763,22 @@ export const AnalysisPage = {
       if (this._treemapChart) { this._treemapChart.destroy(); this._treemapChart = null }
       document.getElementById('analysis-heatmap').innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem">Sin datos</div>'
     }
+  },
+
+  _renderRiskAlerts(assetData, totalMarketValueAll) {
+    const el = document.getElementById('analysis-risk-alerts')
+    if (!el) return
+    if (!totalMarketValueAll) { el.innerHTML = ''; return }
+
+    const alycLabel = this._activeAlycName ? `este ALyC (${this._activeAlycName})` : 'este ALyC'
+    const alerts = [
+      getConcentrationAlert(
+        assetData.map(a => ({ label: a.ticker, weight: (a.currentValue / totalMarketValueAll) * 100 })),
+        { subject: alycLabel, thresholdWarning: 25, thresholdDanger: 40 }
+      )
+    ].filter(Boolean)
+
+    el.innerHTML = alerts.length ? `<div class="risk-alerts">${renderRiskAlerts(alerts)}</div>` : ''
   },
 
   _renderTotalsCards(totalsByCurrency) {
