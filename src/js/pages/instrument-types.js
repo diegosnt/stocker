@@ -5,9 +5,9 @@ import { invalidate as cacheInvalidate } from '../cache.js'
 import { esc, setFieldError, fmtDate, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 
-let _tiposData = []
-
 export const InstrumentTypesPage = {
+  _tiposData: [],
+
   async render() {
     const content = document.getElementById('page-content')
     content.innerHTML = `
@@ -86,7 +86,7 @@ export const InstrumentTypesPage = {
       return
     }
 
-    _tiposData = data
+    this._tiposData = data
     this._renderRows(data)
   },
 
@@ -155,10 +155,10 @@ export const InstrumentTypesPage = {
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase()
       const filtered = q
-        ? _tiposData.filter(t =>
+        ? this._tiposData.filter(t =>
             t.name.toLowerCase().includes(q) ||
             (t.description || '').toLowerCase().includes(q))
-        : _tiposData
+        : this._tiposData
       this._renderRows(filtered)
     })
   },
@@ -240,6 +240,6 @@ export const InstrumentTypesPage = {
   },
 
   cleanup() {
-    _tiposData = []
+    this._tiposData = []
   }
 }

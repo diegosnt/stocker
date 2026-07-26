@@ -5,11 +5,11 @@ import { invalidate as cacheInvalidate } from '../cache.js'
 import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 
-let _alycsData    = []
-let _alycSortCol  = 'name'
-let _alycSortAsc  = true
-
 export const AlycsPage = {
+  _alycsData: [],
+  _alycSortCol: 'name',
+  _alycSortAsc: true,
+
   async render() {
     const content = document.getElementById('page-content')
     content.innerHTML = `
@@ -92,7 +92,7 @@ export const AlycsPage = {
       return
     }
 
-    _alycsData = data
+    this._alycsData = data
     this._renderRows(this._sorted(data))
   },
 
@@ -173,11 +173,11 @@ export const AlycsPage = {
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase()
       const filtered = q
-        ? _alycsData.filter(a =>
+        ? this._alycsData.filter(a =>
             a.name.toLowerCase().includes(q) ||
             (a.cuit || '').toLowerCase().includes(q) ||
             (a.website || '').toLowerCase().includes(q))
-        : _alycsData
+        : this._alycsData
       this._renderRows(this._sorted(filtered))
     })
   },
@@ -185,26 +185,26 @@ export const AlycsPage = {
   _sorted(data) {
     return [...data].sort((a, b) => {
       let va, vb
-      if (_alycSortCol === 'name')       { va = a.name || '';       vb = b.name || '' }
-      else if (_alycSortCol === 'cuit')  { va = a.cuit || '';       vb = b.cuit || '' }
-      else if (_alycSortCol === 'created_at') { va = a.created_at; vb = b.created_at }
+      if (this._alycSortCol === 'name')       { va = a.name || '';       vb = b.name || '' }
+      else if (this._alycSortCol === 'cuit')  { va = a.cuit || '';       vb = b.cuit || '' }
+      else if (this._alycSortCol === 'created_at') { va = a.created_at; vb = b.created_at }
       else return 0
       const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb
-      return _alycSortAsc ? cmp : -cmp
+      return this._alycSortAsc ? cmp : -cmp
     })
   },
 
   _bindSortHeaders() {
     bindSortableHeaders('alyc-tbody', {
-      getCol: () => _alycSortCol,
-      getAsc: () => _alycSortAsc,
+      getCol: () => this._alycSortCol,
+      getAsc: () => this._alycSortAsc,
       onChange: col => {
-        if (_alycSortCol === col) { _alycSortAsc = !_alycSortAsc }
-        else { _alycSortCol = col; _alycSortAsc = col !== 'created_at' }
+        if (this._alycSortCol === col) { this._alycSortAsc = !this._alycSortAsc }
+        else { this._alycSortCol = col; this._alycSortAsc = col !== 'created_at' }
         const q = document.getElementById('alyc-search')?.value.trim().toLowerCase() || ''
         const visible = q
-          ? _alycsData.filter(a => a.name.toLowerCase().includes(q) || (a.cuit || '').toLowerCase().includes(q) || (a.website || '').toLowerCase().includes(q))
-          : _alycsData
+          ? this._alycsData.filter(a => a.name.toLowerCase().includes(q) || (a.cuit || '').toLowerCase().includes(q) || (a.website || '').toLowerCase().includes(q))
+          : this._alycsData
         this._renderRows(this._sorted(visible))
       }
     })
@@ -291,9 +291,9 @@ export const AlycsPage = {
   },
 
   cleanup() {
-    _alycsData   = []
-    _alycSortCol = 'name'
-    _alycSortAsc = true
+    this._alycsData   = []
+    this._alycSortCol = 'name'
+    this._alycSortAsc = true
   }
 }
 

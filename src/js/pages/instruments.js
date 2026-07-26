@@ -7,13 +7,13 @@ import { deleteWithConfirm } from '../crud-helpers.js'
 
 const PAGE_SIZE   = 10
 
-let _instrData    = []
-let _instrSortCol = 'ticker'
-let _instrSortAsc = true
-let _instrPage    = 0
-let _instrVisible = []   // datos filtrados + ordenados actualmente visibles
-
 export const InstrumentsPage = {
+  _instrData: [],
+  _instrSortCol: 'ticker',
+  _instrSortAsc: true,
+  _instrPage: 0,
+  _instrVisible: [], // datos filtrados + ordenados actualmente visibles
+
   async render() {
     const content = document.getElementById('page-content')
     content.innerHTML = `
@@ -121,38 +121,38 @@ export const InstrumentsPage = {
       return
     }
 
-    _instrData    = data
-    _instrPage    = 0
-    _instrVisible = this._sorted(data)
+    this._instrData    = data
+    this._instrPage    = 0
+    this._instrVisible = this._sorted(data)
     this._renderRows()
   },
 
   _sorted(data) {
     return [...data].sort((a, b) => {
       let va, vb
-      if (_instrSortCol === 'ticker')      { va = a.ticker;                           vb = b.ticker }
-      else if (_instrSortCol === 'name')   { va = a.name;                             vb = b.name }
-      else if (_instrSortCol === 'type')   { va = a.instrument_types?.name ?? '';     vb = b.instrument_types?.name ?? '' }
-      else if (_instrSortCol === 'created_at') { va = a.created_at;                  vb = b.created_at }
+      if (this._instrSortCol === 'ticker')      { va = a.ticker;                           vb = b.ticker }
+      else if (this._instrSortCol === 'name')   { va = a.name;                             vb = b.name }
+      else if (this._instrSortCol === 'type')   { va = a.instrument_types?.name ?? '';     vb = b.instrument_types?.name ?? '' }
+      else if (this._instrSortCol === 'created_at') { va = a.created_at;                  vb = b.created_at }
       else return 0
       const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb
-      return _instrSortAsc ? cmp : -cmp
+      return this._instrSortAsc ? cmp : -cmp
     })
   },
 
   _bindSortHeaders() {
     bindSortableHeaders('inst-tbody', {
-      getCol: () => _instrSortCol,
-      getAsc: () => _instrSortAsc,
+      getCol: () => this._instrSortCol,
+      getAsc: () => this._instrSortAsc,
       onChange: col => {
-        if (_instrSortCol === col) { _instrSortAsc = !_instrSortAsc }
-        else { _instrSortCol = col; _instrSortAsc = col !== 'created_at' }
+        if (this._instrSortCol === col) { this._instrSortAsc = !this._instrSortAsc }
+        else { this._instrSortCol = col; this._instrSortAsc = col !== 'created_at' }
         const q = document.getElementById('inst-search')?.value.trim().toLowerCase() || ''
         const filtered = q
-          ? _instrData.filter(i => i.ticker.toLowerCase().includes(q) || i.name.toLowerCase().includes(q) || (i.instrument_types?.name || '').toLowerCase().includes(q))
-          : _instrData
-        _instrPage    = 0
-        _instrVisible = this._sorted(filtered)
+          ? this._instrData.filter(i => i.ticker.toLowerCase().includes(q) || i.name.toLowerCase().includes(q) || (i.instrument_types?.name || '').toLowerCase().includes(q))
+          : this._instrData
+        this._instrPage    = 0
+        this._instrVisible = this._sorted(filtered)
         this._renderRows()
       }
     })
@@ -164,15 +164,15 @@ export const InstrumentsPage = {
     const listCard    = document.getElementById('inst-list-card')
     if (!tbody || !mobileList) return
 
-    if (!_instrVisible.length) {
+    if (!this._instrVisible.length) {
       tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">No hay instrumentos. Agregá uno arriba.</td></tr>`
       mobileList.innerHTML = `<p class="table-empty">No hay instrumentos. Agregá uno arriba.</p>`
       this._renderPagination()
       return
     }
 
-    const start = _instrPage * PAGE_SIZE
-    const page  = _instrVisible.slice(start, start + PAGE_SIZE)
+    const start = this._instrPage * PAGE_SIZE
+    const page  = this._instrVisible.slice(start, start + PAGE_SIZE)
 
     tbody.innerHTML = page.map(i => `
       <tr>
@@ -235,37 +235,37 @@ export const InstrumentsPage = {
     const container = document.getElementById('inst-pagination')
     if (!container) return
 
-    const total      = _instrVisible.length
+    const total      = this._instrVisible.length
     const totalPages = Math.ceil(total / PAGE_SIZE)
 
     if (totalPages <= 1) { container.innerHTML = ''; return }
 
-    const from  = _instrPage * PAGE_SIZE + 1
-    const to    = Math.min((_instrPage + 1) * PAGE_SIZE, total)
-    const pages = buildPageRange(_instrPage, totalPages)
+    const from  = this._instrPage * PAGE_SIZE + 1
+    const to    = Math.min((this._instrPage + 1) * PAGE_SIZE, total)
+    const pages = buildPageRange(this._instrPage, totalPages)
 
     const pageButtons = pages.map(p =>
       p === '...'
         ? `<span class="pag-ellipsis">…</span>`
-        : `<button class="btn btn-sm ${p === _instrPage ? 'btn-primary pag-active' : 'btn-ghost'} pag-num" data-page="${p}">${p + 1}</button>`
+        : `<button class="btn btn-sm ${p === this._instrPage ? 'btn-primary pag-active' : 'btn-ghost'} pag-num" data-page="${p}">${p + 1}</button>`
     ).join('')
 
     container.innerHTML = `
       <div class="pagination">
-        <button class="btn btn-sm btn-ghost" id="btn-inst-prev" ${_instrPage === 0 ? 'disabled' : ''}>←</button>
+        <button class="btn btn-sm btn-ghost" id="btn-inst-prev" ${this._instrPage === 0 ? 'disabled' : ''}>←</button>
         <div class="pag-pages">${pageButtons}</div>
-        <button class="btn btn-sm btn-ghost" id="btn-inst-next" ${_instrPage >= totalPages - 1 ? 'disabled' : ''}>→</button>
+        <button class="btn btn-sm btn-ghost" id="btn-inst-next" ${this._instrPage >= totalPages - 1 ? 'disabled' : ''}>→</button>
         <span class="pag-info">Mostrando ${from}–${to} de ${total}</span>
       </div>`
 
     container.querySelectorAll('.pag-num').forEach(btn => {
-      btn.addEventListener('click', () => { _instrPage = parseInt(btn.dataset.page, 10); this._renderRows() })
+      btn.addEventListener('click', () => { this._instrPage = parseInt(btn.dataset.page, 10); this._renderRows() })
     })
-    if (_instrPage > 0) {
-      document.getElementById('btn-inst-prev').addEventListener('click', () => { _instrPage--; this._renderRows() })
+    if (this._instrPage > 0) {
+      document.getElementById('btn-inst-prev').addEventListener('click', () => { this._instrPage--; this._renderRows() })
     }
-    if (_instrPage < totalPages - 1) {
-      document.getElementById('btn-inst-next').addEventListener('click', () => { _instrPage++; this._renderRows() })
+    if (this._instrPage < totalPages - 1) {
+      document.getElementById('btn-inst-next').addEventListener('click', () => { this._instrPage++; this._renderRows() })
     }
   },
 
@@ -275,13 +275,13 @@ export const InstrumentsPage = {
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase()
       const filtered = q
-        ? _instrData.filter(i =>
+        ? this._instrData.filter(i =>
             i.ticker.toLowerCase().includes(q) ||
             i.name.toLowerCase().includes(q) ||
             (i.instrument_types?.name || '').toLowerCase().includes(q))
-        : _instrData
-      _instrPage    = 0
-      _instrVisible = this._sorted(filtered)
+        : this._instrData
+      this._instrPage    = 0
+      this._instrVisible = this._sorted(filtered)
       this._renderRows()
     })
   },
@@ -384,10 +384,10 @@ export const InstrumentsPage = {
   },
 
   cleanup() {
-    _instrData    = []
-    _instrVisible = []
-    _instrPage    = 0
-    _instrSortCol = 'ticker'
-    _instrSortAsc = true
+    this._instrData    = []
+    this._instrVisible = []
+    this._instrPage    = 0
+    this._instrSortCol = 'ticker'
+    this._instrSortAsc = true
   }
 }
