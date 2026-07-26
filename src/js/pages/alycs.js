@@ -111,10 +111,10 @@ export const AlycsPage = {
     tbody.innerHTML = data.map(a => `
       <tr>
         <td><strong>${esc(a.name)}</strong></td>
-        <td>${a.cuit ? esc(a.cuit) : '<span style="color:var(--color-muted)">—</span>'}</td>
+        <td>${a.cuit ? esc(a.cuit) : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td>${a.website
           ? `<a href="${esc(a.website)}" target="_blank" rel="noopener">${esc(a.website)}</a>`
-          : '<span style="color:var(--color-muted)">—</span>'}</td>
+          : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td>${fmtDate(a.created_at)}</td>
         <td class="actions-cell">
           <button class="btn btn-sm btn-ghost btn-edit"

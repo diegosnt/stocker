@@ -4,7 +4,7 @@ import { showToast } from '../init.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, Chart } from '../chart-manager.js'
-import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts } from '../utils.js'
+import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts, bindCardAccordion } from '../utils.js'
 import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
 
@@ -1301,13 +1301,6 @@ export const AnalysisPage = {
     },
 
     _bindMobileAccordion() {
-    document.querySelectorAll('.dash-instrument-card-header').forEach(header => {
-      header.addEventListener('click', (e) => {
-        const card = e.currentTarget.closest('.dash-instrument-card');
-        if (card) {
-          card.classList.toggle('collapsed');
-        }
-      });
-    });
+    bindCardAccordion()
   }
 }

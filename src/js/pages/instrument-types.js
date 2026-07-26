@@ -105,7 +105,7 @@ export const InstrumentTypesPage = {
     tbody.innerHTML = data.map(t => `
       <tr>
         <td><strong>${esc(t.name)}</strong></td>
-        <td>${t.description ? esc(t.description) : '<span style="color:var(--color-muted)">—</span>'}</td>
+        <td>${t.description ? esc(t.description) : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td>${fmtDate(t.created_at)}</td>
         <td class="actions-cell">
           <button class="btn btn-sm btn-ghost btn-edit"

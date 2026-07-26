@@ -3,7 +3,7 @@ import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
-import { getConcentrationAlert, renderRiskAlerts, esc } from '../utils.js'
+import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion } from '../utils.js'
 import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equity-curve.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
@@ -1048,32 +1048,12 @@ export const DashboardPage = {
         </div>
       </div>`
 
-    const header  = document.getElementById('dash-realized-pnl-header')
-    const body    = document.getElementById('dash-realized-pnl-body')
-    const chevron = document.getElementById('dash-realized-pnl-chevron')
-    header.addEventListener('click', () => {
-      const collapsed = body.style.display === 'none'
-      body.style.display = collapsed ? '' : 'none'
-      chevron.style.transform = collapsed ? '' : 'rotate(-90deg)'
-    })
-
-    el.querySelectorAll('.dash-instrument-card-header').forEach(cardHeader => {
-      cardHeader.addEventListener('click', (e) => {
-        e.currentTarget.closest('.dash-instrument-card')?.classList.toggle('collapsed')
-      })
-    })
+    bindCollapsibleSection({ headerId: 'dash-realized-pnl-header', bodyId: 'dash-realized-pnl-body', chevronId: 'dash-realized-pnl-chevron' })
+    bindCardAccordion(el)
   },
 
   _bindTableToggle() {
-    const header  = document.getElementById('dash-table-header')
-    const body    = document.getElementById('dash-table-body')
-    const chevron = document.getElementById('dash-table-chevron')
-    if (!header || !body) return
-    header.addEventListener('click', () => {
-      const collapsed = body.style.display === 'none'
-      body.style.display    = collapsed ? '' : 'none'
-      chevron.style.transform = collapsed ? '' : 'rotate(-90deg)'
-    })
+    bindCollapsibleSection({ headerId: 'dash-table-header', bodyId: 'dash-table-body', chevronId: 'dash-table-chevron' })
   },
 
   _bindSortHeaders() {
@@ -1140,13 +1120,6 @@ export const DashboardPage = {
   },
 
   _bindMobileAccordion() {
-    document.querySelectorAll('.dash-instrument-card-header').forEach(header => {
-      header.addEventListener('click', (e) => {
-        const card = e.currentTarget.closest('.dash-instrument-card');
-        if (card) {
-          card.classList.toggle('collapsed');
-        }
-      });
-    });
+    bindCardAccordion()
   }
 }

@@ -277,7 +277,7 @@ export const OperationsPage = {
          
           <td>
             <span class="ticker-chip" title="${esc(instName)}">${esc(ticker)}</span>
-            <span class="ticker-name" style="color:var(--color-muted);font-size:.8rem;margin-left:.35rem">${esc(instName)}</span>
+            <span class="ticker-name" style="color:var(--text-muted);font-size:.8rem;margin-left:.35rem">${esc(instName)}</span>
           </td>
           <td class="alyc-col"><div class="alyc-name-cell">${esc(alycName)}</div></td>
           <td class="amount total-${op.type}"><strong>${fmtQty(op.quantity)}</strong></td>
@@ -349,8 +349,18 @@ export const OperationsPage = {
       opsCards.innerHTML = cardsHtml
       // Eventos para colapsar/expandir tarjetas mobile
       opsCards.querySelectorAll('.op-card-header').forEach(header => {
-        header.addEventListener('click', () => {
+        header.setAttribute('role', 'button')
+        header.setAttribute('tabindex', '0')
+        header.setAttribute('aria-expanded', String(!header.parentElement.classList.contains('collapsed')))
+        const toggle = () => {
           header.parentElement.classList.toggle('collapsed')
+          header.setAttribute('aria-expanded', String(!header.parentElement.classList.contains('collapsed')))
+        }
+        header.addEventListener('click', toggle)
+        header.addEventListener('keydown', e => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          toggle()
         })
       })
     }

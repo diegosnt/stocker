@@ -179,3 +179,59 @@ export function resetEditForm({ formId, titleId, submitId, cancelId, defaultTitl
   document.getElementById(cancelId).style.display = 'none'
   delete document.getElementById(formId).dataset.editId
 }
+
+// Header colapsable (div con onclick) que muestra/oculta un body y rota un chevron.
+// Lo hace operable por teclado (Enter/Espacio) y expone aria-expanded — el patrón
+// <div onclick> por sí solo no es alcanzable con Tab ni anunciado por lectores de pantalla.
+export function bindCollapsibleSection({ headerId, bodyId, chevronId }) {
+  const header  = document.getElementById(headerId)
+  const body    = document.getElementById(bodyId)
+  const chevron = chevronId ? document.getElementById(chevronId) : null
+  if (!header || !body) return
+
+  header.setAttribute('role', 'button')
+  header.setAttribute('tabindex', '0')
+  header.setAttribute('aria-expanded', String(body.style.display !== 'none'))
+
+  const toggle = () => {
+    const collapsed = body.style.display === 'none'
+    body.style.display = collapsed ? '' : 'none'
+    if (chevron) chevron.style.transform = collapsed ? '' : 'rotate(-90deg)'
+    header.setAttribute('aria-expanded', String(collapsed))
+  }
+
+  header.addEventListener('click', toggle)
+  header.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    toggle()
+  })
+}
+
+// Acordeón de tarjetas mobile (`.dash-instrument-card` / `.dash-instrument-card-header`):
+// togglea la clase `.collapsed` en la tarjeta contenedora. Mismo motivo que arriba —
+// hace falta tabindex + rol + manejo de teclado porque el header es un <div>, no un <button>.
+// scope acota la búsqueda (por default, todo el documento) para evitar re-bindear
+// headers de otras secciones si se llama más de una vez por render.
+export function bindCardAccordion(scope = document) {
+  scope.querySelectorAll('.dash-instrument-card-header').forEach(header => {
+    const card = header.closest('.dash-instrument-card')
+    if (!card) return
+
+    header.setAttribute('role', 'button')
+    header.setAttribute('tabindex', '0')
+    header.setAttribute('aria-expanded', String(!card.classList.contains('collapsed')))
+
+    const toggle = () => {
+      card.classList.toggle('collapsed')
+      header.setAttribute('aria-expanded', String(!card.classList.contains('collapsed')))
+    }
+
+    header.addEventListener('click', toggle)
+    header.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return
+      e.preventDefault()
+      toggle()
+    })
+  })
+}

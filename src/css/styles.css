@@ -43,7 +43,7 @@
   --bg-main: #f1f5f9;       /* Slate 100 */
   --bg-card: #ffffff;
   --text-main: #1e293b;     /* Slate 800 */
-  --text-muted: #64748b;    /* Slate 500 */
+  --text-muted: #475569;    /* Slate 600 — Slate 500 daba 4.35:1 contra --bg-main, por debajo del mínimo WCAG AA (4.5:1) */
   --border: #e2e8f0;
   --shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
   --gradient: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
@@ -230,7 +230,7 @@ h1, h2, h3, h4, h5 {
   padding: 0.3rem 0.5rem;
   width: 145px;
 }
-.ops-date-range span { color: var(--color-muted); font-size: 0.8rem; }
+.ops-date-range span { color: var(--text-muted); font-size: 0.8rem; }
 
 .op-card--modern {
   display: flex;
@@ -1588,7 +1588,7 @@ input:focus, select:focus, textarea:focus {
 .pag-active { font-weight: 700; }
 .pag-ellipsis {
   padding: 0 0.25rem;
-  color: var(--color-muted);
+  color: var(--text-muted);
   font-size: 0.85rem;
   user-select: none;
 }
