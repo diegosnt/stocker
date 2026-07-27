@@ -1,6 +1,7 @@
 import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
+import { downloadFullBackup, downloadOperationsMarkdown } from './settings/backup.js'
 
 export const SettingsPage = {
   async render() {
@@ -52,7 +53,37 @@ export const SettingsPage = {
             </div>
           </div>
         </div>
+
+        <div class="card">
+          <h3>Copia de seguridad</h3>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Backup completo de tus datos</div>
+              <div class="setting-desc">
+                Descarga un archivo JSON con todas tus operaciones, instrumentos, tipos de instrumento y ALyCs.
+                Guardalo en un lugar seguro para poder recargar tus operaciones si perdés el acceso o se borran los datos.
+              </div>
+            </div>
+            <button class="btn btn-sm" id="btn-download-backup">Descargar backup</button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Operaciones en tabla (Markdown)</div>
+              <div class="setting-desc">
+                Descarga todas tus operaciones como una tabla Markdown, para revisar o compartir un resumen legible.
+              </div>
+            </div>
+            <button class="btn btn-sm" id="btn-download-md">Descargar Markdown</button>
+          </div>
+        </div>
       </div>`
+
+    document.getElementById('btn-download-backup').addEventListener('click', (e) => {
+      downloadFullBackup(e.currentTarget)
+    })
+    document.getElementById('btn-download-md').addEventListener('click', (e) => {
+      downloadOperationsMarkdown(e.currentTarget)
+    })
 
     await Promise.all([this._load(), this._loadMarketBadge()])
   },

@@ -18,7 +18,7 @@ export const DashboardPage = {
   _assetChart: null,
   _alycHoldingChart: null,
   _equityCharts: {},
-  _equityRange: '1y',
+  _equityRange: '1mo',
   _resolvedPrices: {},
   _chartRendered: false,
   _chartsReady: false,
@@ -34,7 +34,7 @@ export const DashboardPage = {
     this._alycHoldingChart = ChartManager.destroy(this._alycHoldingChart)
     Object.keys(this._equityCharts).forEach(curr => { this._equityCharts[curr] = ChartManager.destroy(this._equityCharts[curr]) })
     this._equityCharts = {}
-    this._equityRange = '1y'
+    this._equityRange = '1mo'
     this._chartRendered = false
     this._chartsReady = false
     this._alycRows = null
@@ -70,10 +70,9 @@ export const DashboardPage = {
         <div class="chart-panel-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem">
           <span>Evolución del Patrimonio</span>
           <div id="dash-equity-range" style="display:flex; gap:0.5rem; flex-wrap:wrap">
+            <button class="btn-alyc dash-equity-range-btn" data-range="5d">1S</button>
+            <button class="btn-alyc dash-equity-range-btn btn-primary" data-range="1mo">1M</button>
             <button class="btn-alyc dash-equity-range-btn" data-range="6mo">6M</button>
-            <button class="btn-alyc dash-equity-range-btn btn-primary" data-range="1y">1A</button>
-            <button class="btn-alyc dash-equity-range-btn" data-range="5y">5A</button>
-            <button class="btn-alyc dash-equity-range-btn" data-range="max">Todo</button>
           </div>
         </div>
         <div id="dash-equity-charts">
