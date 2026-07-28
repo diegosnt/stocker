@@ -23,7 +23,7 @@ export const AnalysisPage = {
   _activeAlycName: null,
   _activeAlycId: null,
   _activeBenchmark: 'SPY',
-  _lastValidHoldings: [],
+  _displayHoldings: [],
   _validHistories: [],
   _validTickers: [],
   _holdingsSortCol: 'marketValue',
@@ -352,10 +352,10 @@ export const AnalysisPage = {
     if (btnRefreshComp) {
       btnRefreshComp.onclick = async () => {
         btnRefreshComp.style.transform = 'rotate(360deg)'
-        const tickers = (this._lastValidHoldings || []).map(h => h.ticker)
+        const tickers = (this._displayHoldings || []).map(h => h.ticker)
         if (tickers.length > 0) {
           await this._updateMarketPrices(tickers)
-          this._renderComparisonChart(this._lastValidHoldings)
+          this._renderComparisonChart(this._displayHoldings)
         }
         setTimeout(() => { btnRefreshComp.style.transform = 'none' }, 400)
       }
@@ -379,9 +379,9 @@ export const AnalysisPage = {
     // Redibuja el gráfico de comparación al cambiar de tema (los colores de texto quedan fijos al crear el chart)
     if (this._themeChangeHandler) document.removeEventListener('darkmodechange', this._themeChangeHandler)
     this._themeChangeHandler = () => {
-      if (this._lastValidHoldings?.length) {
+      if (this._displayHoldings?.length) {
         if (this._compChart) { this._compChart.destroy(); this._compChart = null }
-        this._renderComparisonChart(this._lastValidHoldings)
+        this._renderComparisonChart(this._displayHoldings)
       }
     }
     document.addEventListener('darkmodechange', this._themeChangeHandler)
@@ -485,7 +485,7 @@ export const AnalysisPage = {
       })
 
       if (failedTickers.length > 0) {
-        console.warn(`[Analysis] Failed to load history for: ${failedTickers.join(', ')}`)
+        console.warn(`[Analysis] No hay historial suficiente para: ${failedTickers.join(', ')} (no participan del análisis estadístico, pero sí se muestran en la cartera)`)
       }
 
       if (validTickers.length < 2) throw new Error('No hay suficientes datos históricos.')
@@ -540,16 +540,18 @@ export const AnalysisPage = {
 
       try { renderCorrelationHeatmap(validTickers, returnsMatrix) } catch(e) { console.error('Error Correlación:', e) }
       
-      await this._updateMarketPrices(validTickers)
-      this._lastValidHoldings = validHoldings
-      this._renderCurrentHoldings(validHoldings, analysis)
-      this._renderComparisonChart(validHoldings)
+      // Precio actual y visualización de cartera: para TODOS los holdings del ALyC,
+      // no solo los que tienen historial suficiente para el análisis estadístico.
+      await this._updateMarketPrices(alycHoldings.map(h => h.ticker))
+      this._displayHoldings = alycHoldings
+      this._renderCurrentHoldings(alycHoldings, analysis)
+      this._renderComparisonChart(alycHoldings)
       this._renderActivityChart(alycId)
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${sanitize(benchmarkTicker)}.`
-      
+
       if (failedTickers.length > 0) {
-        showToast(`Algunos datos no estarán completos: ${failedTickers.join(', ')}`, 'warning')
+        showToast(`Sin historial suficiente, no participan del análisis estadístico: ${failedTickers.join(', ')}`, 'warning')
       }
       
       loadingDiv.style.display = 'none'
