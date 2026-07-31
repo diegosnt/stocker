@@ -396,6 +396,9 @@ export const ChartManager = {
       options.instance.data.datasets[0].data = (analysis.portfolios || []).map(p => ({ x: p.std, y: p.return }))
       options.instance.data.datasets[1].data = [{ x: analysis.optimal.std, y: analysis.optimal.return }]
       options.instance.data.datasets[2].data = [{ x: analysis.current.std, y: analysis.current.return }]
+      if (options.instance.data.datasets[3]) {
+        options.instance.data.datasets[3].data = (analysis.assets || []).map(a => ({ x: a.std, y: a.return, ticker: a.ticker, weight: a.weight }))
+      }
       options.instance.update()
       return options.instance
     }
@@ -437,6 +440,16 @@ export const ChartManager = {
             borderWidth: 3,
             pointStyle: 'rectRot',
             zIndex: 11
+          },
+          {
+            label: 'Activos Individuales',
+            data: (analysis.assets || []).map(a => ({ x: a.std, y: a.return, ticker: a.ticker, weight: a.weight })),
+            backgroundColor: 'rgba(245, 158, 11, 0.85)',
+            borderColor: getCSSVar('--bg-card') || '#ffffff',
+            borderWidth: 1.5,
+            pointRadius: (ctx) => 5 + (ctx.raw?.weight || 0) * 35,
+            pointHoverRadius: (ctx) => 7 + (ctx.raw?.weight || 0) * 35,
+            zIndex: 9
           }
         ]
       },
@@ -464,6 +477,10 @@ export const ChartManager = {
               label: (ctx) => {
                 const x = (ctx.parsed.x * 100).toFixed(2) + '%'
                 const y = (ctx.parsed.y * 100).toFixed(2) + '%'
+                if (ctx.raw?.ticker) {
+                  const w = ctx.raw.weight != null ? ` | Peso: ${(ctx.raw.weight * 100).toFixed(1)}%` : ''
+                  return ` ${ctx.raw.ticker}: Riesgo ${x}, Retorno ${y}${w}`
+                }
                 return ` ${ctx.dataset.label}: Riesgo ${x}, Retorno ${y}`
               }
             }
@@ -536,6 +553,99 @@ export const ChartManager = {
             intersect: false,
             mode: 'index',
             filter: (item) => item.dataset.zIndex > 1,
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+            }
+          }
+        },
+        ...options.chartOptions
+      }
+    })
+  },
+
+  renderPriceWithTradesChart(canvas, data, options = {}) {
+    if (!canvas || !data) return null
+    const { labels, price, compras, ventas } = data
+
+    if (options.instance && options.instance.config.type === 'line') {
+      options.instance.data.labels = labels
+      options.instance.data.datasets[0].data = price
+      options.instance.data.datasets[1].data = compras
+      options.instance.data.datasets[2].data = ventas
+      options.instance.update()
+      return options.instance
+    }
+
+    const baseOptions = getBaseOptions()
+    const scales = getScaleOptions()
+    const textColor = getCSSVar('--text-muted') || '#64748b'
+    const cardBg = getCSSVar('--bg-card') || '#ffffff'
+
+    return new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Precio',
+            data: price,
+            borderColor: '#4f46e6',
+            backgroundColor: 'rgba(79, 70, 230, 0.08)',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            fill: true,
+            tension: 0.15,
+            order: 3
+          },
+          {
+            label: 'Compras',
+            data: compras,
+            pointStyle: 'triangle',
+            pointRadius: 7,
+            pointHoverRadius: 9,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: cardBg,
+            pointBorderWidth: 1.5,
+            showLine: false,
+            order: 1
+          },
+          {
+            label: 'Ventas',
+            data: ventas,
+            pointStyle: 'triangle',
+            pointRotation: 180,
+            pointRadius: 7,
+            pointHoverRadius: 9,
+            pointBackgroundColor: '#ef4444',
+            pointBorderColor: cardBg,
+            pointBorderWidth: 1.5,
+            showLine: false,
+            order: 2
+          }
+        ]
+      },
+      options: {
+        ...baseOptions,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            ...scales.x,
+            grid: { display: false },
+            ticks: { ...scales.x.ticks, maxTicksLimit: 8 }
+          },
+          y: {
+            ...scales.y,
+            title: { display: true, text: 'Precio', color: textColor },
+            ticks: { ...scales.y.ticks, callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 }) }
+          }
+        },
+        plugins: {
+          ...baseOptions.plugins,
+          legend: { display: true, position: 'top', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+          tooltip: {
+            ...baseOptions.plugins.tooltip,
+            filter: (item) => item.parsed.y != null,
             callbacks: {
               label: (ctx) => ` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
             }

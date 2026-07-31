@@ -19,6 +19,10 @@ export const AnalysisPage = {
   _typeChart: null,
   _compChart: null,
   _activityChart: null,
+  _pnlChart: null,
+  _timingChart: null,
+  _timingTicker: null,
+  _alycOperations: [],
   _resolvedPrices: {},
   _activeAlycName: null,
   _activeAlycId: null,
@@ -33,7 +37,7 @@ export const AnalysisPage = {
     const charts = [
       this._chart, this._mcChart, this._btChart, 
       this._rcChart, this._ddChart, this._treemapChart,
-      this._assetChart, this._typeChart, this._compChart, this._activityChart
+      this._assetChart, this._typeChart, this._compChart, this._activityChart, this._pnlChart, this._timingChart
     ]
     charts.forEach(chart => {
       if (chart) {
@@ -50,6 +54,9 @@ export const AnalysisPage = {
     this._typeChart = null
     this._compChart = null
     this._activityChart = null
+    this._pnlChart = null
+    this._timingChart = null
+    this._alycOperations = []
     this._validHistories = []
     this._validTickers = []
     if (this._themeChangeHandler) {
@@ -184,6 +191,26 @@ export const AnalysisPage = {
             </div>
           </div>
 
+          <div class="analysis-grid-two" id="asset-distribution-card" style="margin-bottom: 0; display: none">
+            <div class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
+              <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Peso por Activo en la Cartera</h3>
+              <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+                Porcentaje que representa cada CEDEAR sobre el valor total de mercado.
+              </p>
+              <div id="current-holdings-chart" style="flex: 1; min-height: 280px; position: relative"></div>
+            </div>
+
+            <div class="card" style="margin-bottom: 0; padding: 1.25rem; display: flex; flex-direction: column">
+              <h3 style="font-size: 0.95rem; margin-bottom: 0.25rem">Ganancias y Pérdidas por Activo</h3>
+              <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+                Resultado $ de cada activo y cuánto impacta en el valor total de la cartera.
+              </p>
+              <div style="flex: 1; min-height: 280px; position: relative">
+                <canvas id="pnl-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
           <div class="card" style="margin-bottom: 0; padding: 1.25rem">
             <h3 style="font-size: 1rem; margin-bottom: 1rem">Detalle de Tenencia Actual
               <span id="current-holdings-alyc-name" style="font-size: 1.20rem; font-weight: bold; color: var(--text-muted); margin-left: 0.5rem"></span>
@@ -198,6 +225,20 @@ export const AnalysisPage = {
           <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">Frecuencia de compras y ventas por mes.</p>
           <div id="activity-chart-container" style="height: 200px; position: relative">
             <div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding-top:2rem">Cargando actividad...</div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 0.3: Timing de Operaciones -->
+        <div class="card" id="timing-card" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.25rem">
+            <h3 style="font-size: 0.95rem; margin: 0">Timing de tus Operaciones</h3>
+            <select id="timing-ticker-select" style="font-size: 0.8rem; padding: 0.25rem 0.5rem"></select>
+          </div>
+          <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+            Precio histórico del activo con tus compras (▲ verde) y ventas (▼ roja) marcadas — para ver si estás comprando en bajas o persiguiendo subas.
+          </p>
+          <div style="height: 300px; position: relative">
+            <canvas id="timing-chart"></canvas>
           </div>
         </div>
 
@@ -249,8 +290,11 @@ export const AnalysisPage = {
           </div>
 
           <div class="card" style="padding: 1.25rem; height: 100%; margin-bottom: 0">
-            <h3 style="font-size: 1rem; margin-bottom: 1rem">Frontera Eficiente (Markowitz Pro)</h3>
-            <div style="height: 350px; position: relative"><canvas id="markowitz-chart"></canvas></div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.25rem">Frontera Eficiente (Markowitz Pro)</h3>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
+              Puntos naranjas: cada activo individual (tamaño = peso en cartera). Celeste: tu cartera actual. Verde: la óptima según Sharpe.
+            </p>
+            <div style="height: 320px; position: relative"><canvas id="markowitz-chart"></canvas></div>
           </div>
         </div>
 
@@ -358,6 +402,15 @@ export const AnalysisPage = {
           this._renderComparisonChart(this._displayHoldings)
         }
         setTimeout(() => { btnRefreshComp.style.transform = 'none' }, 400)
+      }
+    }
+
+    // Selector de activo para el gráfico de Timing de Operaciones
+    const timingSelect = document.getElementById('timing-ticker-select')
+    if (timingSelect) {
+      timingSelect.onchange = () => {
+        this._timingTicker = timingSelect.value
+        this._renderTimingChart(this._timingTicker)
       }
     }
 
@@ -547,6 +600,7 @@ export const AnalysisPage = {
       this._renderCurrentHoldings(alycHoldings, analysis)
       this._renderComparisonChart(alycHoldings)
       this._renderActivityChart(alycId)
+      try { await this._loadTimingChart(alycId) } catch(e) { console.error('Error Timing:', e) }
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${sanitize(benchmarkTicker)}.`
 
@@ -657,7 +711,7 @@ export const AnalysisPage = {
         const type = h.instrument_type_name || 'Sin tipo'
  
         // Datos para gráficos
-        assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnlPct })
+        assetData.push({ ticker: h.ticker, currentValue: currentVal, cost: invested, pnl, pnlPct })
         typeGroups[type] = (typeGroups[type] || 0) + currentVal
  
         // Desktop row
@@ -748,9 +802,10 @@ export const AnalysisPage = {
 
     if (numAssets > 0) {
       if (numAssets > 1) {
-        if (assetCard) assetCard.style.display = 'flex'
+        if (assetCard) assetCard.style.display = 'grid'
         const sortedAssets = assetData.sort((a, b) => b.currentValue - a.currentValue)
         this._renderAssetColumnChart(assetChartContainer, sortedAssets, totalMarketValueAll, '_assetChart')
+        this._renderPnlChart(document.getElementById('pnl-chart'), assetData, totalMarketValueAll)
       } else {
         if (assetCard) assetCard.style.display = 'none'
       }
@@ -897,6 +952,71 @@ export const AnalysisPage = {
     }
   },
 
+  async _loadTimingChart(alycId) {
+    const card = document.getElementById('timing-card')
+    const select = document.getElementById('timing-ticker-select')
+    if (!card || !select || !this._validTickers.length) {
+      if (card) card.style.display = 'none'
+      return
+    }
+
+    select.innerHTML = this._validTickers
+      .map(t => `<option value="${sanitizeAttr(t)}">${sanitize(t)}</option>`)
+      .join('')
+
+    if (!this._validTickers.includes(this._timingTicker)) {
+      this._timingTicker = this._validTickers[0]
+    }
+    select.value = this._timingTicker
+
+    const { data, error } = await supabase
+      .from('operations_search')
+      .select('operated_at, type, price, instrument_ticker')
+      .eq('alyc_id', alycId)
+    if (error) throw error
+    this._alycOperations = data || []
+
+    card.style.display = 'block'
+    this._renderTimingChart(this._timingTicker)
+  },
+
+  _renderTimingChart(ticker) {
+    const canvas = document.getElementById('timing-chart')
+    const idx = this._validTickers.indexOf(ticker)
+    const history = idx >= 0 ? this._validHistories[idx] : null
+    if (!canvas || !history || history.length === 0) return
+
+    const points = history
+      .map(h => ({ date: new Date(h.date * 1000).toISOString().split('T')[0], price: h.price }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    const labels = points.map(p => p.date)
+    const priceData = points.map(p => p.price)
+    const compras = new Array(labels.length).fill(null)
+    const ventas = new Array(labels.length).fill(null)
+
+    // Ubica cada operación en la fecha disponible más cercana (el historial no siempre
+    // tiene una vela exacta para el día de la operación, ej. feriados).
+    this._alycOperations
+      .filter(op => op.instrument_ticker === ticker)
+      .forEach(op => {
+        const opDate = String(op.operated_at).slice(0, 10)
+        let matchIdx = labels.indexOf(opDate)
+        if (matchIdx === -1) {
+          matchIdx = labels.findIndex(d => d >= opDate)
+          if (matchIdx === -1) matchIdx = labels.length - 1
+          else if (matchIdx > 0) matchIdx -= 1
+        }
+        const price = parseFloat(op.price)
+        if (op.type === 'compra') compras[matchIdx] = price
+        else if (op.type === 'venta') ventas[matchIdx] = price
+      })
+
+    this._timingChart = ChartManager.renderPriceWithTradesChart(canvas, { labels, price: priceData, compras, ventas }, {
+      instance: this._timingChart
+    })
+  },
+
   _renderDonutChart(container, items, total, chartKey) {
     if (!container || !items || items.length === 0) return
     this[chartKey] = ChartManager.destroy(this[chartKey])
@@ -916,6 +1036,29 @@ export const AnalysisPage = {
 
     this[chartKey] = ChartManager.renderVerticalBarChart(canvas, items, {
       total: total
+    })
+  },
+
+  _renderPnlChart(canvas, items, total) {
+    if (!canvas || !items || items.length === 0) return
+    // Destruye y recrea (no reutiliza instancia): el tooltip cierra sobre `total`,
+    // que cambia entre renders (ALyC distinto, refresh de precios), y el branch de
+    // actualización in-place de ChartManager no reconstruye los callbacks del tooltip.
+    this._pnlChart = ChartManager.destroy(this._pnlChart)
+
+    const sorted = items.slice().sort((a, b) => b.pnl - a.pnl)
+    const chartItems = sorted.map(a => ({ label: a.ticker, value: a.pnl }))
+    const fmt = v => Math.abs(v).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+    this._pnlChart = ChartManager.renderBarChart(canvas, chartItems, {
+      isCurrency: true,
+      barThickness: 16,
+      tooltipFormatter: (v) => {
+        const sign = v >= 0 ? '+' : '-'
+        const impact = total ? (v / total) * 100 : 0
+        const impactSign = impact >= 0 ? '+' : ''
+        return ` P&L: ${sign}$${fmt(v)} (${impactSign}${impact.toFixed(1)}% de la cartera)`
+      }
     })
   },
 

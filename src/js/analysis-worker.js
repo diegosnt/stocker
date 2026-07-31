@@ -69,9 +69,10 @@ function performMarkowitz(tickers, returnsMatrix, holdings) {
   const weightsObj = tickers.reduce((acc, t, i) => { acc[t] = optimalW[i]; return acc; }, {});
   const currentWeightsObj = tickers.reduce((acc, t, i) => { acc[t] = currW[i]; return acc; }, {});
   
-  return { 
-    portfolios, 
-    tickers, 
+  return {
+    portfolios,
+    tickers,
+    assets: tickers.map((t, i) => ({ ticker: t, return: avgR[i], std: stdR[i], weight: currW[i] })),
     optimal: { weights: weightsObj, return: portfolios[maxSharpeIdx].return, std: portfolios[maxSharpeIdx].std },
     current: { weights: currentWeightsObj, return: currW.reduce((a, v, i) => a + v * avgR[i], 0), std: currW.reduce((a, v, i) => a + v * stdR[i], 0) }
   };
