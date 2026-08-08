@@ -207,10 +207,6 @@ fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
 
 **Roadmap completo — los 25 ítems originales fueron revisados y resueltos (implementados, verificados-ya-hechos, o descartados con justificación).**
 
-### ❌ Descartados
-- Distribución global por tipo de instrumento — sin sentido si operás un solo tipo de instrumento (ej. solo CEDEARs): siempre mostraría 100% en una categoría, cero información útil. Mismo motivo por el que se sacó la alerta de concentración por tipo (ver #12).
-- Performance (virtual scrolling / lazy loading de imágenes) — verificado, no hay nada real para resolver: solo hay 2 `<img>` en todo el proyecto (el mismo logo SVG, contenido crítico above-the-fold que no debe lazy-loadearse), y la única tabla que puede crecer sin límite (`operations.js`) ya tiene paginación. El resto de las tablas están acotadas por naturaleza (catálogos chicos o cantidad de tickers distintos, no historial transaccional)
-
 ## 🔍 Segunda ronda (auditoría posterior al roadmap original)
 
 ### ✅ Completadas
