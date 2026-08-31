@@ -173,7 +173,7 @@ export const AnalysisPage = {
                 </button>
               </div>
               <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.75rem">
-                Capital invertido frente a valoración de mercado actual por activo.
+                Una barra por activo: capital invertido (índigo) más el resultado apilado arriba — ganancia en azul, pérdida en rojo.
               </p>
               <div style="flex: 1; min-height: 340px; position: relative">
                 <canvas id="comparison-chart"></canvas>

@@ -11,18 +11,18 @@ export { Chart }
  * Proporciona una interfaz única y consistente para todos los gráficos del proyecto.
  */
 
-// Paleta de colores consistente con el proyecto
+// Paleta de colores consistente con el proyecto ("Fintech sobrio")
 export const CHART_COLORS = [
-  '#4f46e6', // Indigo (Primary)
+  '#7c3aed', // Violeta (Primary)
+  '#0ea5e9', // Sky
   '#10b981', // Emerald
   '#f59e0b', // Amber
   '#ef4444', // Red
   '#8b5cf6', // Violet
   '#ec4899', // Pink
-  '#06b6d4', // Cyan
-  '#f97316', // Orange
   '#14b8a6', // Teal
-  '#6366f1'  // Indigo Light
+  '#f97316', // Orange
+  '#64748b'  // Slate
 ]
 
 // Función auxiliar para obtener colores de variables CSS reales (para modo dark/light)
@@ -138,7 +138,7 @@ const getBaseOptions = () => {
 
 const getScaleOptions = () => {
   const textColor = getCSSVar('--text-muted') || '#64748b'
-  const gridColor = 'rgba(255, 255, 255, 0.05)'
+  const gridColor = getCSSVar('--border') || 'rgba(120, 120, 130, 0.15)'
   return {
     x: {
       ticks: { color: textColor },
@@ -303,7 +303,7 @@ export const ChartManager = {
           },
           y: {
             ...scales.y,
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            grid: { color: getCSSVar('--border') || 'rgba(120, 120, 130, 0.15)' },
             ticks: {
               ...scales.y.ticks,
               callback: v => {
@@ -580,6 +580,8 @@ export const ChartManager = {
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
     const cardBg = getCSSVar('--bg-card') || '#ffffff'
+    const primary = getCSSVar('--color-primary') || '#7c3aed'
+    const primaryRgb = getCSSVar('--color-primary-rgb') || '91, 91, 214'
 
     return new Chart(canvas, {
       type: 'line',
@@ -589,8 +591,8 @@ export const ChartManager = {
           {
             label: 'Precio',
             data: price,
-            borderColor: '#4f46e6',
-            backgroundColor: 'rgba(79, 70, 230, 0.08)',
+            borderColor: primary,
+            backgroundColor: `rgba(${primaryRgb}, 0.08)`,
             borderWidth: 2,
             pointRadius: 0,
             pointHoverRadius: 3,
@@ -669,7 +671,9 @@ export const ChartManager = {
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
     const textColor = getCSSVar('--text-muted') || '#64748b'
-    
+    const primary = getCSSVar('--color-primary') || '#7c3aed'
+    const primaryRgb = getCSSVar('--color-primary-rgb') || '91, 91, 214'
+
     return new Chart(canvas, {
       type: 'line',
       data: {
@@ -678,9 +682,9 @@ export const ChartManager = {
           {
             label: 'Tu Cartera',
             data: portfolioData,
-            borderColor: '#4f46e6',
+            borderColor: primary,
             borderWidth: 3,
-            backgroundColor: 'rgba(79, 70, 230, 0.1)',
+            backgroundColor: `rgba(${primaryRgb}, 0.12)`,
             fill: true,
             pointRadius: 0,
             tension: 0.2,
@@ -805,18 +809,26 @@ export const ChartManager = {
   renderComparisonChart(canvas, labels, investedData, currentData, options = {}) {
     if (!canvas || !investedData) return null
 
-    const INVESTED_COLOR = '#4f46e6'
-    const investedColors = labels.map(() => INVESTED_COLOR)
-    const currentColors = currentData.map((val, i) =>
-      val >= investedData[i] ? '#10b981' : '#ef4444'
-    )
+    // Barra única apilada por activo:
+    //  - Segmento base (índigo) = capital "en juego" = min(invertido, actual)
+    //  - Segmento superior      = |resultado|; azul si es ganancia, rojo si es pérdida
+    // Ganancia  -> la barra llega hasta el valor actual (base = invertido, +azul encima)
+    // Pérdida   -> la barra llega hasta el capital invertido (base = actual, +rojo encima)
+    const BASE_COLOR = getCSSVar('--color-primary') || '#7c3aed'
+    const GAIN_COLOR = '#3b82f6'
+    const LOSS_COLOR = '#ef4444'
+
+    const baseData  = currentData.map((cur, i) => Math.min(investedData[i], cur))
+    const deltaData = currentData.map((cur, i) => Math.abs(cur - investedData[i]))
+    const baseColors  = labels.map(() => BASE_COLOR)
+    const deltaColors = currentData.map((cur, i) => (cur >= investedData[i] ? GAIN_COLOR : LOSS_COLOR))
 
     if (options.instance && options.instance.config.type === 'bar') {
       options.instance.data.labels = labels
-      options.instance.data.datasets[0].data = investedData
-      options.instance.data.datasets[0].backgroundColor = investedColors
-      options.instance.data.datasets[1].data = currentData
-      options.instance.data.datasets[1].backgroundColor = currentColors
+      options.instance.data.datasets[0].data = baseData
+      options.instance.data.datasets[0].backgroundColor = baseColors
+      options.instance.data.datasets[1].data = deltaData
+      options.instance.data.datasets[1].backgroundColor = deltaColors
       options.instance.update()
       return options.instance
     }
@@ -832,19 +844,21 @@ export const ChartManager = {
         datasets: [
           {
             label: 'Capital Invertido',
-            data: investedData,
-            backgroundColor: investedColors,
-            borderRadius: 4,
-            barPercentage: 0.5,
-            categoryPercentage: 0.6
+            data: baseData,
+            backgroundColor: baseColors,
+            stack: 'comp',
+            barPercentage: 0.6,
+            categoryPercentage: 0.7
           },
           {
-            label: 'Valor de Mercado',
-            data: currentData,
-            backgroundColor: currentColors,
-            borderRadius: 4,
-            barPercentage: 0.5,
-            categoryPercentage: 0.6
+            label: 'Resultado',
+            data: deltaData,
+            backgroundColor: deltaColors,
+            stack: 'comp',
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: false,
+            barPercentage: 0.6,
+            categoryPercentage: 0.7
           }
         ]
       },
@@ -853,10 +867,12 @@ export const ChartManager = {
         scales: {
           x: {
             ...scales.x,
+            stacked: true,
             grid: { display: false }
           },
           y: {
             ...scales.y,
+            stacked: true,
             ticks: {
               ...scales.y.ticks,
               callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 0 })
@@ -874,9 +890,9 @@ export const ChartManager = {
               usePointStyle: true,
               pointStyle: 'circle',
               generateLabels: (chart) => [
-                { text: 'Capital Invertido', fillStyle: INVESTED_COLOR, strokeStyle: INVESTED_COLOR, fontColor: textColor, pointStyle: 'circle', datasetIndex: 0, hidden: !chart.isDatasetVisible(0) },
-                { text: 'Valor de Mercado +', fillStyle: '#10b981', strokeStyle: '#10b981', fontColor: textColor, pointStyle: 'circle', datasetIndex: 1, hidden: !chart.isDatasetVisible(1) },
-                { text: 'Valor de Mercado -', fillStyle: '#ef4444', strokeStyle: '#ef4444', fontColor: textColor, pointStyle: 'circle', datasetIndex: 1, hidden: !chart.isDatasetVisible(1) }
+                { text: 'Capital Invertido', fillStyle: BASE_COLOR, strokeStyle: BASE_COLOR, fontColor: textColor, pointStyle: 'circle', datasetIndex: 0, hidden: !chart.isDatasetVisible(0) },
+                { text: 'Ganancia', fillStyle: GAIN_COLOR, strokeStyle: GAIN_COLOR, fontColor: textColor, pointStyle: 'circle', datasetIndex: 1, hidden: !chart.isDatasetVisible(1) },
+                { text: 'Pérdida', fillStyle: LOSS_COLOR, strokeStyle: LOSS_COLOR, fontColor: textColor, pointStyle: 'circle', datasetIndex: 1, hidden: !chart.isDatasetVisible(1) }
               ]
             },
             onClick: (e, legendItem, legend) => {
@@ -893,13 +909,15 @@ export const ChartManager = {
                 const inv = investedData[i]
                 const cur = currentData[i]
                 const diff = cur - inv
-                const pct = ((cur / inv) - 1) * 100
-                const prefix = ctx.datasetIndex === 0 ? 'Invertido' : 'Actual'
-                let res = ` ${prefix}: $${ctx.parsed.y.toLocaleString('es-AR')}`
-                if (ctx.datasetIndex === 1) {
-                  res += ` (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+                const pct = inv ? (cur / inv - 1) * 100 : 0
+                if (ctx.datasetIndex === 0) {
+                  return ` Invertido: $${inv.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
                 }
-                return res
+                const tag = diff >= 0 ? 'Ganancia' : 'Pérdida'
+                return [
+                  ` Valor actual: $${cur.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
+                  ` ${tag}: ${diff >= 0 ? '+' : '-'}$${Math.abs(diff).toLocaleString('es-AR', { maximumFractionDigits: 0 })} (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+                ]
               }
             }
           }
