@@ -7,6 +7,7 @@ import { ChartManager, Chart } from '../chart-manager.js'
 import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts, bindCardAccordion } from '../utils.js'
 import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
+import { consumeAlycRequest } from '../nav-state.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -63,6 +64,10 @@ export const AnalysisPage = {
       document.removeEventListener('darkmodechange', this._themeChangeHandler)
       this._themeChangeHandler = null
     }
+    if (this._quicknavHandler) {
+      window.removeEventListener('quicknav-alyc', this._quicknavHandler)
+      this._quicknavHandler = null
+    }
     clearRenderCache(document.getElementById('page-content'))
   },
 
@@ -84,13 +89,13 @@ export const AnalysisPage = {
         <div class="analysis-config-body">
         <div class="analysis-control-panel">
 
-          <!-- Sector ALyCs (Alineado a la izquierda, altura estirada) -->
+          <!-- Sector ALyCs — la selección de cartera vive en la barra de accesos rápidos (arriba) -->
           <div class="analysis-control-alycs">
             <div style="text-align: center">
-            <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Analizar Cartera por ALyC</label>
-            <div id="analysis-alyc-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; align-items: center">
-               <span style="color: var(--text-muted); font-size: 0.85rem">Cargando ALyCs...</span>
-             </div>
+            <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Cartera por ALyC</label>
+            <p id="analysis-alyc-hint" style="color: var(--text-muted); font-size: 0.85rem; margin: 0">
+              Elegí una cartera desde la barra <strong>Carteras</strong> en la parte superior.
+            </p>
              </div>
             </div>
 
@@ -336,42 +341,12 @@ export const AnalysisPage = {
     this._setupEvents()
     // Marcar SPY como benchmark activo por defecto
     document.querySelector('.btn-benchmark-quick[data-ticker="SPY"]')?.classList.add('btn-primary')
-    await this._loadAlycs()
-  },
 
-  async _loadAlycs() {
-    const container = document.getElementById('analysis-alyc-buttons')
-    try {
-      let data = cacheGet('user_holdings')
-      if (!data) {
-        const result = await supabase.rpc('get_user_holdings', { p_limit: 500, p_offset: 0 })
-        if (result.error) throw result.error
-        data = result.data
-        if (data) cacheSet('user_holdings', data)
-      }
-      const alycs = [...new Set(data.map(h => JSON.stringify({ id: h.alyc_id, name: h.alyc_name })))]
-        .map(s => JSON.parse(s))
-      
-      if (alycs.length === 0) {
-        container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem">No tenés tenencias registradas</span>'
-        return
-      }
-
-      container.innerHTML = ''
-      alycs.forEach(alyc => {
-        const btn = document.createElement('button')
-        btn.className = 'btn-alyc'
-        btn.style.border = '1px solid var(--border)'
-        btn.textContent = alyc.name
-        btn.onclick = () => {
-          this._activeAlycName = alyc.name
-          this._runAnalysis(alyc.id, btn)
-        }
-        container.appendChild(btn)
-      })
-    } catch (e) {
-      console.error(e)
-      container.innerHTML = '<span style="color: #ef4444; font-size: 0.85rem">Error al cargar ALyCs</span>'
+    // La cartera a analizar llega desde la barra de accesos rápidos (init.js).
+    const pending = consumeAlycRequest()
+    if (pending) {
+      this._activeAlycName = pending.name
+      this._runAnalysis(pending.id)
     }
   },
 
@@ -422,12 +397,19 @@ export const AnalysisPage = {
         btn.classList.add('btn-primary')
 
         if (this._activeAlycId) {
-          const activeBtn = Array.from(document.querySelectorAll('#analysis-alyc-buttons button'))
-            .find(b => b.textContent === this._activeAlycName)
-          this._runAnalysis(this._activeAlycId, activeBtn)
+          this._runAnalysis(this._activeAlycId)
         }
       }
     })
+
+    // Cambio de cartera desde la barra de accesos rápidos mientras la página ya está abierta
+    if (this._quicknavHandler) window.removeEventListener('quicknav-alyc', this._quicknavHandler)
+    this._quicknavHandler = (e) => {
+      if (!e.detail?.id) return
+      this._activeAlycName = e.detail.name
+      this._runAnalysis(e.detail.id)
+    }
+    window.addEventListener('quicknav-alyc', this._quicknavHandler)
 
     // Redibuja el gráfico de comparación al cambiar de tema (los colores de texto quedan fijos al crear el chart)
     if (this._themeChangeHandler) document.removeEventListener('darkmodechange', this._themeChangeHandler)
@@ -473,20 +455,17 @@ export const AnalysisPage = {
     }
   },
 
-  async _runAnalysis(alycId, activeBtn) {
+  async _runAnalysis(alycId) {
     if (!alycId) return
     this._activeAlycId = alycId
 
     const alycNameSpan = document.getElementById('current-holdings-alyc-name')
     if (alycNameSpan) alycNameSpan.textContent = this._activeAlycName ? `- ${this._activeAlycName}` : ''
 
-    // Update active button state
-    document.querySelectorAll('#analysis-alyc-buttons button').forEach(b => {
-      b.classList.remove('btn-primary')
-    })
-    if (activeBtn) {
-      activeBtn.classList.add('btn-primary')
-    }
+    // Avisar a la barra de accesos rápidos qué cartera quedó en foco
+    window.dispatchEvent(new CustomEvent('analysis-alyc-changed', {
+      detail: { id: alycId, name: this._activeAlycName }
+    }))
 
     const resultsDiv = document.getElementById('analysis-results')
     const loadingDiv = document.getElementById('analysis-loading')

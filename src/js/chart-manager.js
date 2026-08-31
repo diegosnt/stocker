@@ -810,12 +810,11 @@ export const ChartManager = {
     if (!canvas || !investedData) return null
 
     // Barra única apilada por activo:
-    //  - Segmento base (gris neutro) = capital "en juego" = min(invertido, actual).
-    //    Neutro a propósito: no emite veredicto, solo el resultado (arriba) lo hace.
-    //  - Segmento superior           = |resultado|; verde si es ganancia, rojo si es pérdida
+    //  - Segmento base (violeta) = capital "en juego" = min(invertido, actual).
+    //  - Segmento superior       = |resultado|; verde si es ganancia, rojo si es pérdida
     // Ganancia  -> la barra llega hasta el valor actual (base = invertido, +verde encima)
     // Pérdida   -> la barra llega hasta el capital invertido (base = actual, +rojo encima)
-    const BASE_COLOR = '#64748b' // slate: legible en claro y oscuro, sin competir con verde/rojo
+    const BASE_COLOR = '#8b30ff' // violeta eléctrico (fijo: rinde igual en claro y oscuro)
     const GAIN_COLOR = getCSSVar('--color-success') || '#059669'
     const LOSS_COLOR = getCSSVar('--color-danger')  || '#dc2626'
     const SURFACE_COLOR = getCSSVar('--bg-card') || '#ffffff'

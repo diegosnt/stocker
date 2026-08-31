@@ -175,7 +175,7 @@ h1, h2, h3, h4, h5 {
   background: var(--gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  flex: 1;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -231,6 +231,80 @@ h1, h2, h3, h4, h5 {
 .icon-moon { display: none; }
 .dark-mode .icon-sun { display: none; }
 .dark-mode .icon-moon { display: block; }
+
+/* ---- Accesos rápidos en el header (Dashboard + carteras por ALyC) ---- */
+.navbar-quicklinks {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.navbar-quicklinks::-webkit-scrollbar { display: none; }
+
+.quicknav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.quicknav-item:hover { color: var(--color-primary); background: var(--color-primary-soft); }
+.quicknav-item.active {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.quicknav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.quicknav-alycs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.quicknav-alyc {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.quicknav-alyc:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.quicknav-alyc.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.quicknav-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
 
 /* ---- Operaciones: Fila de detalle (Expandible) ---- */
 .op-detail-row {
@@ -722,9 +796,9 @@ h1, h2, h3, h4, h5 {
     transform: translateX(-100%);
     box-shadow: 10px 0 15px -3px rgba(0, 0, 0, 0.1);
   }
-  
+
   .sidebar.open { transform: translateX(0); }
-  
+
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -913,6 +987,7 @@ h1, h2, h3, h4, h5 {
 .sidebar-link {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   padding: 0.5rem 1.25rem;
   color: var(--text-main);
   text-decoration: none;
@@ -921,6 +996,17 @@ h1, h2, h3, h4, h5 {
   border-left: 3px solid transparent;
   transition: var(--transition);
   font-size: 0.85rem;
+}
+
+.sidebar-link svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.sidebar-link span {
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .sidebar-link:hover {
@@ -942,6 +1028,63 @@ h1, h2, h3, h4, h5 {
   overflow-y: auto;
   padding: 1.75rem 1.75rem 3rem;
   scroll-behavior: smooth;
+}
+
+/* ---- Sidebar colapsable (solo escritorio) ----
+   Por defecto queda como un riel de iconos; al pasar el mouse (o al enfocar
+   con teclado) se expande por encima del contenido y muestra los nombres,
+   sin reflujo del contenido. En mobile no aplica: el sidebar sigue siendo
+   el panel deslizante a pantalla completa. */
+@media (min-width: 769px) {
+  :root { --sidebar-rail-width: 64px; }
+
+  .app-body { position: relative; }
+
+  .sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-rail-width);
+    overflow: hidden;
+    z-index: 40;
+    transition: width 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .sidebar:hover,
+  .sidebar:focus-within {
+    width: var(--sidebar-width);
+    overflow-y: auto;
+    box-shadow: 8px 0 24px -8px rgba(0, 0, 0, 0.28);
+  }
+
+  .main-content { margin-left: var(--sidebar-rail-width); }
+
+  /* Riel colapsado: iconos centrados, textos y títulos ocultos */
+  .sidebar-link span {
+    max-width: 160px;
+    opacity: 1;
+    transition: max-width 0.18s ease, opacity 0.12s ease;
+  }
+  .sidebar-section-title {
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.12s ease;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .sidebar-link {
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+  }
+  .sidebar:not(:hover):not(:focus-within) .sidebar-link span {
+    max-width: 0;
+    opacity: 0;
+  }
+  .sidebar:not(:hover):not(:focus-within) .sidebar-section-title {
+    opacity: 0;
+  }
 }
 
 .page-header {

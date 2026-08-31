@@ -1,7 +1,9 @@
 import { signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
 import { initDarkMode, toggleDarkMode, setDOMPurify } from './utils.js'
-import { prunePersistentCache } from './cache.js'
+import { prunePersistentCache, get as cacheGet, set as cacheSet } from './cache.js'
+import { supabase } from './supabase-client.js'
+import { requestAlycAnalysis } from './nav-state.js'
 import { LoginPage } from './pages/login.js'
 
 const app = document.getElementById('app')
@@ -26,6 +28,49 @@ export function showToast(msg, type = 'info') {
   }, 3000)
 }
 
+// Puebla la barra de accesos rápidos con una entrada por ALyC con tenencias.
+// Al hacer clic, salta a Análisis Pro y corre el análisis de esa cartera.
+async function loadQuickNavAlycs() {
+  const box = document.getElementById('quicknav-alycs')
+  if (!box) return
+  try {
+    let data = cacheGet('user_holdings')
+    if (!data) {
+      const { data: rpcData, error } = await supabase.rpc('get_user_holdings', { p_limit: 500, p_offset: 0 })
+      if (error) throw error
+      data = rpcData || []
+      if (data.length) cacheSet('user_holdings', data)
+    }
+
+    const alycs = new Map()
+    for (const h of data) {
+      if (h.alyc_id && !alycs.has(h.alyc_id)) alycs.set(h.alyc_id, h.alyc_name)
+    }
+
+    if (alycs.size === 0) {
+      box.innerHTML = '<span class="quicknav-hint">Sin tenencias</span>'
+      return
+    }
+
+    box.innerHTML = ''
+    for (const [id, name] of alycs) {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'quicknav-alyc'
+      btn.dataset.alycId = id
+      btn.textContent = name
+      btn.addEventListener('click', () => {
+        requestAlycAnalysis({ id, name })
+        if (currentHash() !== 'analysis') navigate('analysis')
+      })
+      box.appendChild(btn)
+    }
+  } catch (e) {
+    console.warn('No se pudieron cargar las ALyCs de la barra:', e)
+    box.innerHTML = '<span class="quicknav-hint">Error al cargar</span>'
+  }
+}
+
 function renderShell(userEmail) {
   app.innerHTML = `
     <div class="app-shell">
@@ -36,6 +81,16 @@ function renderShell(userEmail) {
         <div class="navbar-brand">
           <img src="/img/logo.svg" alt="Logo" class="navbar-logo">
           <span>Stocker</span>
+        </div>
+        <div class="navbar-quicklinks" id="quicknav" aria-label="Accesos rápidos">
+          <a href="#dashboard" class="quicknav-item" data-path="dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+            <span>Dashboard</span>
+          </a>
+          <span class="quicknav-divider" aria-hidden="true"></span>
+          <div class="quicknav-alycs" id="quicknav-alycs">
+            <span class="quicknav-hint">Cargando…</span>
+          </div>
         </div>
         <div class="navbar-user">${userEmail}</div>
         <button class="dark-mode-toggle" id="theme-toggle" title="Cambiar tema" aria-label="Cambiar tema">
@@ -54,18 +109,39 @@ function renderShell(userEmail) {
         <aside class="sidebar" id="sidebar">
           <div class="sidebar-section">
             <div class="sidebar-section-title">Cartera</div>
-            <a href="#dashboard" class="sidebar-link" data-path="dashboard">Dashboard</a>
-            <a href="#analysis" class="sidebar-link" data-path="analysis">Análisis Pro</a>
+            <a href="#dashboard" class="sidebar-link" data-path="dashboard" title="Dashboard">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              <span>Dashboard</span>
+            </a>
+            <a href="#analysis" class="sidebar-link" data-path="analysis" title="Análisis Pro">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+              <span>Análisis Pro</span>
+            </a>
           </div>
           <div class="sidebar-section">
             <div class="sidebar-section-title">Maestros</div>
-            <a href="#operations" class="sidebar-link" data-path="operations">Operaciones</a>
-            <a href="#instruments" class="sidebar-link" data-path="instruments">Instrumentos</a>
-            <a href="#instrument-types" class="sidebar-link" data-path="instrument-types">Tipos</a>
-            <a href="#alycs" class="sidebar-link" data-path="alycs">ALyCs / Brokers</a>
+            <a href="#operations" class="sidebar-link" data-path="operations" title="Operaciones">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+              <span>Operaciones</span>
+            </a>
+            <a href="#instruments" class="sidebar-link" data-path="instruments" title="Instrumentos">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              <span>Instrumentos</span>
+            </a>
+            <a href="#instrument-types" class="sidebar-link" data-path="instrument-types" title="Tipos">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+              <span>Tipos</span>
+            </a>
+            <a href="#alycs" class="sidebar-link" data-path="alycs" title="ALyCs / Brokers">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+              <span>ALyCs / Brokers</span>
+            </a>
           </div>
           <div class="sidebar-section" style="margin-top: auto">
-            <a href="#settings" class="sidebar-link" data-path="settings">Configuración</a>
+            <a href="#settings" class="sidebar-link" data-path="settings" title="Configuración">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Configuración</span>
+            </a>
           </div>
         </aside>
         <main class="main-content" id="page-content"></main>
@@ -101,16 +177,30 @@ function renderShell(userEmail) {
   document.getElementById('theme-toggle').addEventListener('click', toggleDarkMode)
   document.getElementById('reload-btn').addEventListener('click', () => window.location.reload())
 
-  // Manejo de links activos en la sidebar
+  // Manejo de links activos en la sidebar y en la barra de accesos rápidos
   const updateActiveLink = () => {
     const hash = currentHash() || 'dashboard'
-    document.querySelectorAll('.sidebar-link').forEach(link => {
+    document.querySelectorAll('.sidebar-link, .quicknav-item').forEach(link => {
       link.classList.toggle('active', link.dataset.path === hash)
     })
+    // Fuera de Análisis Pro no hay ninguna cartera "en foco"
+    if (hash !== 'analysis') {
+      document.querySelectorAll('.quicknav-alyc.active').forEach(b => b.classList.remove('active'))
+    }
   }
 
   window.addEventListener('hashchange', updateActiveLink)
   updateActiveLink()
+
+  // La página de Análisis avisa qué cartera está mostrando → la marcamos en la barra
+  window.addEventListener('analysis-alyc-changed', (e) => {
+    const id = e.detail?.id
+    document.querySelectorAll('.quicknav-alyc').forEach(b => {
+      b.classList.toggle('active', b.dataset.alycId === String(id))
+    })
+  })
+
+  loadQuickNavAlycs()
 
   // Pre-cargar DOMPurify en background para cuando se necesite
   if (!domPurifyLoading) {
