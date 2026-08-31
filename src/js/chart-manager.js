@@ -810,13 +810,15 @@ export const ChartManager = {
     if (!canvas || !investedData) return null
 
     // Barra única apilada por activo:
-    //  - Segmento base (índigo) = capital "en juego" = min(invertido, actual)
-    //  - Segmento superior      = |resultado|; azul si es ganancia, rojo si es pérdida
-    // Ganancia  -> la barra llega hasta el valor actual (base = invertido, +azul encima)
+    //  - Segmento base (gris neutro) = capital "en juego" = min(invertido, actual).
+    //    Neutro a propósito: no emite veredicto, solo el resultado (arriba) lo hace.
+    //  - Segmento superior           = |resultado|; verde si es ganancia, rojo si es pérdida
+    // Ganancia  -> la barra llega hasta el valor actual (base = invertido, +verde encima)
     // Pérdida   -> la barra llega hasta el capital invertido (base = actual, +rojo encima)
-    const BASE_COLOR = getCSSVar('--color-primary') || '#7c3aed'
-    const GAIN_COLOR = '#3b82f6'
-    const LOSS_COLOR = '#ef4444'
+    const BASE_COLOR = '#64748b' // slate: legible en claro y oscuro, sin competir con verde/rojo
+    const GAIN_COLOR = getCSSVar('--color-success') || '#059669'
+    const LOSS_COLOR = getCSSVar('--color-danger')  || '#dc2626'
+    const SURFACE_COLOR = getCSSVar('--bg-card') || '#ffffff'
 
     const baseData  = currentData.map((cur, i) => Math.min(investedData[i], cur))
     const deltaData = currentData.map((cur, i) => Math.abs(cur - investedData[i]))
@@ -857,6 +859,10 @@ export const ChartManager = {
             stack: 'comp',
             borderRadius: { topLeft: 4, topRight: 4 },
             borderSkipped: false,
+            // Franja de 2px del color de la superficie: separa visualmente el
+            // resultado del capital base aunque los tonos queden cerca.
+            borderColor: SURFACE_COLOR,
+            borderWidth: { bottom: 2 },
             barPercentage: 0.6,
             categoryPercentage: 0.7
           }
