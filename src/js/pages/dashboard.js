@@ -325,55 +325,54 @@ export const DashboardPage = {
 
     const fmt     = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const hasUSD  = data.items.some(h => h.currency === 'USD')
+    const hasARS  = data.items.some(h => h.currency === 'ARS')
     const skeleton = `<span class="cell-skeleton" style="width:80px;height:1.25rem;display:inline-block"></span>`
 
     const totalInvested = data.totalARS + data.totalUSD
 
     // ── KPIs ──────────────────────────────────────────────────
-    kpiEl.innerHTML = `
-      <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: #10b981">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div class="kpi-content">
-          <div class="kpi-label">Total Invertido ARS</div>
-          <div class="kpi-value">${fmt(data.totalARS)}</div>
-        </div>
-      </div>
-      
-      <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-        </div>
-        <div class="kpi-content">
-          <div class="kpi-label">P&amp;L Total ARS</div>
-          <div class="kpi-value" id="dash-pnl-ars">${skeleton}</div>
-          <div class="kpi-sub"  id="dash-pnl-ars-sub"></div>
-        </div>
-      </div>
+    const icoInvested = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
+    const icoMarket   = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="10"/></svg>`
+    const icoPnl      = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`
+    const icoPct      = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`
 
-      ${hasUSD ? `
+    const kpiBlock = (cur, invested) => `
       <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        </div>
+        <div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: #10b981">${icoInvested}</div>
         <div class="kpi-content">
-          <div class="kpi-label">Total Invertido USD</div>
-          <div class="kpi-value">${fmt(data.totalUSD)}</div>
+          <div class="kpi-label">Total Invertido ${cur}</div>
+          <div class="kpi-value">${fmt(invested)}</div>
         </div>
       </div>
 
       <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
+        <div class="kpi-icon-circle" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6">${icoMarket}</div>
         <div class="kpi-content">
-          <div class="kpi-label">P&amp;L Total USD</div>
-          <div class="kpi-value" id="dash-pnl-usd">${skeleton}</div>
-          <div class="kpi-sub"  id="dash-pnl-usd-sub"></div>
+          <div class="kpi-label">Total Valor Mercado ${cur}</div>
+          <div class="kpi-value" id="dash-market-${cur.toLowerCase()}">${skeleton}</div>
         </div>
-      </div>` : ''}
-    `
+      </div>
+
+      <div class="kpi-card kpi-card--modern">
+        <div class="kpi-icon-circle" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">${icoPnl}</div>
+        <div class="kpi-content">
+          <div class="kpi-label">P&amp;L Total ${cur}</div>
+          <div class="kpi-value" id="dash-pnl-${cur.toLowerCase()}">${skeleton}</div>
+          <div class="kpi-sub"  id="dash-pnl-${cur.toLowerCase()}-sub"></div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-card--modern">
+        <div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">${icoPct}</div>
+        <div class="kpi-content">
+          <div class="kpi-label">Total P&amp;L % ${cur}</div>
+          <div class="kpi-value" id="dash-pnlpct-${cur.toLowerCase()}">${skeleton}</div>
+        </div>
+      </div>`
+
+    kpiEl.innerHTML = data.items.length
+      ? (hasARS ? kpiBlock('ARS', data.totalARS) : '') + (hasUSD ? kpiBlock('USD', data.totalUSD) : '')
+      : ''
 
     if (!data.items.length) {
       document.getElementById('dash-risk-alerts').innerHTML = ''
@@ -707,10 +706,11 @@ export const DashboardPage = {
     const entries = Object.entries(this._summary)
     const total = entries.length
 
-    let pnlARS = 0, pnlUSD = 0, resARS = 0, resUSD = 0, totARS = 0, totUSD = 0
+    let pnlARS = 0, pnlUSD = 0, resARS = 0, resUSD = 0, totARS = 0, totUSD = 0, invARS = 0, invUSD = 0
 
     for (const [ticker, h] of entries) {
-      if (h.currency === 'ARS') totARS++; else totUSD++
+      const invested = h.avgBuyPrice * h.quantity
+      if (h.currency === 'ARS') { totARS++; invARS += invested } else { totUSD++; invUSD += invested }
       const price = prices[ticker]
       if (price === undefined) continue
       if (h.currency === 'ARS') { resARS++; if (price !== null) pnlARS += (price - h.avgBuyPrice) * h.quantity }
@@ -722,20 +722,27 @@ export const DashboardPage = {
     const color = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-main)'
     const pending = resARS + resUSD < total
 
-    const arsEl = document.getElementById('dash-pnl-ars')
-    const usdEl = document.getElementById('dash-pnl-usd')
-    if (!arsEl) return
+    // Si los KPIs aún no están en el DOM, no hay nada que actualizar
+    if (!document.getElementById('dash-pnl-ars') && !document.getElementById('dash-pnl-usd')) return
 
-    if (totARS > 0 && resARS > 0) {
-      arsEl.innerHTML = `<span style="color:${color(pnlARS)};font-weight:700">${sign(pnlARS)}${fmt(pnlARS)}</span>`
-      const sub = document.getElementById('dash-pnl-ars-sub')
-      if (sub) sub.innerHTML = pending ? `<span style="font-size:0.7rem;color:var(--text-muted)">${resARS}/${totARS} tickers</span>` : ''
+    const fillCurrency = (cur, inv, pnl, res, tot) => {
+      if (!(tot > 0 && res > 0)) return
+      const c = cur.toLowerCase()
+      const pnlEl = document.getElementById(`dash-pnl-${c}`)
+      if (pnlEl) pnlEl.innerHTML = `<span style="color:${color(pnl)};font-weight:700">${sign(pnl)}${fmt(pnl)}</span>`
+      const sub = document.getElementById(`dash-pnl-${c}-sub`)
+      if (sub) sub.innerHTML = pending ? `<span style="font-size:0.7rem;color:var(--text-muted)">${res}/${tot} tickers</span>` : ''
+      const marketEl = document.getElementById(`dash-market-${c}`)
+      if (marketEl) marketEl.innerHTML = fmt(inv + pnl)
+      const pctEl = document.getElementById(`dash-pnlpct-${c}`)
+      if (pctEl) {
+        const pct = inv > 0 ? (pnl / inv) * 100 : 0
+        pctEl.innerHTML = `<span style="color:${color(pnl)};font-weight:700">${sign(pct)}${pct.toFixed(1)}%</span>`
+      }
     }
-    if (usdEl && totUSD > 0 && resUSD > 0) {
-      usdEl.innerHTML = `<span style="color:${color(pnlUSD)};font-weight:700">${sign(pnlUSD)}${fmt(pnlUSD)}</span>`
-      const sub = document.getElementById('dash-pnl-usd-sub')
-      if (sub) sub.innerHTML = pending ? `<span style="font-size:0.7rem;color:var(--text-muted)">${resUSD}/${totUSD} tickers</span>` : ''
-    }
+
+    fillCurrency('ARS', invARS, pnlARS, resARS, totARS)
+    fillCurrency('USD', invUSD, pnlUSD, resUSD, totUSD)
   },
 
   _refreshHeatmap() {
