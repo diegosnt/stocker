@@ -14,6 +14,7 @@ const FILTERS_STORAGE_KEY = 'stocker_operations_filters'
 
 const state = {
   editingOperation: null,
+  selectedIds: new Set(),
   pagination: {
     currentPage: 0,
     pageSize: PAGE_SIZE,
@@ -44,6 +45,7 @@ const set = (path, value) => {
 }
 const updateFilters = (updates) => {
   Object.assign(state.filters, updates)
+  state.selectedIds.clear()
   state.pagination.currentPage = 0
 }
 const setPage = (page) => { state.pagination.currentPage = page }
@@ -78,6 +80,7 @@ export const OperationsPage = {
   // ── Listado ──────────────────────────────────────────────
   async _renderList() {
     state.pagination.currentPage = 0
+    state.selectedIds.clear()
     loadPersistedFilters()
     const content = document.getElementById('page-content')
     content.innerHTML = `
@@ -94,7 +97,18 @@ export const OperationsPage = {
       <div class="card ops-card">
         <div class="ops-filters-bar">
           <div class="ops-filters-title">
-            <h3 style="margin:0">Registros</h3>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap">
+              <h3 style="margin:0">Registros</h3>
+              <div id="ops-bulk-actions" class="ops-bulk-actions" style="display: none">
+                <span class="badge badge-primary" id="ops-selected-count" style="font-size: 0.75rem; padding: 0.2rem 0.5rem">0 seleccionadas</span>
+                <button class="btn btn-sm btn-danger" id="btn-bulk-delete" title="Eliminar seleccionadas" style="padding: 0.25rem 0.6rem; font-size: 0.75rem">
+                  ${ICON_DELETE} <span>Eliminar seleccionadas</span>
+                </button>
+                <button class="btn btn-sm btn-ghost" id="btn-bulk-deselect" title="Cancelar selección" style="padding: 0.25rem 0.5rem; font-size: 0.75rem">
+                  ✕ Cancelar
+                </button>
+              </div>
+            </div>
             <button class="btn btn-sm btn-ghost" id="btn-clear-filters" style="display:none">✕ Limpiar filtros</button>
           </div>
           <div class="ops-filters-row">
@@ -127,6 +141,9 @@ export const OperationsPage = {
             <table class="ops-table">
               <thead>
                 <tr>
+                  <th class="select-col" style="width: 36px; text-align: center">
+                    <input type="checkbox" id="ops-select-all" title="Seleccionar todas" aria-label="Seleccionar todas las operaciones de la página">
+                  </th>
                   <th class="sortable" data-col="operated_at">Fecha</th>
                   <th class="sortable" data-col="instrument_ticker">Ticker</th>
                   <th class="sortable" data-col="alyc_name">ALyC</th>
@@ -140,6 +157,7 @@ export const OperationsPage = {
               <tbody id="ops-tbody">
                 ${Array(10).fill(`
                   <tr>
+                    <td class="select-col"><div class="skeleton" style="height:14px; width:14px; margin:auto"></div></td>
                     <td><div class="skeleton" style="height:14px; width:80px"></div></td>
                     <td><div class="skeleton" style="height:14px; width:60px"></div></td>
                     <td><div class="skeleton" style="height:14px; width:120px"></div></td>
@@ -177,6 +195,64 @@ export const OperationsPage = {
       await handleCsvImport(file, this)
       inputCsv.value = '' // Reset
     })
+
+    const btnBulkDelete = document.getElementById('btn-bulk-delete')
+    if (btnBulkDelete) {
+      btnBulkDelete.addEventListener('click', () => this._deleteSelectedOps())
+    }
+
+    const btnBulkDeselect = document.getElementById('btn-bulk-deselect')
+    if (btnBulkDeselect) {
+      btnBulkDeselect.addEventListener('click', () => {
+        state.selectedIds.clear()
+        const tbody = document.getElementById('ops-tbody')
+        const opsCards = document.getElementById('ops-cards')
+        if (tbody) {
+          tbody.querySelectorAll('.op-select-check').forEach(chk => {
+            chk.checked = false
+            chk.closest('tr')?.classList.remove('selected-row')
+          })
+        }
+        if (opsCards) {
+          opsCards.querySelectorAll('.op-card-select-check').forEach(chk => {
+            chk.checked = false
+            chk.closest('.op-card--modern')?.classList.remove('selected-card')
+          })
+        }
+        this._updateBulkActionsBar()
+      })
+    }
+
+    const selectAll = document.getElementById('ops-select-all')
+    if (selectAll) {
+      selectAll.addEventListener('change', () => {
+        const isChecked = selectAll.checked
+        const tbody = document.getElementById('ops-tbody')
+        const opsCards = document.getElementById('ops-cards')
+        const ops = this._currentOps || []
+        ops.forEach(op => {
+          if (isChecked) {
+            state.selectedIds.add(op.id)
+          } else {
+            state.selectedIds.delete(op.id)
+          }
+        })
+        if (tbody) {
+          tbody.querySelectorAll('.op-select-check').forEach(chk => {
+            chk.checked = isChecked
+            chk.closest('tr')?.classList.toggle('selected-row', isChecked)
+          })
+        }
+        if (opsCards) {
+          opsCards.querySelectorAll('.op-card-select-check').forEach(chk => {
+            chk.checked = isChecked
+            chk.closest('.op-card--modern')?.classList.toggle('selected-card', isChecked)
+          })
+        }
+        this._updateBulkActionsBar()
+      })
+    }
+
     this._bindSearch()
     this._bindFilters()
     this._bindSortHeaders()
@@ -239,15 +315,20 @@ export const OperationsPage = {
         console.error('Error cargando operaciones:', result.error)
         tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
         this._renderPagination(0, 0)
+        this._updateBulkActionsBar()
         return
       }
 
       if (!data.length) {
+        if (page > 0 && count > 0) {
+          return this._loadList(page - 1)
+        }
         const hasFilters = state.filters.searchQuery || state.filters.alycFilter || state.filters.instrumentFilter || state.filters.typeFilter || state.filters.currencyFilter || state.filters.dateFrom || state.filters.dateTo
         const emptyMsg = hasFilters ? 'No se encontraron resultados para los filtros aplicados.' : 'No hay operaciones registradas.'
         tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
         if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
         this._renderPagination(0, 0)
+        this._updateBulkActionsBar()
         return
       }
     } catch (e) {
@@ -256,9 +337,11 @@ export const OperationsPage = {
       console.error('Error cargando operaciones:', e)
       tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
       this._renderPagination(0, 0)
+      this._updateBulkActionsBar()
       return
     }
 
+    this._currentOps = data
     let rowsHtml  = ''
     let cardsHtml = ''
     data.forEach(op => {
@@ -270,9 +353,13 @@ export const OperationsPage = {
       const alycName = op.alyc_name         ?? '—'
       const hasNotes = !!op.notes?.trim()
       const idx      = data.indexOf(op)
+      const isSelected = state.selectedIds.has(op.id)
 
       rowsHtml += `
-        <tr class="op-row ${hasNotes ? 'has-notes' : ''}" data-id="${op.id}">
+        <tr class="op-row ${hasNotes ? 'has-notes' : ''} ${isSelected ? 'selected-row' : ''}" data-id="${op.id}">
+          <td class="select-col" onclick="event.stopPropagation()">
+            <input type="checkbox" class="op-select-check" data-id="${op.id}" aria-label="Seleccionar operación ${esc(ticker)}" ${isSelected ? 'checked' : ''}>
+          </td>
           <td class="date-col">${fmtDateShort(op.operated_at)}</td>
          
           <td>
@@ -306,10 +393,13 @@ export const OperationsPage = {
         </tr>`
 
       cardsHtml += `
-        <div class="op-card--modern ${op.type} collapsed" data-id="${op.id}">
+        <div class="op-card--modern ${op.type} ${isSelected ? 'selected-card' : ''} collapsed" data-id="${op.id}">
           <div class="op-card-header">
-            <div class="op-card-ticker-badge">
-              ${esc(ticker)}
+            <div style="display: flex; align-items: center; gap: 0.5rem" onclick="event.stopPropagation()">
+              <input type="checkbox" class="op-card-select-check" data-id="${op.id}" aria-label="Seleccionar operación ${esc(ticker)}" ${isSelected ? 'checked' : ''}>
+              <div class="op-card-ticker-badge">
+                ${esc(ticker)}
+              </div>
             </div>
             <div class="op-card-header-meta">
               <span class="op-card-header-date">${fmtDateShort(op.operated_at)}</span>
@@ -365,10 +455,54 @@ export const OperationsPage = {
       })
     }
 
+    // Eventos de selección de filas individuales (desktop)
+    tbody.querySelectorAll('.op-select-check').forEach(chk => {
+      chk.addEventListener('click', (e) => e.stopPropagation())
+      chk.addEventListener('change', () => {
+        const id = chk.dataset.id
+        if (chk.checked) {
+          state.selectedIds.add(id)
+        } else {
+          state.selectedIds.delete(id)
+        }
+        chk.closest('tr')?.classList.toggle('selected-row', chk.checked)
+        if (opsCards) {
+          const cardChk = opsCards.querySelector(`.op-card-select-check[data-id="${id}"]`)
+          if (cardChk) {
+            cardChk.checked = chk.checked
+            cardChk.closest('.op-card--modern')?.classList.toggle('selected-card', chk.checked)
+          }
+        }
+        this._updateBulkActionsBar()
+      })
+    })
+
+    // Eventos de selección en tarjetas (mobile)
+    if (opsCards) {
+      opsCards.querySelectorAll('.op-card-select-check').forEach(chk => {
+        chk.addEventListener('click', (e) => e.stopPropagation())
+        chk.addEventListener('change', () => {
+          const id = chk.dataset.id
+          if (chk.checked) {
+            state.selectedIds.add(id)
+          } else {
+            state.selectedIds.delete(id)
+          }
+          chk.closest('.op-card--modern')?.classList.toggle('selected-card', chk.checked)
+          const rowChk = tbody.querySelector(`.op-select-check[data-id="${id}"]`)
+          if (rowChk) {
+            rowChk.checked = chk.checked
+            rowChk.closest('tr')?.classList.toggle('selected-row', chk.checked)
+          }
+          this._updateBulkActionsBar()
+        })
+      })
+    }
+
     // Eventos de expansión (desktop)
     tbody.querySelectorAll('.op-row').forEach(row => {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.actions-cell')) return
+        if (e.target.closest('.actions-cell') || e.target.closest('.select-col')) return
         row.classList.toggle('expanded')
       })
     })
@@ -409,6 +543,8 @@ export const OperationsPage = {
         btn.addEventListener('click', (e) => { e.stopPropagation(); handleDelete(btn) })
       })
     }
+
+    this._updateBulkActionsBar()
 
     this._renderPagination(page, count)
     this._updateSortHeaders()
@@ -550,6 +686,65 @@ export const OperationsPage = {
     }
   },
 
+  _updateBulkActionsBar() {
+    const bar = document.getElementById('ops-bulk-actions')
+    const countSpan = document.getElementById('ops-selected-count')
+    const selectAll = document.getElementById('ops-select-all')
+    if (!bar) return
+
+    const count = state.selectedIds.size
+    if (count > 0) {
+      bar.style.display = 'inline-flex'
+      if (countSpan) countSpan.textContent = `${count} seleccionada${count > 1 ? 's' : ''}`
+    } else {
+      bar.style.display = 'none'
+    }
+
+    if (selectAll && this._currentOps?.length) {
+      const pageIds = this._currentOps.map(o => o.id)
+      const selectedOnPage = pageIds.filter(id => state.selectedIds.has(id)).length
+      if (selectedOnPage === 0) {
+        selectAll.checked = false
+        selectAll.indeterminate = false
+      } else if (selectedOnPage === pageIds.length) {
+        selectAll.checked = true
+        selectAll.indeterminate = false
+      } else {
+        selectAll.checked = false
+        selectAll.indeterminate = true
+      }
+    } else if (selectAll) {
+      selectAll.checked = false
+      selectAll.indeterminate = false
+    }
+  },
+
+  async _deleteSelectedOps() {
+    const count = state.selectedIds.size
+    if (count === 0) return
+
+    const ok = await confirmModal({
+      title: count === 1 ? 'Eliminar operación' : `Eliminar ${count} operaciones`,
+      message: count === 1
+        ? '¿Estás seguro de que querés eliminar la operación seleccionada? Esta acción no se puede deshacer.'
+        : `¿Estás seguro de que querés eliminar las ${count} operaciones seleccionadas? Esta acción no se puede deshacer.`,
+      confirmLabel: count === 1 ? 'Eliminar operación' : `Eliminar ${count} operaciones`
+    })
+    if (!ok) return
+
+    try {
+      const ids = Array.from(state.selectedIds)
+      await apiRequest('POST', '/api/operations/bulk-delete', { ids })
+      showToast(count === 1 ? 'Operación eliminada.' : `${count} operaciones eliminadas.`, 'success')
+      state.selectedIds.clear()
+      cacheInvalidate('user_holdings')
+      await this._loadList(state.pagination.currentPage)
+    } catch (err) {
+      console.error('Error al eliminar operaciones en lote:', err)
+      showToast('Error al eliminar las operaciones seleccionadas.', 'error')
+    }
+  },
+
   async _deleteOp(id) {
     const ok = await confirmModal({
       title: 'Eliminar operación',
@@ -560,6 +755,7 @@ export const OperationsPage = {
     try {
       await apiRequest('DELETE', `/api/operations/${id}`)
       showToast('Operación eliminada.', 'success')
+      state.selectedIds.delete(id)
       cacheInvalidate('user_holdings')
       await this._loadList(state.pagination.currentPage)
     } catch {
@@ -1247,6 +1443,7 @@ export const OperationsPage = {
       state.searchTimer = null
     }
     state.editingOperation = null
+    state.selectedIds.clear()
     state.pagination.currentPage = 0
     state.pagination.requestId = null
     Object.assign(state.filters, {

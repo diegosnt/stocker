@@ -541,6 +541,44 @@ h1, h2, h3, h4, h5 {
   font-size: 0.75rem;
 }
 
+/* ---- Operations Bulk Actions & Selection ---- */
+.ops-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-card);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.select-col {
+  width: 36px;
+  text-align: center;
+  padding: 0.5rem 0.25rem !important;
+}
+
+.op-select-check,
+.op-card-select-check,
+#ops-select-all {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+  margin: 0;
+  vertical-align: middle;
+}
+
+tr.selected-row td {
+  background-color: var(--color-primary-soft) !important;
+}
+
+.op-card--modern.selected-card {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1.5px var(--color-primary);
+}
+
 /* ---- Tarjetas mobile de operaciones ---- */
 .ops-cards-grid {
   display: none; /* oculto en desktop; se activa en el media query mobile */

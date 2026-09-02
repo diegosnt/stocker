@@ -917,6 +917,32 @@ app.delete('/api/operations/:id', mutationLimiter, requireAuth, requireCsrf, asy
   }
 })
 
+// ── POST /api/operations/bulk-delete ───────────────────────
+app.post('/api/operations/bulk-delete', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
+  const { ids } = req.body
+  const userId  = req.userId
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: { ids: 'Se requiere un array de IDs' } })
+  }
+
+  if (ids.some(id => !isUuid(id))) {
+    return res.status(400).json({ error: { ids: 'Uno o más IDs son inválidos' } })
+  }
+
+  logger.info({ count: ids.length, user_id: userId }, 'Eliminación masiva de operaciones — solicitada')
+
+  try {
+    const filter = `id=in.(${ids.join(',')})`
+    await supabaseFetch(`operations?${filter}`, 'DELETE', req.headers.authorization)
+    logger.info({ count: ids.length }, 'Operaciones eliminadas en lote OK')
+    res.status(200).json({ success: true, count: ids.length })
+  } catch (err) {
+    logger.warn({ count: ids.length, status: err.status, error: err.payload }, 'Error al eliminar operaciones en lote')
+    res.status(err.status ?? 500).json({ error: err.payload })
+  }
+})
+
 // ── PATCH /api/settings/:key ───────────────────────────────
 const ALLOWED_SETTINGS = new Set(['registration_enabled', 'market_badge_enabled'])
 
