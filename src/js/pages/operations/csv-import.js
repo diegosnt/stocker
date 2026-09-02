@@ -145,7 +145,8 @@ export async function showDuplicateSelectionModal(duplicates, cleanCount = 0) {
 
 export async function handleCsvImport(file, ops) {
   const text = await file.text()
-  const lines = text.split(/\r?\n/).filter(line => line.trim())
+  const cleanText = text.replace(/^\ufeff/, '')
+  const lines = cleanText.split(/\r?\n/).filter(line => line.trim())
   if (lines.length < 2) {
     showToast('Archivo vacío o sin datos.', 'error')
     return

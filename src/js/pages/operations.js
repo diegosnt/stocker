@@ -496,22 +496,38 @@ export const OperationsPage = {
         return
       }
 
-      // Generar CSV
-      const headers = ['Fecha', 'Ticker', 'Nombre', 'ALyC', 'Tipo', 'Cantidad', 'Precio', 'Moneda', 'Notas']
+      // Formatear fecha a DD/MM/AAAA
+      const formatDateToDMY = (dateStr) => {
+        if (!dateStr) return ''
+        const clean = dateStr.split('T')[0]
+        const parts = clean.split('-')
+        if (parts.length === 3) {
+          const [y, m, d] = parts
+          return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`
+        }
+        return dateStr
+      }
+
+      const formatNum = (num) => {
+        if (num == null || isNaN(num)) return '0'
+        if (Number.isInteger(num)) return String(num)
+        return String(num).replace('.', ',')
+      }
+
+      // Generar CSV unificado: fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
+      const headers = ['fecha operacion', 'operacion', 'especie', 'alyc', 'precio', 'cantidad', 'moneda']
       const rows = data.map(op => [
-        (op.operated_at || '').split('T')[0] || '—',
-        op.instrument_ticker || '—',
-        `"${(op.instrument_name || '').replace(/"/g, '""')}"`,
-        `"${(op.alyc_name || '').replace(/"/g, '""')}"`,
-        op.type || '—',
-        op.quantity || 0,
-        op.price || 0,
-        op.currency || '—',
-        `"${(op.notes || '').replace(/"/g, '""')}"`
+        formatDateToDMY(op.operated_at),
+        (op.type || '').toLowerCase(),
+        op.instrument_ticker || '',
+        op.alyc_name || '',
+        formatNum(op.price),
+        formatNum(op.quantity),
+        (op.currency || 'ARS').toUpperCase()
       ])
 
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n')
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       
@@ -522,6 +538,7 @@ export const OperationsPage = {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
       
       showToast('Exportación completada.', 'success')
     } catch (err) {

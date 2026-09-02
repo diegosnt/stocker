@@ -655,48 +655,7 @@ h1, h2, h3, h4, h5 {
   padding: 1rem;
 }
 
-/* ---- Analysis config card (collapsible) ---- */
-.analysis-config-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
-}
-
-.analysis-config-header h3 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-main);
-}
-
-.analysis-config-toggle {
-  background: none;
-  border: none;
-  padding: 0.25rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  transition: transform 0.2s ease;
-}
-
-.analysis-config-body {
-  margin-top: 1.25rem;
-  overflow: hidden;
-  transition: opacity 0.2s ease;
-}
-
-#analysis-control-card.collapsed .analysis-config-body {
-  display: none;
-}
-
-#analysis-control-card.collapsed .analysis-config-toggle {
-  transform: rotate(-90deg);
-}
-
-/* ---- Analysis ALyC buttons ---- */
+/* ---- Analysis ALyC / Benchmark buttons ---- */
 .btn-alyc {
   display: inline-flex;
   align-items: center;
@@ -721,45 +680,55 @@ h1, h2, h3, h4, h5 {
   border-color: var(--color-primary);
 }
 
-/* ---- Analysis control panel ---- */
-.analysis-control-panel {
+/* ---- Analysis header actions ---- */
+.analysis-header-actions {
   display: flex;
-  gap: 1.5rem;
-  align-items: stretch;
-  flex-wrap: wrap;
-  justify-content: space-between;
-}
-
-.analysis-control-alycs {
-  flex: 1;
-  min-width: 300px;
-  background: var(--bg-main);
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 0.75rem;
 }
 
 .analysis-control-benchmark {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: var(--bg-main);
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
+  gap: 0.6rem;
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  min-width: 250px;
+  border-radius: var(--radius);
+  padding: 0.35rem 0.65rem;
+  box-shadow: var(--shadow-sm);
 }
 
-.analysis-control-pdf {
-  width: 180px;
+.analysis-benchmark-label {
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+  margin: 0;
+}
+
+.analysis-benchmark-buttons {
   display: flex;
-  align-items: stretch;
-  justify-content: center;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.analysis-benchmark-buttons .btn-alyc {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  min-height: 28px;
+}
+
+.analysis-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  min-height: 38px;
+  white-space: nowrap;
 }
 
 /* ---- Responsividad General ---- */
@@ -815,21 +784,27 @@ h1, h2, h3, h4, h5 {
   .desktop-only { display: none !important; }
   .mobile-only { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }
 
-  /* Analysis control panel — mobile: stack vertical, sin scroll horizontal */
-  .analysis-control-panel {
+  /* Analysis header actions — mobile */
+  .analysis-header-actions {
     flex-direction: column;
-    flex-wrap: nowrap;
-    overflow-x: visible;
-    gap: 0.75rem;
-  }
-  .analysis-control-alycs,
-  .analysis-control-benchmark,
-  .analysis-control-pdf {
-    flex: 1 1 100%;
+    align-items: stretch;
     width: 100%;
-    min-width: 0;
+    gap: 0.5rem;
   }
-  .analysis-control-benchmark .form-group { width: 100% !important; }
+  .analysis-control-benchmark {
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    box-sizing: border-box;
+  }
+  .analysis-control-benchmark .btn-alyc {
+    flex: 1;
+  }
+  .analysis-pdf-btn {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    justify-content: center;
+  }
 
   /* Dashboard mobile instruments cards */
   .dash-instruments-cards {

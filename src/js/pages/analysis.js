@@ -75,51 +75,31 @@ export const AnalysisPage = {
     this.cleanup()
     const content = document.getElementById('page-content')
     content.innerHTML = `
-      <div class="page-header">
+      <div class="page-header analysis-page-header">
         <h2>Análisis de Cartera</h2>
-      </div>
-
-      <div class="card" id="analysis-control-card" style="margin-bottom: 2rem">
-        <div class="analysis-config-header" id="analysis-config-header">
-          <h3 id="analysis-config-title">Configuración de Análisis</h3>
-          <button class="analysis-config-toggle" title="Expandir / Contraer" aria-label="Expandir o contraer configuración de análisis">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="page-header-actions analysis-header-actions">
+          <!-- Tarjeta Benchmark Base -->
+          <div class="analysis-control-benchmark">
+            <label class="analysis-benchmark-label">Benchmark Base</label>
+            <div class="analysis-benchmark-buttons">
+              <button class="btn-alyc btn-benchmark-quick" data-ticker="SPY">SPY</button>
+              <button class="btn-alyc btn-benchmark-quick" data-ticker="QQQ">QQQ</button>
+              <button class="btn-alyc btn-benchmark-quick" data-ticker="DIA">DIA</button>
+              <button class="btn-alyc btn-benchmark-quick" data-ticker="IWM">IWM</button>
+            </div>
+          </div>
+          <!-- Botón Generar Reporte PDF -->
+          <button id="btn-generate-pdf" class="btn btn-primary analysis-pdf-btn" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Generar Reporte PDF</span>
           </button>
         </div>
-        <div class="analysis-config-body">
-        <div class="analysis-control-panel">
-
-          <!-- Sector ALyCs — la selección de cartera vive en la barra de accesos rápidos (arriba) -->
-          <div class="analysis-control-alycs">
-            <div style="text-align: center">
-            <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Cartera por ALyC</label>
-            <p id="analysis-alyc-hint" style="color: var(--text-muted); font-size: 0.85rem; margin: 0">
-              Elegí una cartera desde la barra <strong>Carteras</strong> en la parte superior.
-            </p>
-             </div>
-            </div>
-
-            <!-- Sector Benchmark (Tarjeta Independiente y Centrada) -->
-            <div class="analysis-control-benchmark">
-             <div class="form-group" style="margin:0; width: 240px; text-align: center">
-               <label style="font-weight: 700; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem">Benchmark Base</label>
-               <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; justify-content: center">
-                 <button class="btn-alyc btn-benchmark-quick" data-ticker="SPY">SPY</button>
-                 <button class="btn-alyc btn-benchmark-quick" data-ticker="QQQ">QQQ</button>
-                 <button class="btn-alyc btn-benchmark-quick" data-ticker="DIA">DIA</button>
-                 <button class="btn-alyc btn-benchmark-quick" data-ticker="IWM">IWM</button>
-               </div>
-             </div>
-            </div>
-          <!-- Contenedor fijo para el botón PDF (Altura igualada a las tarjetas, siempre visible) -->
-          <div class="analysis-control-pdf">
-            <button id="btn-generate-pdf" class="btn btn-primary" disabled style="display: flex; width: 100%; height: 100%; min-height: 0; font-size: 0.85rem; font-weight: 700; flex-direction: column; gap: 0.35rem; justify-content: center; align-items: center; line-height: 1.2; box-shadow: var(--shadow-sm); border-radius: var(--radius); opacity: 0.5; cursor: not-allowed; padding: 0.75rem;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              <span>Generar Reporte PDF</span>
-            </button>
-          </div>
-        </div>
-        </div><!-- analysis-config-body -->
       </div>
 
       <div id="analysis-results" style="display: none">
@@ -350,21 +330,8 @@ export const AnalysisPage = {
     }
   },
 
-  _toggleConfigCard(alycName) {
-    const card  = document.getElementById('analysis-control-card')
-    const title = document.getElementById('analysis-config-title')
-    const isCollapsed = card.classList.toggle('collapsed')
-    title.textContent = isCollapsed && alycName
-      ? `Configuración — ${alycName}`
-      : 'Configuración de Análisis'
-  },
-
   _setupEvents() {
     document.getElementById('btn-generate-pdf').addEventListener('click', () => this._generatePDF())
-
-    document.getElementById('analysis-config-header').addEventListener('click', () => {
-      this._toggleConfigCard(this._activeAlycName || null)
-    })
     
     // Refresh individual Comparison Chart
     const btnRefreshComp = document.getElementById('btn-refresh-comp')
@@ -1068,10 +1035,16 @@ export const AnalysisPage = {
     const resultsEl = document.getElementById('analysis-results')
     if (!resultsEl) return
     const alycName = this._activeAlycName || 'Cartera'
-    const pdfBtn = document.getElementById('btn-generate-pdf'), originalText = pdfBtn.textContent
-    pdfBtn.textContent = 'Generando...'; pdfBtn.disabled = true
+    const pdfBtn = document.getElementById('btn-generate-pdf')
+    const originalHTML = pdfBtn ? pdfBtn.innerHTML : ''
+    if (pdfBtn) {
+      pdfBtn.innerHTML = `<span>Generando...</span>`
+      pdfBtn.disabled = true
+    }
     
-    const updateProgress = (msg) => { pdfBtn.textContent = msg }
+    const updateProgress = (msg) => {
+      if (pdfBtn) pdfBtn.innerHTML = `<span>${msg}</span>`
+    }
     
     try {
       updateProgress('Cargando librerías...')
@@ -1128,8 +1101,10 @@ export const AnalysisPage = {
       console.error(err); 
       showToast('Error PDF', 'error') 
     } finally { 
-      pdfBtn.textContent = originalText; 
-      pdfBtn.disabled = false 
+      if (pdfBtn) {
+        pdfBtn.innerHTML = originalHTML
+        pdfBtn.disabled = false
+      }
     }
   },
 
