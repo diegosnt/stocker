@@ -4,6 +4,7 @@ import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
 import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
+import { isAlycVisible, setAlycHidden } from '../alyc-visibility.js'
 
 export const AlycsPage = {
   _alycsData: [],
@@ -110,7 +111,10 @@ export const AlycsPage = {
 
     tbody.innerHTML = data.map(a => `
       <tr>
-        <td><strong>${esc(a.name)}</strong></td>
+        <td>
+          <strong>${esc(a.name)}</strong>
+          ${!isAlycVisible(a.id) ? '<span style="font-size:0.7rem; margin-left:0.4rem; padding: 2px 6px; border-radius: 4px; background: var(--bg-main); color: var(--text-muted); font-weight: normal; border: 1px solid var(--border)">Oculta</span>' : ''}
+        </td>
         <td>${a.cuit ? esc(a.cuit) : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td>${a.website
           ? `<a href="${esc(a.website)}" target="_blank" rel="noopener">${esc(a.website)}</a>`
@@ -131,7 +135,10 @@ export const AlycsPage = {
     mobileList.innerHTML = data.map(a => `
       <div class="mobile-card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; margin-bottom:0.4rem">
-          <strong>${esc(a.name)}</strong>
+          <div>
+            <strong>${esc(a.name)}</strong>
+            ${!isAlycVisible(a.id) ? '<span style="font-size:0.7rem; margin-left:0.4rem; padding: 2px 6px; border-radius: 4px; background: var(--bg-main); color: var(--text-muted); font-weight: normal; border: 1px solid var(--border)">Oculta</span>' : ''}
+          </div>
           <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap">${fmtDate(a.created_at)}</span>
         </div>
         <div class="dash-instrument-row">
@@ -286,7 +293,10 @@ export const AlycsPage = {
       cacheKey: 'alycs',
       successMessage: `ALyC "${name}" eliminada.`,
       conflictMessage: 'No se puede eliminar: tiene operaciones asociadas.',
-      onDone: () => this._loadList()
+      onDone: () => {
+        setAlycHidden(id, false)
+        this._loadList()
+      }
     })
   },
 

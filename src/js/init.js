@@ -4,6 +4,7 @@ import { initDarkMode, toggleDarkMode, setDOMPurify } from './utils.js'
 import { prunePersistentCache, get as cacheGet, set as cacheSet } from './cache.js'
 import { supabase } from './supabase-client.js'
 import { requestAlycAnalysis } from './nav-state.js'
+import { isAlycVisible } from './alyc-visibility.js'
 import { LoginPage } from './pages/login.js'
 
 const app = document.getElementById('app')
@@ -44,7 +45,7 @@ async function loadQuickNavAlycs() {
 
     const alycs = new Map()
     for (const h of data) {
-      if (h.alyc_id && !alycs.has(h.alyc_id)) alycs.set(h.alyc_id, h.alyc_name)
+      if (h.alyc_id && isAlycVisible(h.alyc_id) && !alycs.has(h.alyc_id)) alycs.set(h.alyc_id, h.alyc_name)
     }
 
     if (alycs.size === 0) {
@@ -198,6 +199,10 @@ function renderShell(userEmail) {
     document.querySelectorAll('.quicknav-alyc').forEach(b => {
       b.classList.toggle('active', b.dataset.alycId === String(id))
     })
+  })
+
+  window.addEventListener('alyc-visibility-changed', () => {
+    loadQuickNavAlycs()
   })
 
   loadQuickNavAlycs()

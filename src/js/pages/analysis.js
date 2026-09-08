@@ -8,6 +8,7 @@ import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts, bindCa
 import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
 import { consumeAlycRequest } from '../nav-state.js'
+import { isAlycVisible } from '../alyc-visibility.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -324,7 +325,7 @@ export const AnalysisPage = {
 
     // La cartera a analizar llega desde la barra de accesos rápidos (init.js).
     const pending = consumeAlycRequest()
-    if (pending) {
+    if (pending && isAlycVisible(pending.id)) {
       this._activeAlycName = pending.name
       this._runAnalysis(pending.id)
     }
@@ -424,6 +425,10 @@ export const AnalysisPage = {
 
   async _runAnalysis(alycId) {
     if (!alycId) return
+    if (!isAlycVisible(alycId)) {
+      showToast('Esta ALyC está oculta en la configuración.', 'warning')
+      return
+    }
     this._activeAlycId = alycId
 
     const alycNameSpan = document.getElementById('current-holdings-alyc-name')

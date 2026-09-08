@@ -5,6 +5,7 @@ import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion } from '../utils.js'
 import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equity-curve.js'
+import { getHiddenAlycSet, aggregateHoldings, computeRealizedPnl } from '../alyc-visibility.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 const HISTORY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 horas
@@ -23,6 +24,9 @@ export const DashboardPage = {
   _chartRendered: false,
   _chartsReady: false,
   _alycRows: null,
+  _hiddenAlycIds: null,
+  _visibilityHandler: null,
+  _totalInvested: 0,
 
   cleanup() {
     this._heatmapChart = ChartManager.destroy(this._heatmapChart)
@@ -38,6 +42,13 @@ export const DashboardPage = {
     this._chartRendered = false
     this._chartsReady = false
     this._alycRows = null
+    this._hiddenAlycIds = null
+    this._totalInvested = 0
+
+    if (this._visibilityHandler) {
+      window.removeEventListener('alyc-visibility-changed', this._visibilityHandler)
+      this._visibilityHandler = null
+    }
 
     clearRenderCache(document.getElementById('page-content'))
   },
@@ -45,6 +56,16 @@ export const DashboardPage = {
   async render() {
     this.cleanup()
     this._resolvedPrices = {} // Reset al entrar
+
+    const hiddenAlycIds = getHiddenAlycSet()
+    this._hiddenAlycIds = hiddenAlycIds
+
+    if (!this._visibilityHandler) {
+      this._visibilityHandler = () => {
+        this.render()
+      }
+      window.addEventListener('alyc-visibility-changed', this._visibilityHandler)
+    }
 
     const content = document.getElementById('page-content')
     const skeletonHTML = `
@@ -133,40 +154,82 @@ export const DashboardPage = {
   },
 
   async _loadHoldings() {
-    const { data: holdings, error } = await supabase.rpc('get_user_holdings_global')
-    if (error) throw error
-
-    let totalARS = 0, totalUSD = 0
-    const items = []
-    const summary = {}
-
-    for (const h of holdings) {
-      const quantity    = parseFloat(h.total_quantity)
-      const avgBuyPrice = parseFloat(h.avg_buy_price)
-      const invested    = quantity * avgBuyPrice
-
-      if (h.currency === 'ARS') totalARS += invested
-      else                      totalUSD += invested
-
-      items.push({
-        ticker: h.ticker, name: h.instrument_name,
-        instrumentType: h.instrument_type_name,
-        quantity, avgBuyPrice, currency: h.currency, invested
-      })
-
-      summary[h.ticker] = { currency: h.currency, quantity, avgBuyPrice }
+    const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
+    let holdings = cacheGet('user_holdings')
+    if (!holdings) {
+      const { data, error } = await supabase.rpc('get_user_holdings', { p_limit: 500, p_offset: 0 })
+      if (!error && data) {
+        holdings = data
+        if (holdings.length) cacheSet('user_holdings', holdings)
+      }
     }
 
-    items.sort((a, b) => b.invested - a.invested)
-    const tickers = items.map(h => h.ticker)
-    return { items, totalARS, totalUSD, tickers, summary }
+    if (holdings && holdings.length) {
+      return aggregateHoldings(holdings, hiddenAlycIds)
+    }
+
+    if (hiddenAlycIds.size === 0) {
+      const { data: globalHoldings, error } = await supabase.rpc('get_user_holdings_global')
+      if (error) throw error
+
+      let totalARS = 0, totalUSD = 0
+      const items = []
+      const summary = {}
+
+      for (const h of (globalHoldings || [])) {
+        const quantity    = parseFloat(h.total_quantity)
+        const avgBuyPrice = parseFloat(h.avg_buy_price)
+        const invested    = quantity * avgBuyPrice
+
+        if (h.currency === 'ARS') totalARS += invested
+        else                      totalUSD += invested
+
+        items.push({
+          ticker: h.ticker, name: h.instrument_name,
+          instrumentType: h.instrument_type_name,
+          quantity, avgBuyPrice, currency: h.currency, invested
+        })
+
+        summary[h.ticker] = { currency: h.currency, quantity, avgBuyPrice }
+      }
+
+      items.sort((a, b) => b.invested - a.invested)
+      const tickers = items.map(h => h.ticker)
+      return { items, totalARS, totalUSD, tickers, summary }
+    }
+
+    return { items: [], totalARS: 0, totalUSD: 0, tickers: [], summary: {} }
   },
 
   async _loadRealizedPnl() {
+    const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
+
+    if (hiddenAlycIds.size > 0) {
+      try {
+        const { data: operations, error } = await supabase
+          .from('operations_search')
+          .select('type, quantity, price, currency, operated_at, instrument_ticker, instrument_name, alyc_id')
+          .order('operated_at', { ascending: true })
+        if (error) throw error
+        return computeRealizedPnl(operations || [], hiddenAlycIds)
+      } catch (err) {
+        console.error('[Dashboard] Error al calcular P&L realizado con ALyCs filtradas:', err)
+        return []
+      }
+    }
+
     const { data, error } = await supabase.rpc('get_user_realized_pnl')
     if (error) {
       console.error('[Dashboard] get_user_realized_pnl no disponible:', error)
-      return []
+      try {
+        const { data: operations } = await supabase
+          .from('operations_search')
+          .select('type, quantity, price, currency, operated_at, instrument_ticker, instrument_name, alyc_id')
+          .order('operated_at', { ascending: true })
+        return computeRealizedPnl(operations || [], hiddenAlycIds)
+      } catch {
+        return []
+      }
     }
     return data || []
   },
@@ -202,11 +265,14 @@ export const DashboardPage = {
     container.innerHTML = `<div class="skeleton" style="height:280px"></div>`
 
     try {
-      const { data: operations, error } = await supabase
+      const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
+      const { data: rawOperations, error } = await supabase
         .from('operations_search')
-        .select('type, quantity, price, currency, operated_at, instrument_ticker')
+        .select('type, quantity, price, currency, operated_at, instrument_ticker, alyc_id')
         .order('operated_at', { ascending: true })
       if (error) throw error
+
+      const operations = (rawOperations || []).filter(op => !hiddenAlycIds.has(String(op.alyc_id)))
 
       if (!operations || operations.length === 0) {
         container.innerHTML = `<p class="table-empty">No tenés operaciones registradas.</p>`
@@ -320,6 +386,8 @@ export const DashboardPage = {
     const kpiEl   = document.getElementById('dash-kpis')
     const mainEl  = document.getElementById('dash-content')
     this._summary = data.summary
+    this._totalInvested = (data.totalARS || 0) + (data.totalUSD || 0)
+    this._heatmapChart = ChartManager.destroy(this._heatmapChart)
     this._sortCol = ''
     this._sortAsc = true
 
@@ -757,14 +825,20 @@ export const DashboardPage = {
       return '#64748b'
     }
 
-    const data = Object.entries(this._summary).map(([ticker, h]) => {
+    const rawData = Object.entries(this._summary).map(([ticker, h]) => {
       const price = this._resolvedPrices?.[ticker] ?? null
       const invested = h.quantity * h.avgBuyPrice
       const pct = price !== null && h.avgBuyPrice > 0 ? (price / h.avgBuyPrice - 1) * 100 : 0
-      return { ticker, value: invested, pct, color: getColor(pct) }
+      return { ticker, value: invested, pct, currency: h.currency || 'ARS', color: getColor(pct) }
     }).filter(d => d.value > 0).sort((a, b) => b.value - a.value)
 
-    if (!data.length) return
+    if (!rawData.length) return
+
+    const totalInvested = this._totalInvested || rawData.reduce((sum, d) => sum + d.value, 0)
+    const data = rawData.map(d => ({
+      ...d,
+      weight: totalInvested > 0 ? (d.value / totalInvested) * 100 : 0
+    }))
 
     if (!el.querySelector('canvas')) {
       el.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
@@ -776,7 +850,21 @@ export const DashboardPage = {
       formatter: (ctx) => {
         const d = ctx.raw?._data || ctx.raw
         if (!d || !d.ticker) return []
-        return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
+        const weightStr = `${(d.weight != null ? d.weight.toFixed(1) : '0.0')}%`
+        const sign = d.pct > 0 ? '+' : ''
+        const pnlStr = `${sign}${d.pct != null ? fmt(d.pct) : '0,00'}%`
+
+        const w = ctx.element?.width || 0
+        const h = ctx.element?.height || 0
+        const area = w * h
+
+        if (area > 0 && (area < 1800 || w < 55 || h < 32)) {
+          return [d.ticker, weightStr]
+        }
+        if (area > 0 && (area < 4200 || h < 52 || w < 85)) {
+          return [d.ticker, `${weightStr} | ${pnlStr}`]
+        }
+        return [d.ticker, `Peso: ${weightStr}`, `P&L: ${pnlStr}`]
       },
       chartOptions: {
         plugins: {
@@ -785,7 +873,11 @@ export const DashboardPage = {
               label: (ctx) => {
                 const d = ctx.raw?._data
                 if (!d) return ''
-                return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
+                const curPrefix = d.currency === 'USD' ? 'US$ ' : '$ '
+                const sign = d.pct > 0 ? '+' : ''
+                const pnlStr = `${sign}${fmt(d.pct)}%`
+                const weightStr = `${(d.weight != null ? d.weight.toFixed(1) : '0.0')}%`
+                return ` ${d.ticker}: ${curPrefix}${fmt(d.value)} | Peso: ${weightStr} | P&L: ${pnlStr}`
               }
             }
           }
@@ -795,9 +887,34 @@ export const DashboardPage = {
   },
 
   async _loadHoldingsByAlyc() {
-    const { data, error } = await supabase.rpc('get_user_holdings_by_alyc')
-    if (error) throw error
-    return data || []
+    const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
+
+    let holdings = cacheGet('user_holdings')
+    if (!holdings) {
+      const { data, error } = await supabase.rpc('get_user_holdings', { p_limit: 500, p_offset: 0 })
+      if (!error && data) {
+        holdings = data
+        if (holdings.length) cacheSet('user_holdings', holdings)
+      }
+    }
+
+    if (holdings && holdings.length) {
+      return holdings
+        .filter(h => !hiddenAlycIds.has(String(h.alyc_id)))
+        .map(h => ({
+          ...h,
+          invested: (parseFloat(h.total_quantity) || 0) * (parseFloat(h.avg_buy_price) || 0)
+        }))
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_user_holdings_by_alyc')
+      if (error) throw error
+      const rows = data || []
+      return rows.filter(r => !hiddenAlycIds.has(String(r.alyc_id)))
+    } catch {
+      return []
+    }
   },
 
   _buildAlycData(rows) {

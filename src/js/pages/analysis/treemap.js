@@ -17,10 +17,13 @@ export function renderTreemapChart(container, items, prevInstance) {
   }
   const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+  const totalValue = items.reduce((sum, item) => sum + (item.currentValue || 0), 0)
+
   const data = items.map(item => ({
     ticker: item.ticker,
     value: item.currentValue,
     pct: item.pnlPct ?? 0,
+    weight: totalValue > 0 ? ((item.currentValue || 0) / totalValue) * 100 : 0,
     color: getColor(item.pnlPct ?? 0)
   })).filter(d => d.value > 0)
 
@@ -29,9 +32,21 @@ export function renderTreemapChart(container, items, prevInstance) {
     formatter: (ctx) => {
       const d = ctx.raw?._data || ctx.raw
       if (!d || !d.ticker) return []
-      const area = ctx.element?.width * ctx.element?.height || 1000
-      if (area < 2500) return [d.ticker]
-      return [d.ticker, (d.pct != null ? fmt(d.pct) : '0') + '%']
+      const weightStr = `${(d.weight != null ? d.weight.toFixed(1) : '0.0')}%`
+      const sign = d.pct > 0 ? '+' : ''
+      const pnlStr = `${sign}${d.pct != null ? fmt(d.pct) : '0,00'}%`
+
+      const w = ctx.element?.width || 0
+      const h = ctx.element?.height || 0
+      const area = w * h
+
+      if (area > 0 && (area < 1800 || w < 55 || h < 32)) {
+        return [d.ticker, weightStr]
+      }
+      if (area > 0 && (area < 4200 || h < 52 || w < 85)) {
+        return [d.ticker, `${weightStr} | ${pnlStr}`]
+      }
+      return [d.ticker, `Peso: ${weightStr}`, `P&L: ${pnlStr}`]
     },
     chartOptions: {
       plugins: {
@@ -40,7 +55,10 @@ export function renderTreemapChart(container, items, prevInstance) {
             label: (ctx) => {
               const d = ctx.raw?._data
               if (!d) return ''
-              return ` ${d.ticker}: $${fmt(d.value)} (${fmt(d.pct)}%)`
+              const sign = d.pct > 0 ? '+' : ''
+              const pnlStr = `${sign}${fmt(d.pct)}%`
+              const weightStr = `${(d.weight != null ? d.weight.toFixed(1) : '0.0')}%`
+              return ` ${d.ticker}: $${fmt(d.value)} | Peso: ${weightStr} | P&L: ${pnlStr}`
             }
           }
         }

@@ -4,6 +4,7 @@ import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
 import { esc, confirmModal, setFieldError, fmtDateShort, buildPageRange } from '../utils.js'
 import { handleCsvImport } from './operations/csv-import.js'
+import { isAlycVisible } from '../alyc-visibility.js'
 
 const ICON_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`
 const ICON_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
@@ -773,9 +774,15 @@ export const OperationsPage = {
       if (data) cacheSet('alycs', data)
     }
 
-    if (data?.length) {
+    if (data) {
+      const visibleData = data.filter(a => isAlycVisible(a.id))
       sel.innerHTML = '<option value="">Todas las ALyCs</option>' +
-        data.map(a => `<option value="${a.id}" ${a.id === state.filters.alycFilter ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+        visibleData.map(a => `<option value="${a.id}" ${a.id === state.filters.alycFilter ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+
+      if (state.filters.alycFilter && !isAlycVisible(state.filters.alycFilter)) {
+        state.filters.alycFilter = ''
+        sel.value = ''
+      }
     }
 
     sel.addEventListener('change', () => {
@@ -1198,8 +1205,19 @@ export const OperationsPage = {
       return
     }
 
+    const visibleData = data.filter(a => isAlycVisible(a.id) || a.id === selectedId)
+
+    if (!visibleData.length) {
+      sel.innerHTML = '<option value="">— Sin ALyCs visibles —</option>'
+      return
+    }
+
     sel.innerHTML = '<option value="">— Seleccioná una ALyC —</option>' +
-      data.map(a => `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+      visibleData.map(a => `
+        <option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>
+          ${esc(a.name)}${!isAlycVisible(a.id) ? ' (oculta)' : ''}
+        </option>
+      `).join('')
   },
 
   async _showInstrumentModal() {

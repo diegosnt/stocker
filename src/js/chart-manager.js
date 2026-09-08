@@ -346,9 +346,21 @@ export const ChartManager = {
     if (!canvas) return null
 
     if (options.instance && options.instance.config.type === 'treemap') {
-      options.instance.data.datasets[0].tree = data
-      options.instance.update()
-      return options.instance
+      if (options.instance.canvas === canvas) {
+        options.instance.data.datasets[0].tree = data
+        if (options.formatter) {
+          options.instance.data.datasets[0].labels.formatter = options.formatter
+        }
+        if (options.chartOptions?.plugins?.tooltip?.callbacks?.label) {
+          if (!options.instance.options.plugins) options.instance.options.plugins = {}
+          if (!options.instance.options.plugins.tooltip) options.instance.options.plugins.tooltip = {}
+          if (!options.instance.options.plugins.tooltip.callbacks) options.instance.options.plugins.tooltip.callbacks = {}
+          options.instance.options.plugins.tooltip.callbacks.label = options.chartOptions.plugins.tooltip.callbacks.label
+        }
+        options.instance.update()
+        return options.instance
+      }
+      this.destroy(options.instance)
     }
 
     const baseOptions = getBaseOptions()
@@ -368,7 +380,9 @@ export const ChartManager = {
             formatter: options.formatter || ((ctx) => {
               const d = ctx.raw?._data || ctx.raw
               if (!d || !d.ticker) return []
-              return [d.ticker, (d.pct != null ? d.pct.toFixed(1) : '0') + '%']
+              const weightStr = d.weight != null ? `${d.weight.toFixed(1)}%` : null
+              const pnlStr = (d.pct != null ? d.pct.toFixed(1) : '0') + '%'
+              return weightStr ? [d.ticker, `Peso: ${weightStr}`, pnlStr] : [d.ticker, pnlStr]
             }),
             font: { size: 13, weight: 'bold' },
             color: '#ffffff',

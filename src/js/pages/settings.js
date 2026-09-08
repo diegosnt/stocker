@@ -2,6 +2,8 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { downloadFullBackup, downloadOperationsMarkdown } from './settings/backup.js'
+import { esc } from '../utils.js'
+import { getHiddenAlycSet, toggleAlycVisibility } from '../alyc-visibility.js'
 
 export const SettingsPage = {
   async render() {
@@ -54,6 +56,21 @@ export const SettingsPage = {
           </div>
         </div>
 
+        <div class="card" id="card-alycs-visibility">
+          <h3>Visibilidad de ALyCs</h3>
+          <p class="setting-desc" style="color:var(--text-muted); margin-bottom:1rem">
+            Seleccioná qué ALyCs querés ver u ocultar. Las ALyCs ocultas se excluyen de todos los totales, gráficos y cálculos del Dashboard, y dejan de estar disponibles en los selectores. No se eliminan datos ni operaciones.
+          </p>
+          <div id="alycs-vis-loading" class="setting-row">
+            <div class="setting-info">
+              <div class="skeleton" style="height:14px; width:180px; margin-bottom:0.4rem"></div>
+              <div class="skeleton" style="height:12px; width:260px"></div>
+            </div>
+            <div class="skeleton" style="height:32px; width:90px; flex-shrink:0"></div>
+          </div>
+          <div id="alycs-vis-content" style="display:none; flex-direction:column; gap:0.75rem"></div>
+        </div>
+
         <div class="card">
           <h3>Copia de seguridad</h3>
           <div class="setting-row">
@@ -85,7 +102,7 @@ export const SettingsPage = {
       downloadOperationsMarkdown(e.currentTarget)
     })
 
-    await Promise.all([this._load(), this._loadMarketBadge()])
+    await Promise.all([this._load(), this._loadMarketBadge(), this._loadAlycsVisibility()])
   },
 
   // ── Registro ──────────────────────────────────────────────
@@ -200,6 +217,74 @@ export const SettingsPage = {
     } finally {
       btn.disabled = false
     }
+  },
+
+  // ── Visibilidad de ALyCs ─────────────────────────────────
+  async _loadAlycsVisibility() {
+    const loading = document.getElementById('alycs-vis-loading')
+    const container = document.getElementById('alycs-vis-content')
+    if (!loading || !container) return
+
+    const { data: alycs, error } = await supabase
+      .from('alycs')
+      .select('id, name, cuit')
+      .order('name')
+
+    loading.style.display = 'none'
+    container.style.display = 'flex'
+
+    if (error) {
+      container.innerHTML = '<p style="color:var(--color-danger)">Error al cargar las ALyCs.</p>'
+      return
+    }
+
+    if (!alycs || alycs.length === 0) {
+      container.innerHTML = '<p class="setting-desc" style="color:var(--text-muted)">No tenés ALyCs registradas. Podés agregar una en <a href="#alycs" style="color:var(--color-primary)">ALyCs / Brokers</a>.</p>'
+      return
+    }
+
+    const hiddenSet = getHiddenAlycSet()
+
+    container.innerHTML = alycs.map(a => {
+      const isVisible = !hiddenSet.has(String(a.id))
+      return `
+        <div class="setting-row alyc-vis-item" data-alyc-id="${a.id}" style="padding-bottom:0.6rem; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.06))">
+          <div class="setting-info">
+            <div class="setting-label">
+              <strong>${esc(a.name)}</strong>
+              ${a.cuit ? `<span style="font-size:0.75rem; color:var(--text-muted); margin-left:0.4rem">(${esc(a.cuit)})</span>` : ''}
+            </div>
+            <div class="setting-desc" id="alyc-vis-desc-${a.id}" style="color:${isVisible ? 'var(--color-success)' : 'var(--text-muted)'}">
+              ${isVisible ? 'Visible — incluida en cálculos del Dashboard y selectores.' : 'Oculta — excluida de totales, gráficos y selectores.'}
+            </div>
+          </div>
+          <button class="btn btn-sm ${isVisible ? 'btn-ghost' : 'btn-primary'} btn-toggle-alyc-vis"
+            data-id="${a.id}" data-name="${esc(a.name)}">
+            ${isVisible ? 'Ocultar' : 'Mostrar'}
+          </button>
+        </div>`
+    }).join('')
+
+    container.querySelectorAll('.btn-toggle-alyc-vis').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id
+        const name = btn.dataset.name
+        const nowVisible = toggleAlycVisibility(id)
+
+        btn.textContent = nowVisible ? 'Ocultar' : 'Mostrar'
+        btn.className = `btn btn-sm ${nowVisible ? 'btn-ghost' : 'btn-primary'} btn-toggle-alyc-vis`
+
+        const desc = document.getElementById(`alyc-vis-desc-${id}`)
+        if (desc) {
+          desc.textContent = nowVisible
+            ? 'Visible — incluida en cálculos del Dashboard y selectores.'
+            : 'Oculta — excluida de totales, gráficos y selectores.'
+          desc.style.color = nowVisible ? 'var(--color-success)' : 'var(--text-muted)'
+        }
+
+        showToast(`ALyC "${name}" ${nowVisible ? 'ahora es visible' : 'ocultada del dashboard'}.`, 'success')
+      })
+    })
   },
 
   cleanup() {
