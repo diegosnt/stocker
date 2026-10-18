@@ -8,8 +8,8 @@ import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equi
 import { getHiddenAlycSet, aggregateHoldings, computeRealizedPnl } from '../alyc-visibility.js'
 import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
 import { computeUsdCostBasis } from '../real-return.js'
+import { getCachedQuote, setCachedQuote, clearCachedQuotes, createFreshnessIndicator } from '../quote-freshness.js'
 
-const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 const HISTORY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 horas
 
 export const DashboardPage = {
@@ -46,6 +46,8 @@ export const DashboardPage = {
     this._alycRows = null
     this._hiddenAlycIds = null
     this._totalInvested = 0
+    this._freshness?.destroy()
+    this._freshness = null
 
     if (this._visibilityHandler) {
       window.removeEventListener('alyc-visibility-changed', this._visibilityHandler)
@@ -60,6 +62,7 @@ export const DashboardPage = {
     this._resolvedPrices = {} // Reset al entrar
     this._usdCost = null
     this._arsTotals = null
+    this._operationsPromise = null
 
     const hiddenAlycIds = getHiddenAlycSet()
     this._hiddenAlycIds = hiddenAlycIds
@@ -75,6 +78,7 @@ export const DashboardPage = {
     const skeletonHTML = `
       <div class="page-header">
         <h2>Dashboard</h2>
+        <div id="dash-price-freshness"></div>
       </div>
       
       <div id="dash-kpis" class="kpi-grid">
@@ -264,22 +268,38 @@ export const DashboardPage = {
     }
   },
 
+  // Operaciones de las ALyCs visibles, consultadas una sola vez por render y
+  // compartidas entre la curva de patrimonio (en cada cambio de rango) y el costo en US$
+  _getOperations() {
+    if (!this._operationsPromise) {
+      const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
+      this._operationsPromise = supabase
+        .from('operations_search')
+        .select('type, quantity, price, currency, operated_at, instrument_ticker, alyc_id, usd_rate')
+        .order('operated_at', { ascending: true })
+        .then(({ data, error }) => {
+          if (error) throw error
+          return (data || []).filter(op => !hiddenAlycIds.has(String(op.alyc_id)))
+        })
+      // Si falla, el próximo pedido vuelve a intentar
+      this._operationsPromise.catch(() => { this._operationsPromise = null })
+    }
+    return this._operationsPromise
+  },
+
   async _loadEquityCurve(range) {
     const container = document.getElementById('dash-equity-charts')
     if (!container) return
     container.innerHTML = `<div class="skeleton" style="height:280px"></div>`
+    // Si se cambia de rango antes de que termine, la respuesta vieja se descarta
+    const requestId = this._equityRequestId = (this._equityRequestId || 0) + 1
+    const isStale = () => requestId !== this._equityRequestId || !container.isConnected
 
     try {
-      const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
-      const { data: rawOperations, error } = await supabase
-        .from('operations_search')
-        .select('type, quantity, price, currency, operated_at, instrument_ticker, alyc_id')
-        .order('operated_at', { ascending: true })
-      if (error) throw error
+      const operations = await this._getOperations()
+      if (isStale()) return
 
-      const operations = (rawOperations || []).filter(op => !hiddenAlycIds.has(String(op.alyc_id)))
-
-      if (!operations || operations.length === 0) {
+      if (operations.length === 0) {
         container.innerHTML = `<p class="table-empty">No tenés operaciones registradas.</p>`
         return
       }
@@ -287,7 +307,7 @@ export const DashboardPage = {
       const byCurrency = groupOperationsByCurrency(operations)
       const seriesByCurrency = {}
 
-      for (const currency of Object.keys(byCurrency)) {
+      await Promise.all(Object.keys(byCurrency).map(async currency => {
         const ops = byCurrency[currency]
         const tickers = [...new Set(ops.map(o => o.instrument_ticker))]
         const histories = {}
@@ -295,10 +315,12 @@ export const DashboardPage = {
           histories[ticker] = await this._fetchHistoryForRange(ticker, range)
         }))
         seriesByCurrency[currency] = computeEquitySeries(ops, histories)
-      }
+      }))
+      if (isStale()) return
 
       this._renderEquityCurve(seriesByCurrency)
     } catch (err) {
+      if (isStale()) return
       console.error('[Dashboard] Error al cargar evolución del patrimonio:', err)
       container.innerHTML = `<p class="table-empty">Error al cargar la evolución del patrimonio.</p>`
     }
@@ -339,42 +361,46 @@ export const DashboardPage = {
     })
   },
 
-  async _updateMarketPrices(tickers) {
+  async _updateMarketPrices(tickers, { force = false } = {}) {
     if (!tickers || tickers.length === 0) return
+    this._tickers = tickers
+    if (force) clearCachedQuotes(tickers)
 
     const missingTickers = []
-    
+    const fetchedAt = {}
+
     // 1. Intentar recuperar de cache primero
     for (const ticker of tickers) {
-      const cached = cacheGet(`quote_${ticker}`, { persistent: true })
-      if (cached !== null) {
-        this._resolvedPrices[ticker] = cached
-        this._updatePriceCells(ticker, cached)
+      const cached = getCachedQuote(ticker)
+      if (cached) {
+        this._resolvedPrices[ticker] = cached.price
+        fetchedAt[ticker] = cached.at
+        this._updatePriceCells(ticker, cached.price)
       } else {
         missingTickers.push(ticker)
       }
     }
+    if (missingTickers.length < tickers.length) this._afterPricesUpdated()
 
     // 2. Si todo está en cache, no pedimos nada
     if (missingTickers.length === 0) {
-      console.log('[Dashboard] Todos los precios recuperados de cache (2h)')
+      this._updateFreshness(fetchedAt)
       return
     }
 
+    this._freshness?.setLoading(true)
     try {
       // 3. Un solo request masivo para los faltantes
-      console.log(`[Dashboard] Solicitando precios faltantes: ${missingTickers.join(', ')}`)
       const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(missingTickers.join(','))}`)
-      
+      const now = Date.now()
+
       for (const ticker of missingTickers) {
         const price = data[ticker]?.price ?? null
         this._resolvedPrices[ticker] = price
-        
-        // Guardar en cache por 2 horas
         if (price !== null) {
-          cacheSet(`quote_${ticker}`, price, { persistent: true, ttlMs: QUOTE_CACHE_TTL })
+          setCachedQuote(ticker, price, now)
+          fetchedAt[ticker] = now
         }
-        
         this._updatePriceCells(ticker, price)
       }
     } catch (err) {
@@ -385,6 +411,20 @@ export const DashboardPage = {
         this._updatePriceCells(t, null)
       })
     }
+    this._afterPricesUpdated()
+    this._freshness?.setLoading(false)
+    this._updateFreshness(fetchedAt)
+  },
+
+  // Muestra la antigüedad de la cotización más vieja en pantalla
+  _updateFreshness(fetchedAt) {
+    const el = document.getElementById('dash-price-freshness')
+    if (!el) return
+    if (!this._freshness) {
+      this._freshness = createFreshnessIndicator(el, () => this._updateMarketPrices(this._tickers, { force: true }))
+    }
+    const times = Object.values(fetchedAt)
+    this._freshness.update(times.length ? Math.min(...times) : null)
   },
 
   _renderDashboard(data) {
@@ -765,6 +805,11 @@ export const DashboardPage = {
       el.innerHTML = `<span style="color:${pnlColor(pct)};font-weight:600">${sign(pct)}${pct.toFixed(1)}%</span>`
     })
 
+  },
+
+  // Gráficos, KPIs y orden de la tabla dependen de todos los precios: se
+  // recalculan una vez por lote, no una vez por ticker
+  _afterPricesUpdated() {
     if (this._chartsReady) {
       this._refreshHeatmap()
       this._refreshComparisonChart()
@@ -838,14 +883,7 @@ export const DashboardPage = {
   // siguen mostrando la conversión al MEP de hoy.
   async _loadUsdCost() {
     try {
-      const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
-      const { data, error } = await supabase
-        .from('operations_search')
-        .select('type, quantity, price, currency, operated_at, instrument_ticker, alyc_id, usd_rate')
-        .eq('currency', 'ARS')
-        .order('operated_at', { ascending: true })
-      if (error) throw error
-      const operations = (data || []).filter(op => !hiddenAlycIds.has(String(op.alyc_id)))
+      const operations = await this._getOperations()
       this._usdCost = computeUsdCostBasis(operations)
       this._renderRealUsdKpis()
     } catch (err) {

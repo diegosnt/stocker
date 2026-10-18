@@ -1214,6 +1214,26 @@ tr.selected-row td {
   display: none;
 }
 
+/* Antigüedad de las cotizaciones ("Precios de hace 12 min ↻") */
+.price-freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.price-freshness-text:empty {
+  display: none;
+}
+.price-freshness-btn {
+  padding: 0.25rem;
+  line-height: 0;
+}
+.price-freshness-btn.is-loading svg {
+  animation: spin 1s linear infinite;
+}
+
 .kpi-card--compact {
   padding: 0.5rem 0.75rem;
 }

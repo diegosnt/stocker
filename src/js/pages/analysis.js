@@ -11,6 +11,7 @@ import { consumeAlycRequest } from '../nav-state.js'
 import { isAlycVisible } from '../alyc-visibility.js'
 import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
 import { computeUsdCostBasis } from '../real-return.js'
+import { getCachedQuote, setCachedQuote, clearCachedQuotes, createFreshnessIndicator } from '../quote-freshness.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -30,6 +31,7 @@ export const AnalysisPage = {
   _resolvedPrices: {},
   _activeAlycName: null,
   _activeAlycId: null,
+  _runId: 0,
   _activeBenchmark: 'SPY',
   _displayHoldings: [],
   _validHistories: [],
@@ -38,6 +40,8 @@ export const AnalysisPage = {
   _holdingsSortAsc: false,
 
   cleanup() {
+    this._freshness?.destroy()
+    this._freshness = null
     const charts = [
       this._chart, this._mcChart, this._btChart, 
       this._rcChart, this._ddChart, this._treemapChart,
@@ -108,6 +112,7 @@ export const AnalysisPage = {
       <div id="analysis-results" style="display: none">
         <!-- SECCIÓN 0: Tenencia Actual -->
         <div id="analysis-section-0" style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem">
+          <div id="analysis-price-freshness" style="align-self: flex-end; margin-bottom: -1rem"></div>
           <div id="analysis-risk-alerts"></div>
 
           <div class="kpi-grid" id="analysis-totals-cards" style="margin-bottom: 0">
@@ -230,6 +235,12 @@ export const AnalysisPage = {
           </div>
         </div>
 
+        <div id="analysis-advanced-loading" class="card" style="text-align: center; padding: 2.5rem">
+          <span class="spinner" style="width: 32px; height: 32px; border-width: 3px"></span>
+          <p style="margin-top: 1rem; color: var(--text-muted)">Ejecutando algoritmos de optimización avanzada (Michaud &amp; HRP)...</p>
+        </div>
+
+        <div id="analysis-advanced" style="display: none">
         <!-- SECCIÓN 1: KPIs y Eficiencia -->
         <div class="analysis-grid-mixed">
           <div class="card" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0">
@@ -314,11 +325,12 @@ export const AnalysisPage = {
          </div>        <div class="card" style="padding: 1rem">
           <p id="analysis-summary" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4"></p>
         </div>
+        </div>
       </div>
 
       <div id="analysis-loading" class="card" style="display: none; text-align: center; padding: 3rem">
         <span class="spinner" style="width: 40px; height: 40px; border-width: 4px"></span>
-        <p style="margin-top: 1rem">Ejecutando algoritmos de optimización avanzada (Michaud & HRP)...</p>
+        <p style="margin-top: 1rem">Cargando cartera...</p>
       </div>`
 
     this._setupEvents()
@@ -432,6 +444,9 @@ export const AnalysisPage = {
       return
     }
     this._activeAlycId = alycId
+    // Si se elige otro ALyC mientras corre el análisis, los resultados viejos se descartan
+    const runId = ++this._runId
+    const isStale = () => runId !== this._runId
 
     const alycNameSpan = document.getElementById('current-holdings-alyc-name')
     if (alycNameSpan) alycNameSpan.textContent = this._activeAlycName ? `- ${this._activeAlycName}` : ''
@@ -444,12 +459,17 @@ export const AnalysisPage = {
     const resultsDiv = document.getElementById('analysis-results')
     const loadingDiv = document.getElementById('analysis-loading')
     const pdfBtn = document.getElementById('btn-generate-pdf')
+    const setPdfEnabled = (enabled) => {
+      pdfBtn.disabled = !enabled
+      pdfBtn.style.opacity = enabled ? '1' : '0.5'
+      pdfBtn.style.cursor = enabled ? 'pointer' : 'not-allowed'
+    }
 
     resultsDiv.style.display = 'none'
-    pdfBtn.disabled = true
-    pdfBtn.style.opacity = '0.5'
-    pdfBtn.style.cursor = 'not-allowed'
+    setPdfEnabled(false)
     loadingDiv.style.display = 'block'
+
+    let alycHoldings
     try {
       let holdings = cacheGet('user_holdings')
       if (!holdings) {
@@ -458,16 +478,46 @@ export const AnalysisPage = {
         holdings = result.data
         if (holdings) cacheSet('user_holdings', holdings)
       }
-      const alycHoldings = holdings.filter(h => h.alyc_id === alycId)
+      alycHoldings = holdings.filter(h => h.alyc_id === alycId)
       if (alycHoldings.length < 2) throw new Error('Se necesitan al menos 2 activos.')
+    } catch (e) {
+      if (isStale()) return
+      console.error(e)
+      showToast(e.message, 'error')
+      loadingDiv.style.display = 'none'
+      return
+    }
+    if (isStale()) return
 
-      const benchmarkTicker = this._activeBenchmark || 'SPY'
+    // La tenencia actual solo necesita precios de mercado: se muestra apenas
+    // llegan, sin esperar historiales ni el Worker (que pueden tardar varios segundos)
+    const advancedDiv = document.getElementById('analysis-advanced')
+    const advancedLoading = document.getElementById('analysis-advanced-loading')
+    advancedDiv.style.display = 'none'
+    advancedLoading.style.display = 'block'
+    advancedLoading.innerHTML = `
+      <span class="spinner" style="width: 32px; height: 32px; border-width: 3px"></span>
+      <p style="margin-top: 1rem; color: var(--text-muted)">Ejecutando algoritmos de optimización avanzada (Michaud &amp; HRP)...</p>`
+    loadingDiv.style.display = 'none'
+    resultsDiv.style.display = 'block'
+
+    const holdingsPromise = this._updateMarketPrices(alycHoldings.map(h => h.ticker)).then(() => {
+      if (isStale()) return
+      this._displayHoldings = alycHoldings
+      this._renderCurrentHoldings(alycHoldings)
+      this._renderComparisonChart(alycHoldings)
+      this._renderActivityChart(alycId)
+    })
+
+    const benchmarkTicker = this._activeBenchmark || 'SPY'
+    try {
       const historyPromises = [
         ...alycHoldings.map(h => this._fetchHistory(h.ticker)),
         this._fetchHistory(benchmarkTicker)
       ]
-      
+
       const results = await Promise.allSettled(historyPromises)
+      if (isStale()) return
       const assetResults = results.slice(0, alycHoldings.length)
       const benchmarkResult = results[results.length - 1]
 
@@ -475,7 +525,6 @@ export const AnalysisPage = {
       const validTickers = []
       const validHoldings = []
       const failedTickers = []
-      this._resolvedPrices = {}
 
       assetResults.forEach((res, i) => {
         const h = alycHoldings[i]
@@ -483,8 +532,6 @@ export const AnalysisPage = {
           validHistories.push(res.value)
           validTickers.push(h.ticker)
           validHoldings.push(h)
-          const lastPoint = res.value[res.value.length - 1]
-          if (lastPoint) this._resolvedPrices[h.ticker] = lastPoint.price
         } else {
           failedTickers.push(h.ticker)
         }
@@ -523,9 +570,14 @@ export const AnalysisPage = {
           worker.terminate()
         }
       })
+      if (isStale()) return
 
       const { markowitz, hrp, michaud, monteCarlo, metrics } = workerResults
       const analysis = { ...markowitz, hrp, michaud, ...metrics }
+
+      // Mostrar la sección antes de dibujar, para que los gráficos tomen su tamaño real
+      advancedLoading.style.display = 'none'
+      advancedDiv.style.display = 'block'
 
       // Actualizar métricas CAPM en UI (las que devolvió el worker)
       this._updateMetricsUI(analysis, benchmarkTicker)
@@ -545,14 +597,9 @@ export const AnalysisPage = {
       }
 
       try { renderCorrelationHeatmap(validTickers, returnsMatrix) } catch(e) { console.error('Error Correlación:', e) }
-      
-      // Precio actual y visualización de cartera: para TODOS los holdings del ALyC,
-      // no solo los que tienen historial suficiente para el análisis estadístico.
-      await this._updateMarketPrices(alycHoldings.map(h => h.ticker))
-      this._displayHoldings = alycHoldings
-      this._renderCurrentHoldings(alycHoldings, analysis)
-      this._renderComparisonChart(alycHoldings)
-      this._renderActivityChart(alycId)
+
+      await holdingsPromise
+      if (isStale()) return
       try { await this._loadTimingChart(alycId) } catch(e) { console.error('Error Timing:', e) }
 
       document.getElementById('analysis-summary').innerHTML = `Análisis multi-algoritmo completado contra ${sanitize(benchmarkTicker)}.`
@@ -560,46 +607,80 @@ export const AnalysisPage = {
       if (failedTickers.length > 0) {
         showToast(`Sin historial suficiente, no participan del análisis estadístico: ${failedTickers.join(', ')}`, 'warning')
       }
-      
-      loadingDiv.style.display = 'none'
-      resultsDiv.style.display = 'block'
-      pdfBtn.disabled = false
-      pdfBtn.style.opacity = '1'
-      pdfBtn.style.cursor = 'pointer'
+
+      setPdfEnabled(true)
     } catch (e) {
+      if (isStale()) return
       console.error(e)
+      // La tenencia actual ya está visible: el error solo afecta al análisis avanzado
+      advancedDiv.style.display = 'none'
+      advancedLoading.style.display = 'block'
+      advancedLoading.innerHTML = `<p style="color: var(--text-muted)">No se pudo completar el análisis avanzado: ${sanitize(e.message || 'error desconocido')}</p>`
       showToast(e.message, 'error')
-      loadingDiv.style.display = 'none'
-      pdfBtn.disabled = true
-      pdfBtn.style.opacity = '0.5'
-      pdfBtn.style.cursor = 'not-allowed'
     }
   },
 
-  async _updateMarketPrices(tickers) {
+  // Precios actuales con la misma cache que el Dashboard (ver quote-freshness.js)
+  async _updateMarketPrices(tickers, { force = false } = {}) {
     this._resolvedPrices = {}
     if (!tickers || tickers.length === 0) return
-    
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    if (force) clearCachedQuotes(tickers)
 
-    try {
-      const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(tickers.join(','))}`, null, {
-        signal: controller.signal
-      })
-      clearTimeout(timeoutId)
-      
-      for (const ticker of tickers) {
-        this._resolvedPrices[ticker] = data[ticker]?.price ?? null
-      }
-    } catch (err) { 
-      clearTimeout(timeoutId)
-      if (err.name === 'AbortError') {
-        console.warn('[Analysis] Timeout en consulta de precios de mercado (10s)')
+    const fetchedAt = {}
+    const missing = []
+    for (const ticker of tickers) {
+      const cached = getCachedQuote(ticker)
+      if (cached) {
+        this._resolvedPrices[ticker] = cached.price
+        fetchedAt[ticker] = cached.at
       } else {
-        console.error('Error precios:', err) 
+        missing.push(ticker)
       }
     }
+
+    if (missing.length) {
+      this._freshness?.setLoading(true)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      try {
+        const data = await apiRequest('GET', `/api/quotes?tickers=${encodeURIComponent(missing.join(','))}`, null, {
+          signal: controller.signal
+        })
+        const now = Date.now()
+        for (const ticker of missing) {
+          const price = data[ticker]?.price ?? null
+          this._resolvedPrices[ticker] = price
+          if (price !== null) {
+            setCachedQuote(ticker, price, now)
+            fetchedAt[ticker] = now
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.warn('[Analysis] Timeout en consulta de precios de mercado (10s)')
+        } else {
+          console.error('Error precios:', err)
+        }
+      } finally {
+        clearTimeout(timeoutId)
+        this._freshness?.setLoading(false)
+      }
+    }
+
+    const el = document.getElementById('analysis-price-freshness')
+    if (el && !this._freshness) {
+      this._freshness = createFreshnessIndicator(el, () => this._refreshPrices())
+    }
+    const times = Object.values(fetchedAt)
+    this._freshness?.update(times.length ? Math.min(...times) : null)
+  },
+
+  async _refreshPrices() {
+    const holdings = this._displayHoldings || []
+    if (!holdings.length) return
+    await this._updateMarketPrices(holdings.map(h => h.ticker), { force: true })
+    this._renderCurrentHoldings(holdings)
+    this._renderComparisonChart(holdings)
   },
 
   _renderCurrentHoldings(holdings, analysis = null) {
