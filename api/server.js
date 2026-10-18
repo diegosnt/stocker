@@ -11,6 +11,7 @@ const sanitizeHtml   = require('sanitize-html')
 const logger         = require('./logger')
 const { renderPage } = require('./views/renderPage')
 const { getMepHistory, rateAt } = require('./mep-history')
+const { getHistory, isValidRange } = require('./history')
 
 const app  = express()
 const PORT = process.env.PORT || 3000
@@ -1223,59 +1224,40 @@ app.get('/api/dollar-rate', requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/history?tickers=A,B,C&range=6mo ───────────────
+// Historial de varios tickers en un solo request (una sola invocación
+// serverless en vez de una por ticker). Devuelve { ticker: [{ date, price }] },
+// con [] para los que no tienen datos.
+const HISTORY_BATCH_MAX = 40
+
+app.get('/api/history', financeLimiter, requireAuth, async (req, res) => {
+  const range = req.query.range || '6mo'
+  if (!isValidRange(range)) return res.status(400).json({ error: 'Rango inválido' })
+
+  const tickers = [...new Set(String(req.query.tickers || '').split(',').filter(t => TICKER_RE.test(t)))]
+  if (tickers.length === 0) return res.status(400).json({ error: 'Faltan tickers' })
+  if (tickers.length > HISTORY_BATCH_MAX) return res.status(400).json({ error: `Máximo ${HISTORY_BATCH_MAX} tickers por consulta` })
+
+  try {
+    const entries = await Promise.all(tickers.map(async t => [t, await getHistory(t, range, logger)]))
+    res.json(Object.fromEntries(entries))
+  } catch (err) {
+    logger.warn({ tickers, err: err.message }, 'Error al consultar historial en lote')
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// ── GET /api/history/:ticker ───────────────────────────────
 app.get('/api/history/:ticker', requireAuth, async (req, res) => {
   const { ticker } = req.params
   const range = req.query.range || '6mo'
 
-  if (!TICKER_RE.test(ticker)) {
-    return res.status(400).json({ error: 'Ticker inválido' })
-  }
-
-  async function fetchFromYahoo(symbol) {
-    const yfBase = process.env.FINANCE_URL
-    const url = `${yfBase}/${encodeURIComponent(symbol)}?interval=1d&range=${range}&includeTimestamps=true`
-    try {
-      const yfRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-      if (!yfRes.ok) return []
-      const data = await yfRes.json()
-      const result = data?.chart?.result?.[0]
-      if (!result || !result.timestamp) return []
-      
-      const timestamps = result.timestamp || []
-      const closes     = result.indicators.quote[0].close || []
-      return timestamps
-        .map((t, i) => ({ date: t, price: closes[i] }))
-        .filter(h => h.price !== null && h.price !== undefined && typeof h.price === 'number')
-    } catch { return [] }
-  }
+  if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: 'Ticker inválido' })
+  if (!isValidRange(range)) return res.status(400).json({ error: 'Rango inválido' })
 
   try {
-    const yfSuffix = process.env.FINANCE_EXCHANGE ? `.${process.env.FINANCE_EXCHANGE}` : ''
-    
-    // Consultar ambos en paralelo
-    const tasks = [fetchFromYahoo(ticker)] // USA / As-is
-    if (!ticker.includes('.') && yfSuffix) {
-      tasks.push(fetchFromYahoo(`${ticker}${yfSuffix}`)) // Local (BA)
-    }
-
-    const [globalData, localData = []] = await Promise.all(tasks)
-
-    console.log(`[Backend Debug] Ticker: ${ticker} | Global: ${globalData.length} pts | Local: ${localData.length} pts`)
-
-    // Preferir el símbolo local (ej. CEDEAR en ARS) cuando existe: el subyacente
-    // en USA casi siempre tiene más historia, pero cotiza en otra moneda y otra
-    // escala de precio — "el que tenga más historia gana" elegía sistemáticamente
-    // el subyacente para CEDEARs, mezclando precios en USD con operaciones en ARS.
-    let history = localData.length > 0 ? localData : globalData
-
-    if (history.length === 0) {
-      return res.status(404).json({ error: 'No se encontró historial' })
-    }
-
-    const first = new Date(history[0].date * 1000).toISOString().split('T')[0]
-    const last  = new Date(history[history.length - 1].date * 1000).toISOString().split('T')[0]
-    console.log(`[Backend Debug] Elegido: ${history.length} pts (${first} a ${last})`)
-
+    const history = await getHistory(ticker, range, logger)
+    if (history.length === 0) return res.status(404).json({ error: 'No se encontró historial' })
     res.json(history)
   } catch (err) {
     logger.warn({ ticker, err: err.message }, 'Error al consultar historial')

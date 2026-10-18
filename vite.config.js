@@ -21,6 +21,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Nombre estable para el chunk de gráficos: si no, toma el nombre del
+        // primer módulo que lo comparte (ej. "real-return-*.js") y confunde
+        manualChunks(id) {
+          if (id.includes('node_modules/chart.js') || id.includes('node_modules/chartjs-chart-treemap') || id.includes('node_modules/@kurkle')) {
+            return 'vendor-charts'
+          }
+        }
+      }
+    }
   },
   
   // truco para que Chart siga siendo global y el treemap se cargue

@@ -9,6 +9,7 @@ import { getHiddenAlycSet, aggregateHoldings, computeRealizedPnl } from '../alyc
 import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
 import { computeUsdCostBasis } from '../real-return.js'
 import { getCachedQuote, setCachedQuote, clearCachedQuotes, createFreshnessIndicator } from '../quote-freshness.js'
+import { fetchHistories } from '../history-client.js'
 
 const HISTORY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 horas
 
@@ -255,18 +256,6 @@ export const DashboardPage = {
     })
   },
 
-  async _fetchHistoryForRange(ticker, range) {
-    const cacheKey = `history_${ticker}_${range}`
-    const cached = cacheGet(cacheKey, { persistent: true })
-    if (cached) return cached
-    try {
-      const data = await apiRequest('GET', `/api/history/${encodeURIComponent(ticker)}?range=${range}`)
-      cacheSet(cacheKey, data, { persistent: true, ttlMs: HISTORY_CACHE_TTL })
-      return data
-    } catch {
-      return []
-    }
-  },
 
   // Operaciones de las ALyCs visibles, consultadas una sola vez por render y
   // compartidas entre la curva de patrimonio (en cada cambio de rango) y el costo en US$
@@ -304,19 +293,19 @@ export const DashboardPage = {
         return
       }
 
+      // Un solo request con el historial de todos los tickers, de todas las monedas
+      const allHistories = await fetchHistories(
+        operations.map(o => o.instrument_ticker), range, { ttlMs: HISTORY_CACHE_TTL }
+      )
+      if (isStale()) return
+
       const byCurrency = groupOperationsByCurrency(operations)
       const seriesByCurrency = {}
-
-      await Promise.all(Object.keys(byCurrency).map(async currency => {
-        const ops = byCurrency[currency]
-        const tickers = [...new Set(ops.map(o => o.instrument_ticker))]
+      for (const [currency, ops] of Object.entries(byCurrency)) {
         const histories = {}
-        await Promise.all(tickers.map(async ticker => {
-          histories[ticker] = await this._fetchHistoryForRange(ticker, range)
-        }))
+        for (const t of new Set(ops.map(o => o.instrument_ticker))) histories[t] = allHistories[t] || []
         seriesByCurrency[currency] = computeEquitySeries(ops, histories)
-      }))
-      if (isStale()) return
+      }
 
       this._renderEquityCurve(seriesByCurrency)
     } catch (err) {

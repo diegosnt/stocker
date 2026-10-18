@@ -12,6 +12,10 @@ import { isAlycVisible } from '../alyc-visibility.js'
 import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
 import { computeUsdCostBasis } from '../real-return.js'
 import { getCachedQuote, setCachedQuote, clearCachedQuotes, createFreshnessIndicator } from '../quote-freshness.js'
+import { fetchHistories } from '../history-client.js'
+
+const HISTORY_RANGE = '6mo'
+const HISTORY_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 horas
 
 export const AnalysisPage = {
   _chart: null,
@@ -404,38 +408,6 @@ export const AnalysisPage = {
     document.addEventListener('darkmodechange', this._themeChangeHandler)
   },
 
-  async _fetchHistory(ticker) {
-    const cacheKey = `history_${ticker}`
-    const cached = cacheGet(cacheKey, { persistent: true })
-    if (cached) {
-      return cached
-    }
-
-    // Timeout de 10 segundos para requests de historial
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
-
-    try {
-      const data = await apiRequest('GET', `/api/history/${encodeURIComponent(ticker)}`, null, {
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-      
-      if (data && data.length > 0) {
-        // 24 horas = 86400000 ms
-        cacheSet(cacheKey, data, { persistent: true, ttlMs: 86400000 })
-      }
-      return data
-    } catch (err) {
-      clearTimeout(timeoutId)
-      if (err.name === 'AbortError') {
-        console.warn(`[Analysis] Timeout cargando historial para ${ticker}`)
-        throw new Error(`La API de historial no respondió para ${ticker} (Timeout 10s)`)
-      }
-      throw err
-    }
-  },
 
   async _runAnalysis(alycId) {
     if (!alycId) return
@@ -511,25 +483,23 @@ export const AnalysisPage = {
 
     const benchmarkTicker = this._activeBenchmark || 'SPY'
     try {
-      const historyPromises = [
-        ...alycHoldings.map(h => this._fetchHistory(h.ticker)),
-        this._fetchHistory(benchmarkTicker)
-      ]
-
-      const results = await Promise.allSettled(historyPromises)
+      // Un solo request con el historial de todos los activos y el benchmark
+      const histories = await fetchHistories(
+        [...alycHoldings.map(h => h.ticker), benchmarkTicker],
+        HISTORY_RANGE,
+        { ttlMs: HISTORY_CACHE_TTL }
+      )
       if (isStale()) return
-      const assetResults = results.slice(0, alycHoldings.length)
-      const benchmarkResult = results[results.length - 1]
 
       const validHistories = []
       const validTickers = []
       const validHoldings = []
       const failedTickers = []
 
-      assetResults.forEach((res, i) => {
-        const h = alycHoldings[i]
-        if (res.status === 'fulfilled' && res.value?.length > 10) {
-          validHistories.push(res.value)
+      alycHoldings.forEach(h => {
+        const history = histories[h.ticker]
+        if (history?.length > 10) {
+          validHistories.push(history)
           validTickers.push(h.ticker)
           validHoldings.push(h)
         } else {
@@ -542,9 +512,8 @@ export const AnalysisPage = {
       }
 
       if (validTickers.length < 2) throw new Error('No hay suficientes datos históricos.')
-      if (benchmarkResult.status === 'rejected') throw new Error('No se pudo cargar el Benchmark.')
-
-      const benchmarkData = benchmarkResult.value
+      const benchmarkData = histories[benchmarkTicker]
+      if (!benchmarkData?.length) throw new Error('No se pudo cargar el Benchmark.')
       const returnsMatrix = this._calculateReturns(validHistories, benchmarkData)
       const benchmarkReturns = this._calculateReturns([benchmarkData], benchmarkData)[0]
 

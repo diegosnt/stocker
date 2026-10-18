@@ -1,6 +1,20 @@
-import { Chart, registerables } from 'chart.js'
+import {
+  Chart,
+  BarController, LineController, ScatterController, DoughnutController, PieController,
+  BarElement, LineElement, PointElement, ArcElement,
+  CategoryScale, LinearScale,
+  Tooltip, Legend, Filler
+} from 'chart.js'
 import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
-Chart.register(...registerables, TreemapController, TreemapElement)
+// Solo lo que usa la app (en vez de `registerables`, que trae todo): permite
+// que el bundler descarte el resto de Chart.js. Si se agrega un tipo de gráfico,
+// escala o plugin nuevo, hay que registrarlo acá o Chart.js tira error al crearlo.
+Chart.register(
+  BarController, LineController, ScatterController, DoughnutController, PieController, TreemapController,
+  BarElement, LineElement, PointElement, ArcElement, TreemapElement,
+  CategoryScale, LinearScale,
+  Tooltip, Legend, Filler
+)
 
 // Sin animaciones si el usuario pidió movimiento reducido en el sistema operativo
 const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
