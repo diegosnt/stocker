@@ -1195,6 +1195,15 @@ const DOLLAR_RATE_TTL = 10 * 60 * 1000  // 10 minutos en ms
 let dollarRateCache = null              // { rate, updatedAt, expiresAt }
 
 app.get('/api/dollar-rate', requireAuth, async (req, res) => {
+  // ?date=YYYY-MM-DD: MEP histórico de ese día (o del último hábil anterior)
+  if (req.query.date !== undefined) {
+    const { date } = req.query
+    if (!isDate(date)) return res.status(400).json({ error: 'Fecha inválida (YYYY-MM-DD)' })
+    const series = await getMepHistory(logger)
+    if (!series) return res.status(502).json({ error: 'No se pudo obtener el MEP histórico' })
+    return res.json({ rate: rateAt(series, date), date })
+  }
+
   if (dollarRateCache && Date.now() < dollarRateCache.expiresAt) {
     const { rate, updatedAt } = dollarRateCache
     return res.json({ rate, updatedAt })

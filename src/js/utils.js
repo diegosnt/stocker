@@ -308,3 +308,37 @@ export function scrollIntoViewSmooth(el) {
   const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' })
 }
+
+// ── Estados vacíos ───────────────────────────────────────────
+// Mensaje + acciones para cuando una lista no tiene datos o falló la carga.
+// Cada acción es { label, href } (link de navegación) o { label, action }
+// (botón que se conecta después con bindEmptyStateActions). primary: true
+// marca la acción principal.
+export function emptyState({ title = '', message = '', actions = [] }) {
+  const buttons = actions.map(a => {
+    const cls = `btn btn-sm ${a.primary ? 'btn-primary' : 'btn-ghost'}`
+    return a.href
+      ? `<a class="${cls}" href="${sanitizeAttr(a.href)}">${esc(a.label)}</a>`
+      : `<button type="button" class="${cls}" data-empty-action="${sanitizeAttr(a.action)}">${esc(a.label)}</button>`
+  }).join('')
+  return `
+    <div class="empty-state">
+      ${title ? `<p class="empty-state-title">${esc(title)}</p>` : ''}
+      ${message ? `<p class="empty-state-msg">${esc(message)}</p>` : ''}
+      ${buttons ? `<div class="empty-state-actions">${buttons}</div>` : ''}
+    </div>`
+}
+
+// handlers: { [action]: () => void }
+export function bindEmptyStateActions(root, handlers) {
+  root?.querySelectorAll('[data-empty-action]').forEach(btn => {
+    const fn = handlers[btn.dataset.emptyAction]
+    if (fn) btn.addEventListener('click', fn)
+  })
+}
+
+// Lleva al formulario de alta de la página y le da foco
+export function focusCreateForm(formId, inputId) {
+  scrollIntoViewSmooth(document.getElementById(formId))
+  document.getElementById(inputId)?.focus({ preventScroll: true })
+}

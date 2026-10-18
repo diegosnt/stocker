@@ -3,7 +3,9 @@ import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, CHART_COLORS } from '../chart-manager.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
-import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion } from '../utils.js'
+import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion, emptyState, bindEmptyStateActions } from '../utils.js'
+import { requestPageAction } from '../nav-state.js'
+import { navigate } from '../router.js'
 import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equity-curve.js'
 import { getHiddenAlycSet, aggregateHoldings, computeRealizedPnl } from '../alyc-visibility.js'
 import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
@@ -158,8 +160,13 @@ export const DashboardPage = {
       content.innerHTML = `
         <div class="page-header"><h2>Dashboard</h2></div>
         <div class="card">
-          <p class="table-empty">Error al cargar el dashboard. Por favor, intentá de nuevo.</p>
+          ${emptyState({
+            title: 'No se pudo cargar el dashboard',
+            message: 'Revisá tu conexión e intentá de nuevo.',
+            actions: [{ label: 'Reintentar', action: 'retry', primary: true }]
+          })}
         </div>`
+      bindEmptyStateActions(content, { retry: () => this.render() })
     }
   },
 
@@ -311,7 +318,11 @@ export const DashboardPage = {
     } catch (err) {
       if (isStale()) return
       console.error('[Dashboard] Error al cargar evolución del patrimonio:', err)
-      container.innerHTML = `<p class="table-empty">Error al cargar la evolución del patrimonio.</p>`
+      container.innerHTML = emptyState({
+        message: 'No se pudo cargar la evolución del patrimonio.',
+        actions: [{ label: 'Reintentar', action: 'retry' }]
+      })
+      bindEmptyStateActions(container, { retry: () => this._loadEquityCurve(this._equityRange) })
     }
   },
 
@@ -485,8 +496,19 @@ export const DashboardPage = {
       document.getElementById('dash-risk-alerts').innerHTML = ''
       mainEl.innerHTML = `
         <div class="card">
-          <p class="table-empty">No tenés operaciones registradas.</p>
+          ${emptyState({
+            title: 'Todavía no tenés operaciones',
+            message: 'Registrá tu primera compra o importá tu historial desde un CSV para ver tu cartera, el P&L y la evolución del patrimonio.',
+            actions: [
+              { label: '+ Registrar operación', action: 'new-op', primary: true },
+              { label: '↑ Importar CSV', action: 'import-csv' }
+            ]
+          })}
         </div>`
+      bindEmptyStateActions(mainEl, {
+        'new-op':     () => { requestPageAction('operations', 'new'); navigate('operations') },
+        'import-csv': () => { requestPageAction('operations', 'import'); navigate('operations') }
+      })
       return
     }
 

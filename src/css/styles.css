@@ -2485,6 +2485,35 @@ input:focus, select:focus, textarea:focus {
   background-size: 200% 100%;
 }
 
+/* ---- Estados vacíos con acción ---- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+.empty-state-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.empty-state-msg {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
 /* ---- Movimiento reducido ----
    Si el usuario lo pidió en su sistema operativo, se cortan animaciones y
    transiciones (skeletons, toasts, spinners decorativos). Los spinners de

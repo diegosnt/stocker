@@ -4,7 +4,7 @@ import { showToast } from '../init.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
 import { ChartManager, Chart } from '../chart-manager.js'
-import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts, bindCardAccordion } from '../utils.js'
+import { sanitize, sanitizeAttr, getConcentrationAlert, renderRiskAlerts, bindCardAccordion, emptyState, bindEmptyStateActions } from '../utils.js'
 import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
 import { consumeAlycRequest } from '../nav-state.js'
@@ -439,6 +439,9 @@ export const AnalysisPage = {
 
     resultsDiv.style.display = 'none'
     setPdfEnabled(false)
+    loadingDiv.innerHTML = `
+      <span class="spinner" style="width: 40px; height: 40px; border-width: 4px"></span>
+      <p style="margin-top: 1rem">Cargando cartera...</p>`
     loadingDiv.style.display = 'block'
 
     let alycHoldings
@@ -451,15 +454,30 @@ export const AnalysisPage = {
         if (holdings) cacheSet('user_holdings', holdings)
       }
       alycHoldings = holdings.filter(h => h.alyc_id === alycId)
-      if (alycHoldings.length < 2) throw new Error('Se necesitan al menos 2 activos.')
     } catch (e) {
       if (isStale()) return
       console.error(e)
-      showToast(e.message, 'error')
-      loadingDiv.style.display = 'none'
+      loadingDiv.innerHTML = emptyState({
+        title: 'No se pudo cargar la cartera',
+        message: 'Revisá tu conexión e intentá de nuevo.',
+        actions: [{ label: 'Reintentar', action: 'retry', primary: true }]
+      })
+      bindEmptyStateActions(loadingDiv, { retry: () => this._runAnalysis(alycId) })
       return
     }
     if (isStale()) return
+
+    // El análisis estadístico (correlación, Markowitz) necesita al menos 2 activos
+    if (alycHoldings.length < 2) {
+      loadingDiv.innerHTML = emptyState({
+        title: 'No hay suficientes activos para analizar',
+        message: alycHoldings.length
+          ? 'El análisis de cartera necesita al menos 2 activos con tenencia en esta ALyC, y hoy tiene 1.'
+          : 'Esta ALyC no tiene tenencias. Registrá operaciones para poder analizarla.',
+        actions: [{ label: 'Ir a Operaciones', href: '#operations' }]
+      })
+      return
+    }
 
     // La tenencia actual solo necesita precios de mercado: se muestra apenas
     // llegan, sin esperar historiales ni el Worker (que pueden tardar varios segundos)

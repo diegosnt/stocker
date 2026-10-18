@@ -2,7 +2,25 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, confirmDiscardChanges, setupModal, setFieldError, fmtDateShort, buildPageRange } from '../utils.js'
+import { esc, confirmModal, confirmDiscardChanges, setupModal, setFieldError, fmtDateShort, buildPageRange, emptyState, bindEmptyStateActions } from '../utils.js'
+import { consumePageAction } from '../nav-state.js'
+import { getMepRateAt } from '../dollar-rate.js'
+
+// Última ALyC y moneda usadas al registrar una operación: se proponen en la siguiente
+const LAST_OP_DEFAULTS_KEY = 'stocker_last_op_defaults'
+
+function readLastOpDefaults() {
+  try { return JSON.parse(localStorage.getItem(LAST_OP_DEFAULTS_KEY)) || {} } catch { return {} }
+}
+
+function saveLastOpDefaults(defaults) {
+  try { localStorage.setItem(LAST_OP_DEFAULTS_KEY, JSON.stringify(defaults)) } catch { /* sin storage: no se recuerda */ }
+}
+
+// Atajo "N" para nueva operación: no se dispara mientras se escribe ni con un modal abierto
+function isTypingTarget(el) {
+  return el?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.tagName)
+}
 import { handleCsvImport } from './operations/csv-import.js'
 import { isAlycVisible } from '../alyc-visibility.js'
 
@@ -91,7 +109,7 @@ export const OperationsPage = {
           <button class="btn btn-ghost" id="btn-export-csv">↓ Exportar CSV</button>
           <button class="btn btn-ghost" id="btn-import-csv">↑ Importar CSV</button>
           <input type="file" id="input-csv" accept=".csv" style="display:none">
-          <button class="btn btn-primary" id="btn-nueva-op">+ Nueva Operación</button>
+          <button class="btn btn-primary" id="btn-nueva-op" title="Nueva operación (atajo: N)" aria-keyshortcuts="n">+ Nueva Operación</button>
         </div>
       </div>
 
@@ -258,7 +276,47 @@ export const OperationsPage = {
     this._bindSearch()
     this._bindFilters()
     this._bindSortHeaders()
+
+    this._shortcutHandler = (e) => {
+      if (e.key !== 'n' && e.key !== 'N') return
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
+      if (isTypingTarget(e.target) || document.querySelector('.modal-overlay')) return
+      e.preventDefault()
+      state.editingOperation = null
+      this._showFormModal()
+    }
+    document.addEventListener('keydown', this._shortcutHandler)
+
+    // Pedido desde otra página (ej. estado vacío del Dashboard)
+    const pendingAction = consumePageAction('operations')
+    if (pendingAction === 'new') this._showFormModal()
+    else if (pendingAction === 'import') inputCsv.click()
+
     await Promise.all([this._loadAlycFilter(), this._loadInstrumentFilter(), this._loadList(0)])
+  },
+
+  // Contenido de la tabla y de las tarjetas mobile cuando no hay filas
+  _renderListMessage(html, handlers = {}) {
+    const tbody = document.getElementById('ops-tbody')
+    const opsCards = document.getElementById('ops-cards')
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="10" class="table-empty">${html}</td></tr>`
+      bindEmptyStateActions(tbody, handlers)
+    }
+    if (opsCards) {
+      opsCards.innerHTML = `<div class="table-empty">${html}</div>`
+      bindEmptyStateActions(opsCards, handlers)
+    }
+  },
+
+  _renderListError() {
+    this._renderListMessage(
+      emptyState({
+        message: 'No se pudieron cargar las operaciones.',
+        actions: [{ label: 'Reintentar', action: 'retry', primary: true }]
+      }),
+      { retry: () => this._loadList(state.pagination.currentPage) }
+    )
   },
 
 
@@ -315,7 +373,7 @@ export const OperationsPage = {
 
       if (result.error) {
         console.error('Error cargando operaciones:', result.error)
-        tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Error al cargar.</td></tr>`
+        this._renderListError()
         this._renderPagination(0, 0)
         this._updateBulkActionsBar()
         return
@@ -326,9 +384,30 @@ export const OperationsPage = {
           return this._loadList(page - 1)
         }
         const hasFilters = state.filters.searchQuery || state.filters.alycFilter || state.filters.instrumentFilter || state.filters.typeFilter || state.filters.currencyFilter || state.filters.dateFrom || state.filters.dateTo
-        const emptyMsg = hasFilters ? 'No se encontraron resultados para los filtros aplicados.' : 'No hay operaciones registradas.'
-        tbody.innerHTML = `<tr><td colspan="10" class="table-empty">${emptyMsg}</td></tr>`
-        if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
+        if (hasFilters) {
+          this._renderListMessage(
+            emptyState({
+              message: 'No se encontraron operaciones con los filtros aplicados.',
+              actions: [{ label: '✕ Limpiar filtros', action: 'clear-filters' }]
+            }),
+            { 'clear-filters': () => document.getElementById('btn-clear-filters')?.click() }
+          )
+        } else {
+          this._renderListMessage(
+            emptyState({
+              title: 'Todavía no registraste operaciones',
+              message: 'Cargá tus compras y ventas una por una o importá tu historial completo desde un CSV.',
+              actions: [
+                { label: '+ Nueva operación', action: 'new-op', primary: true },
+                { label: '↑ Importar CSV', action: 'import-csv' }
+              ]
+            }),
+            {
+              'new-op':     () => { state.editingOperation = null; this._showFormModal() },
+              'import-csv': () => document.getElementById('input-csv')?.click()
+            }
+          )
+        }
         this._renderPagination(0, 0)
         this._updateBulkActionsBar()
         return
@@ -337,7 +416,7 @@ export const OperationsPage = {
       // Request cancelado o error de red
       if (state.pagination.requestId !== requestId) return
       console.error('Error cargando operaciones:', e)
-      tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Error al cargar.</td></tr>`
+      this._renderListError()
       this._renderPagination(0, 0)
       this._updateBulkActionsBar()
       return
@@ -1019,6 +1098,7 @@ export const OperationsPage = {
 
           <div id="op-total-row" style="display:none;margin: 1rem 0;padding: 0.75rem 1rem;background:var(--bg-main);border-radius:var(--radius);font-size:1rem; border: 1px dashed var(--border)">
             Total estimado: <strong id="op-total-value" style="color: var(--color-primary)">—</strong>
+            <span id="op-total-usd" class="kpi-usd" style="display: inline; margin-left: 0.5rem"></span>
           </div>
 
           <div class="form-group">
@@ -1042,6 +1122,9 @@ export const OperationsPage = {
       ? editing.operated_at
       : new Date().toISOString().split('T')[0]
 
+    // ALyC propuesta al abrir (última usada): no cuenta como cambio sin guardar
+    let initialAlycId = ''
+
     const close = async () => {
       const type    = document.getElementById('op-type').value
       const instrId = document.getElementById('op-instrument').value
@@ -1056,7 +1139,7 @@ export const OperationsPage = {
           alycId !== editing.alyc_id      || qty !== String(editing.quantity)  ||
           price !== String(editing.price) || date !== editing.operated_at      ||
           notes !== (editing.notes || '')
-        : type !== '' || instrId !== '' || alycId !== '' || qty !== '' || price !== '' || notes !== ''
+        : type !== '' || instrId !== '' || alycId !== initialAlycId || qty !== '' || price !== '' || notes !== ''
 
       if (isDirty && !(await confirmDiscardChanges())) return
       state.editingOperation = null
@@ -1076,6 +1159,18 @@ export const OperationsPage = {
       ])
     } catch {
       showToast('Error al cargar los datos del formulario. Intentá recargar la página.', 'error')
+    }
+
+    if (!editing) {
+      const last = readLastOpDefaults()
+      const alycSel = document.getElementById('op-alyc')
+      if (last.alyc_id && isAlycVisible(last.alyc_id) && alycSel.querySelector(`option[value="${CSS.escape(last.alyc_id)}"]`)) {
+        alycSel.value = last.alyc_id
+        initialAlycId = last.alyc_id
+      }
+      if (last.currency === 'ARS' || last.currency === 'USD') {
+        document.getElementById('op-currency').value = last.currency
+      }
     }
 
     if (editing) {
@@ -1197,10 +1292,12 @@ export const OperationsPage = {
         opts.forEach(o => o.classList.remove('active'))
         opts[idx]?.classList.add('active')
         opts[idx]?.scrollIntoView({ block: 'nearest' })
-      } else if (e.key === 'Enter' && active) {
+      } else if (e.key === 'Enter' && !listEl.hidden && opts.length) {
+        // Sin opción marcada con las flechas, Enter elige el primer resultado
         e.preventDefault()
-        hiddenEl.value = active.dataset.id
-        searchEl.value = active.dataset.label
+        const pick = active || opts[0]
+        hiddenEl.value = pick.dataset.id
+        searchEl.value = pick.dataset.label
         listEl.hidden  = true
       } else if (e.key === 'Escape') {
         // Con la lista abierta, Esc solo la cierra (no cierra el modal)
@@ -1397,21 +1494,44 @@ export const OperationsPage = {
     const priceInput = document.getElementById('op-price')
     const totalRow   = document.getElementById('op-total-row')
     const totalVal   = document.getElementById('op-total-value')
+    const totalUsd   = document.getElementById('op-total-usd')
     const currSel    = document.getElementById('op-currency')
+    const dateInput  = document.getElementById('op-date')
+    const rateInput  = document.getElementById('op-usd-rate')
+    const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    let token = 0
+
+    // En ARS, además del total en pesos, el equivalente al MEP de la fecha
+    // (o al cargado a mano en el campo "Dólar MEP")
+    async function updateUsd(total) {
+      const current = ++token
+      totalUsd.textContent = ''
+      if (currSel.value !== 'ARS' || !(total > 0)) return
+      const manual = parseFloat(rateInput?.value)
+      const rate = manual > 0 ? manual : await getMepRateAt(dateInput.value)
+      if (current !== token || !rate) return
+      totalUsd.textContent = `≈ US$ ${fmt(total / rate)}`
+      totalUsd.title = `Dólar MEP: $ ${fmt(rate)}${manual > 0 ? ' (cargado a mano)' : ` del ${dateInput.value}`}`
+    }
 
     function update() {
       const qty = parseFloat(qtyInput.value), price = parseFloat(priceInput.value)
       if (qty > 0 && price > 0) {
         totalRow.style.display = 'block'
         totalVal.textContent = `${(qty * price).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ${currSel.value}`
+        updateUsd(qty * price)
       } else {
         totalRow.style.display = 'none'
+        token++
       }
     }
 
     qtyInput.addEventListener('input', update)
     priceInput.addEventListener('input', update)
     currSel.addEventListener('change', update)
+    rateInput?.addEventListener('input', update)
+    // Diferido: al cambiar la fecha, _bindUsdRateField puede vaciar el MEP manual primero
+    dateInput.addEventListener('change', () => setTimeout(update, 0))
     update()
   },
 
@@ -1482,6 +1602,7 @@ export const OperationsPage = {
           showToast('Operación actualizada correctamente.', 'success')
         } else {
           await apiRequest('POST', '/api/operations', payload)
+          saveLastOpDefaults({ alyc_id: alycId, currency })
           showToast('Operación registrada correctamente.', 'success')
         }
         cacheInvalidate('user_holdings')
@@ -1497,6 +1618,10 @@ export const OperationsPage = {
   },
 
   cleanup() {
+    if (this._shortcutHandler) {
+      document.removeEventListener('keydown', this._shortcutHandler)
+      this._shortcutHandler = null
+    }
     if (state.searchTimer) {
       clearTimeout(state.searchTimer)
       state.searchTimer = null

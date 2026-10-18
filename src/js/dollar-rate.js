@@ -31,6 +31,33 @@ export async function getMepRate() {
   return _inflight
 }
 
+const _rateByDate = new Map() // 'YYYY-MM-DD' → Promise<number|null>
+
+/**
+ * Dólar MEP (venta) de una fecha: la cotización de ese día o la del último día
+ * hábil anterior. Null si no hay dato (ej. antes de octubre de 2018) o si falla.
+ */
+export function getMepRateAt(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return Promise.resolve(null)
+  const cacheKey = `dollar_rate_mep_${date}`
+  const cached = cacheGet(cacheKey, { persistent: true })
+  if (cached !== null) return Promise.resolve(cached)
+
+  if (!_rateByDate.has(date)) {
+    _rateByDate.set(date, apiRequest('GET', `/api/dollar-rate?date=${date}`)
+      .then(data => {
+        const rate = Number(data?.rate)
+        if (!Number.isFinite(rate) || rate <= 0) return null
+        // Las fechas pasadas no cambian; la de hoy puede actualizarse durante el día
+        cacheSet(cacheKey, rate, { persistent: true, ttlMs: RATE_CACHE_TTL })
+        return rate
+      })
+      .catch(() => null)
+      .finally(() => _rateByDate.delete(date)))
+  }
+  return _rateByDate.get(date)
+}
+
 /**
  * Placeholder para el equivalente en dólares de un importe en pesos.
  * Se completa con fillUsdEquivalents() una vez que se conoce la cotización.

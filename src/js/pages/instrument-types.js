@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, setFieldError, fmtDate, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth } from '../utils.js'
+import { esc, setFieldError, fmtDate, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth, emptyState, bindEmptyStateActions, focusCreateForm } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 
 export const InstrumentTypesPage = {
@@ -82,7 +82,11 @@ export const InstrumentTypesPage = {
       .order('created_at', { ascending: false })
 
     if (error) {
-      tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Error al cargar datos.</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="4" class="table-empty">${emptyState({
+        message: 'No se pudieron cargar los tipos.',
+        actions: [{ label: 'Reintentar', action: 'retry', primary: true }]
+      })}</td></tr>`
+      bindEmptyStateActions(tbody, { retry: () => this._loadList() })
       return
     }
 
@@ -97,8 +101,16 @@ export const InstrumentTypesPage = {
     if (!tbody || !mobileList) return
 
     if (!data.length) {
-      tbody.innerHTML      = `<tr><td colspan="4" class="table-empty">No hay tipos registrados. Agregá uno arriba.</td></tr>`
-      mobileList.innerHTML = `<p class="table-empty">No hay tipos registrados. Agregá uno arriba.</p>`
+      const html = emptyState({
+        title: 'Todavía no hay tipos de instrumento',
+        message: 'Los tipos agrupan tus instrumentos (Acción, CEDEAR, Bono…) en los gráficos de distribución.',
+        actions: [{ label: '+ Agregar tipo', action: 'add', primary: true }]
+      })
+      const handlers = { add: () => focusCreateForm('form-tipo', 'tipo-name') }
+      tbody.innerHTML      = `<tr><td colspan="4" class="table-empty">${html}</td></tr>`
+      mobileList.innerHTML = `<div class="table-empty">${html}</div>`
+      bindEmptyStateActions(tbody, handlers)
+      bindEmptyStateActions(mobileList, handlers)
       return
     }
 

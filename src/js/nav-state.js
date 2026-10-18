@@ -17,3 +17,17 @@ export function consumeAlycRequest() {
   _pending = null
   return alyc
 }
+
+// Acción a ejecutar al montar una página (ej. desde el estado vacío del Dashboard:
+// ir a Operaciones y abrir el formulario de alta). Se consume una sola vez.
+const _pageActions = {}
+
+export function requestPageAction(page, action) {
+  _pageActions[page] = action
+}
+
+export function consumePageAction(page) {
+  const action = _pageActions[page] ?? null
+  delete _pageActions[page]
+  return action
+}

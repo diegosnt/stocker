@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth } from '../utils.js'
+import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth, emptyState, bindEmptyStateActions, focusCreateForm } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 import { isAlycVisible, setAlycHidden } from '../alyc-visibility.js'
 
@@ -89,7 +89,11 @@ export const AlycsPage = {
     const { data, error } = await supabase.from('alycs').select('*').order('name')
 
     if (error) {
-      tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Error al cargar.</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="5" class="table-empty">${emptyState({
+        message: 'No se pudieron cargar las ALyCs.',
+        actions: [{ label: 'Reintentar', action: 'retry', primary: true }]
+      })}</td></tr>`
+      bindEmptyStateActions(tbody, { retry: () => this._loadList() })
       return
     }
 
@@ -104,8 +108,16 @@ export const AlycsPage = {
     if (!tbody || !mobileList) return
 
     if (!data.length) {
-      tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">No hay ALyCs registradas. Agregá una arriba.</td></tr>`
-      mobileList.innerHTML = `<p class="table-empty">No hay ALyCs registradas. Agregá una arriba.</p>`
+      const html = emptyState({
+        title: 'Todavía no hay ALyCs',
+        message: 'Agregá los brokers donde tenés tus inversiones (IOL, Balanz, Bull Market…) para asignarles operaciones.',
+        actions: [{ label: '+ Agregar ALyC', action: 'add', primary: true }]
+      })
+      const handlers = { add: () => focusCreateForm('form-alyc', 'alyc-name') }
+      tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">${html}</td></tr>`
+      mobileList.innerHTML = `<div class="table-empty">${html}</div>`
+      bindEmptyStateActions(tbody, handlers)
+      bindEmptyStateActions(mobileList, handlers)
       return
     }
 

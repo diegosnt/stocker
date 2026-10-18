@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, setFieldError, fmtDate, buildPageRange, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth } from '../utils.js'
+import { esc, setFieldError, fmtDate, buildPageRange, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth, emptyState, bindEmptyStateActions, focusCreateForm } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 
 const PAGE_SIZE   = 10
@@ -117,7 +117,11 @@ export const InstrumentsPage = {
       .order('ticker')
 
     if (error) {
-      tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Error al cargar.</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="5" class="table-empty">${emptyState({
+        message: 'No se pudieron cargar los instrumentos.',
+        actions: [{ label: 'Reintentar', action: 'retry', primary: true }]
+      })}</td></tr>`
+      bindEmptyStateActions(tbody, { retry: () => this._loadList() })
       return
     }
 
@@ -165,8 +169,19 @@ export const InstrumentsPage = {
     if (!tbody || !mobileList) return
 
     if (!this._instrVisible.length) {
-      tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">No hay instrumentos. Agregá uno arriba.</td></tr>`
-      mobileList.innerHTML = `<p class="table-empty">No hay instrumentos. Agregá uno arriba.</p>`
+      const searching = !!document.getElementById('inst-search')?.value.trim()
+      const html = searching
+        ? emptyState({ message: 'Ningún instrumento coincide con la búsqueda.' })
+        : emptyState({
+            title: 'Todavía no hay instrumentos',
+            message: 'Agregá las especies que operás (GGAL, AAPL, AL30…) para poder registrar operaciones.',
+            actions: [{ label: '+ Agregar instrumento', action: 'add', primary: true }]
+          })
+      const handlers = { add: () => focusCreateForm('form-instrumento', 'inst-ticker') }
+      tbody.innerHTML      = `<tr><td colspan="5" class="table-empty">${html}</td></tr>`
+      mobileList.innerHTML = `<div class="table-empty">${html}</div>`
+      bindEmptyStateActions(tbody, handlers)
+      bindEmptyStateActions(mobileList, handlers)
       this._renderPagination()
       return
     }
