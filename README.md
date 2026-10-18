@@ -24,8 +24,13 @@ Aplicación web moderna para el registro, seguimiento y análisis estratégico d
 ```
 api/
   server.js                         ← Express API (Serverless en Vercel)
-  logger.js                         ← Logger centralizado con Pino
-  views/renderPage.js               ← Renderizador legacy (ahora index.html en raíz)
+  _lib/                             ← Módulos del servidor. En Vercel, cada archivo en api/ es
+                                       su propia función (y le gana al rewrite a server.js):
+                                       los auxiliares van en _lib/, que Vercel ignora
+    logger.js                       ← Logger centralizado con Pino
+    history.js                      ← Historial de precios (cache en memoria)
+    mep-history.js                  ← Serie histórica del dólar MEP
+    views/renderPage.js             ← Renderizador legacy (ahora index.html en raíz)
 src/                                ← Corazón del Frontend procesado por Vite
   css/                              ← Estilos modulares con variables CSS
   js/
