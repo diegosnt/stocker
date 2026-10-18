@@ -9,7 +9,8 @@ import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
 import { consumeAlycRequest } from '../nav-state.js'
 import { isAlycVisible } from '../alyc-visibility.js'
-import { usdEquivSpan, fillUsdEquivalents } from '../dollar-rate.js'
+import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
+import { computeUsdCostBasis } from '../real-return.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -815,12 +816,14 @@ export const AnalysisPage = {
       <div style="${multi ? 'font-size: 0.95rem;' : ''} ${color ? `color: ${color};` : ''}">
         ${multi ? `<span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; margin-right: 0.35rem">${curr}</span>` : ''}${text}
       </div>`
-    // Equivalente en dólares MEP, solo para los importes en pesos
+    // Equivalente en dólares MEP, solo para los importes en pesos. Invertido y
+    // P&L se reemplazan por el costo real en US$ en _renderRealUsdTotals
     const usd = (curr, ars, opts) => curr === 'ARS' ? usdEquivSpan(ars, opts) : ''
+    const slot = (curr, id, html) => curr === 'ARS' ? `<div id="${id}">${html}</div>` : ''
 
     investedEl.innerHTML = currencies.map(curr => {
       const { totalInv } = totalsByCurrency[curr]
-      return line(curr, fmt(totalInv)) + usd(curr, totalInv)
+      return line(curr, fmt(totalInv)) + slot(curr, 'totals-invested-ars-usd', usd(curr, totalInv))
     }).join('')
     marketEl.innerHTML = currencies.map(curr => {
       const { totalMarket } = totalsByCurrency[curr]
@@ -830,7 +833,7 @@ export const AnalysisPage = {
     pnlEl.innerHTML = currencies.map(curr => {
       const { totalInv, totalMarket } = totalsByCurrency[curr]
       const pnl = totalMarket - totalInv
-      return line(curr, `${sign(pnl)}${fmt(pnl)}`, pnlColor(pnl)) + usd(curr, pnl, { signed: true })
+      return line(curr, `${sign(pnl)}${fmt(pnl)}`, pnlColor(pnl)) + slot(curr, 'totals-pnl-ars-usd', usd(curr, pnl, { signed: true }))
     }).join('')
     fillUsdEquivalents(document.getElementById('analysis-totals-cards'))
 
@@ -838,8 +841,55 @@ export const AnalysisPage = {
       const { totalInv, totalMarket } = totalsByCurrency[curr]
       const pnl = totalMarket - totalInv
       const pct = totalInv > 0 ? ((totalMarket / totalInv - 1) * 100) : 0
-      return line(curr, `${sign(pct)}${pct.toFixed(1)}%`, pnlColor(pnl))
+      return line(curr, `${sign(pct)}${pct.toFixed(1)}%`, pnlColor(pnl)) + slot(curr, 'totals-pnlpct-ars-usd', '')
     }).join('')
+
+    if (totalsByCurrency.ARS) this._renderRealUsdTotals(this._activeAlycId, totalsByCurrency.ARS)
+  },
+
+  // Rendimiento real en dólares de la parte en ARS del ALyC: valor de mercado al
+  // MEP de hoy contra el costo de cada compra al MEP de su día (usd_rate).
+  async _renderRealUsdTotals(alycId, { totalMarket }) {
+    if (!alycId) return
+    try {
+      const [{ data, error }, rate] = await Promise.all([
+        supabase
+          .from('operations_search')
+          .select('type, quantity, price, currency, operated_at, instrument_ticker, alyc_id, usd_rate')
+          .eq('alyc_id', alycId)
+          .eq('currency', 'ARS')
+          .order('operated_at', { ascending: true }),
+        getMepRate()
+      ])
+      if (error) throw error
+      // Si mientras tanto se eligió otro ALyC, no pisar sus tarjetas
+      if (alycId !== this._activeAlycId) return
+
+      const cost = computeUsdCostBasis(data)
+      if (!(cost.costUsd > 0)) return
+
+      const fmt  = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      const sign = v => v > 0 ? '+' : ''
+      const note = cost.incomplete
+        ? ` (${cost.incomplete} ${cost.incomplete === 1 ? 'posición tiene' : 'posiciones tienen'} compras sin dólar MEP: el costo queda subestimado)`
+        : ''
+
+      const investedEl = document.getElementById('totals-invested-ars-usd')
+      if (investedEl) {
+        investedEl.innerHTML = `<span class="kpi-usd" title="Cada compra convertida al dólar MEP de su día${note}">US$ ${fmt(cost.costUsd)}${cost.incomplete ? ' *' : ''}</span>`
+      }
+      if (!rate) return
+
+      const realPnl = totalMarket / rate - cost.costUsd
+      const realPct = (realPnl / cost.costUsd) * 100
+      const title = `Valor de mercado al MEP de hoy ($ ${fmt(rate)}) menos el costo en US$ de cada compra${note}`
+      const pnlEl = document.getElementById('totals-pnl-ars-usd')
+      if (pnlEl) pnlEl.innerHTML = `<span class="kpi-usd" title="${title}">US$ ${sign(realPnl)}${fmt(realPnl)} real</span>`
+      const pctEl = document.getElementById('totals-pnlpct-ars-usd')
+      if (pctEl) pctEl.innerHTML = `<span class="kpi-usd" title="${title}">${sign(realPct)}${realPct.toFixed(1)}% en US$</span>`
+    } catch (err) {
+      console.warn('[Análisis] Costo en US$ no disponible:', err)
+    }
   },
 
   async _renderActivityChart(alycId) {

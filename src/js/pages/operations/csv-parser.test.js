@@ -10,7 +10,7 @@ describe('parseCsvRow', () => {
     expect(failure).toBeUndefined()
     expect(op).toMatchObject({
       type: 'compra', ticker: 'GGAL', alyc: 'IOL',
-      operated_at: '2024-03-15', price: 450.5, quantity: 100, currency: 'ARS'
+      operated_at: '2024-03-15', price: 450.5, quantity: 100, currency: 'ARS', usd_rate: null
     })
   })
 
@@ -25,28 +25,28 @@ describe('parseCsvRow', () => {
     expect(r1.failure).toBeUndefined()
     expect(r1.op).toEqual({
       type: 'compra', ticker: 'GGAL', alyc: 'IOL',
-      operated_at: '2024-03-15', price: 450.5, quantity: 100, currency: 'ARS'
+      operated_at: '2024-03-15', price: 450.5, quantity: 100, currency: 'ARS', usd_rate: null
     })
 
     const r2 = parseCsvRow('20/03/2024;venta;YPFD;PPI;25000;50;ARS', 3, headers)
     expect(r2.failure).toBeUndefined()
     expect(r2.op).toEqual({
       type: 'venta', ticker: 'YPFD', alyc: 'PPI',
-      operated_at: '2024-03-20', price: 25000, quantity: 50, currency: 'ARS'
+      operated_at: '2024-03-20', price: 25000, quantity: 50, currency: 'ARS', usd_rate: null
     })
 
     const r3 = parseCsvRow('05/04/2024;compra;BMA;Balanz;550,75;200;ARS', 4, headers)
     expect(r3.failure).toBeUndefined()
     expect(r3.op).toEqual({
       type: 'compra', ticker: 'BMA', alyc: 'Balanz',
-      operated_at: '2024-04-05', price: 550.75, quantity: 200, currency: 'ARS'
+      operated_at: '2024-04-05', price: 550.75, quantity: 200, currency: 'ARS', usd_rate: null
     })
 
     const r4 = parseCsvRow('10/04/2024;compra;AAPL;IOL;185.30;10;USD', 5, headers)
     expect(r4.failure).toBeUndefined()
     expect(r4.op).toEqual({
       type: 'compra', ticker: 'AAPL', alyc: 'IOL',
-      operated_at: '2024-04-10', price: 185.3, quantity: 10, currency: 'USD'
+      operated_at: '2024-04-10', price: 185.3, quantity: 10, currency: 'USD', usd_rate: null
     })
   })
 
@@ -93,6 +93,18 @@ describe('parseCsvRow', () => {
     const bomHeaders = ['\ufefffecha operacion', 'operacion', 'especie', 'alyc', 'precio', 'cantidad', 'moneda']
     const { op } = parseCsvRow(row('compra'), 2, bomHeaders)
     expect(op.operated_at).toBe('2024-03-15')
+  })
+
+  it('reads the optional "dolar mep" column for ARS rows', () => {
+    const mepHeaders = [...headers, 'dolar mep']
+    const { op } = parseCsvRow('15/03/2024;compra;GGAL;IOL;450,50;100;ARS;1.025,50', 2, mepHeaders)
+    expect(op.usd_rate).toBe(1025.5)
+  })
+
+  it('leaves usd_rate null when "dolar mep" is empty or the row is in USD', () => {
+    const mepHeaders = [...headers, 'dolar mep']
+    expect(parseCsvRow('15/03/2024;compra;GGAL;IOL;450,50;100;ARS;', 2, mepHeaders).op.usd_rate).toBeNull()
+    expect(parseCsvRow('10/04/2024;compra;AAPL;IOL;185.30;10;USD;1000', 2, mepHeaders).op.usd_rate).toBeNull()
   })
 })
 

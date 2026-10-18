@@ -151,6 +151,7 @@ export const OperationsPage = {
                   <th class="sortable" data-col="quantity" style="text-align:right">Can.</th>
                   <th class="sortable" data-col="price" style="text-align:right">Precio</th>
                   <th style="text-align:right">Total</th>
+                  <th style="text-align:right" title="Total convertido al dólar MEP del día de la operación">Total US$</th>
                   <th class="sortable currency-col" data-col="currency">Moneda</th>
                   <th class="actions-cell"></th>
                 </tr>
@@ -275,7 +276,7 @@ export const OperationsPage = {
     }
     state.abortController = new AbortController()
 
-    tbody.innerHTML    = `<tr><td colspan="9" class="table-empty"><span class="spinner"></span></td></tr>`
+    tbody.innerHTML    = `<tr><td colspan="10" class="table-empty"><span class="spinner"></span></td></tr>`
     if (opsCards) opsCards.innerHTML = `<div class="table-empty"><span class="spinner"></span></div>`
 
     const from = page * PAGE_SIZE
@@ -314,7 +315,7 @@ export const OperationsPage = {
 
       if (result.error) {
         console.error('Error cargando operaciones:', result.error)
-        tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
+        tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Error al cargar.</td></tr>`
         this._renderPagination(0, 0)
         this._updateBulkActionsBar()
         return
@@ -326,7 +327,7 @@ export const OperationsPage = {
         }
         const hasFilters = state.filters.searchQuery || state.filters.alycFilter || state.filters.instrumentFilter || state.filters.typeFilter || state.filters.currencyFilter || state.filters.dateFrom || state.filters.dateTo
         const emptyMsg = hasFilters ? 'No se encontraron resultados para los filtros aplicados.' : 'No hay operaciones registradas.'
-        tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${emptyMsg}</td></tr>`
+        tbody.innerHTML = `<tr><td colspan="10" class="table-empty">${emptyMsg}</td></tr>`
         if (opsCards) opsCards.innerHTML = `<div class="table-empty">${emptyMsg}</div>`
         this._renderPagination(0, 0)
         this._updateBulkActionsBar()
@@ -336,7 +337,7 @@ export const OperationsPage = {
       // Request cancelado o error de red
       if (state.pagination.requestId !== requestId) return
       console.error('Error cargando operaciones:', e)
-      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Error al cargar.</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Error al cargar.</td></tr>`
       this._renderPagination(0, 0)
       this._updateBulkActionsBar()
       return
@@ -355,6 +356,12 @@ export const OperationsPage = {
       const hasNotes = !!op.notes?.trim()
       const idx      = data.indexOf(op)
       const isSelected = state.selectedIds.has(op.id)
+      const usdRate  = parseFloat(op.usd_rate)
+      const totalUsd = op.currency === 'USD' ? total : usdRate > 0 ? total / usdRate : null
+      const usdTitle = op.currency === 'USD'
+        ? 'Operación en dólares'
+        : usdRate > 0 ? `Dólar MEP: $ ${fmtPrice(usdRate)} · Precio US$ ${fmtPrice(parseFloat(op.price) / usdRate)}` : 'Sin cotización MEP'
+      const usdText  = totalUsd !== null ? fmtPrice(totalUsd) : '—'
 
       rowsHtml += `
         <tr class="op-row ${hasNotes ? 'has-notes' : ''} ${isSelected ? 'selected-row' : ''}" data-id="${op.id}">
@@ -371,6 +378,7 @@ export const OperationsPage = {
           <td class="amount total-${op.type}"><strong>${fmtQty(op.quantity)}</strong></td>
           <td class="amount">${fmtPrice(parseFloat(op.price))}</td>
           <td class="amount"><strong class="total-amount total-${op.type}">${fmtPrice(total)}</strong></td>
+          <td class="amount" title="${usdTitle}" style="color:var(--text-muted)">${usdText}</td>
           <td class="currency-col"><span class="badge badge-${(op.currency || '').toLowerCase()}">${op.currency || '—'}</span></td>
           <td class="actions-cell">
             <button class="btn btn-sm btn-ghost btn-icon-only btn-edit-op" data-op-idx="${idx}" title="Editar" aria-label="Editar">${ICON_EDIT}</button>
@@ -379,10 +387,11 @@ export const OperationsPage = {
           </td>
         </tr>
         <tr class="op-detail-row" id="detail-${op.id}">
-          <td colspan="9">
+          <td colspan="10">
             <div class="op-detail-content">
               <div class="op-detail-type"><strong>Tipo:</strong> <span class="badge badge-${(op.type || '').toLowerCase()}">${(op.type || '—').toUpperCase()}</span></div>
               <div class="op-detail-instrument"><strong>Instrumento:</strong> ${esc(instName)} (${op.currency || '—'})</div>
+              ${op.currency === 'ARS' ? `<div><strong>Dólar MEP:</strong> ${usdRate > 0 ? `$ ${fmtPrice(usdRate)}` : 'sin cotización'}</div>` : ''}
               ${op.notes ? `<div><strong>Notas:</strong> <span style="color:var(--text-muted)">${esc(op.notes)}</span></div>` : ''}
               <div class="op-detail-actions">
                 <button class="btn btn-primary btn-edit-op" data-op-idx="${idx}">${ICON_EDIT} Editar</button>
@@ -421,6 +430,7 @@ export const OperationsPage = {
               <div class="op-card-stat" style="text-align: right">
                 <span class="op-card-stat-label">Total (${op.currency})</span>
                 <span class="op-card-stat-value" style="color: var(--total-${op.type})">${fmtPrice(total)}</span>
+                ${op.currency === 'ARS' ? `<span class="kpi-usd" title="${usdTitle}">${totalUsd !== null ? `≈ US$ ${usdText}` : 'Sin MEP'}</span>` : ''}
               </div>
             </div>
           </div>
@@ -651,8 +661,8 @@ export const OperationsPage = {
         return String(num).replace('.', ',')
       }
 
-      // Generar CSV unificado: fecha operacion;operacion;especie;alyc;precio;cantidad;moneda
-      const headers = ['fecha operacion', 'operacion', 'especie', 'alyc', 'precio', 'cantidad', 'moneda']
+      // Generar CSV unificado: fecha operacion;operacion;especie;alyc;precio;cantidad;moneda;dolar mep
+      const headers = ['fecha operacion', 'operacion', 'especie', 'alyc', 'precio', 'cantidad', 'moneda', 'dolar mep']
       const rows = data.map(op => [
         formatDateToDMY(op.operated_at),
         (op.type || '').toLowerCase(),
@@ -660,7 +670,8 @@ export const OperationsPage = {
         op.alyc_name || '',
         formatNum(op.price),
         formatNum(op.quantity),
-        (op.currency || 'ARS').toUpperCase()
+        (op.currency || 'ARS').toUpperCase(),
+        op.usd_rate != null ? formatNum(parseFloat(op.usd_rate)) : ''
       ])
 
       const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n')
@@ -1001,6 +1012,11 @@ export const OperationsPage = {
             </div>
           </div>
 
+          <div class="form-group" id="op-usd-rate-group">
+            <label for="op-usd-rate">Dólar MEP</label>
+            <input type="number" id="op-usd-rate" min="0.0001" step="any" placeholder="Automático (MEP del día de la operación)">
+          </div>
+
           <div id="op-total-row" style="display:none;margin: 1rem 0;padding: 0.75rem 1rem;background:var(--bg-main);border-radius:var(--radius);font-size:1rem; border: 1px dashed var(--border)">
             Total estimado: <strong id="op-total-value" style="color: var(--color-primary)">—</strong>
           </div>
@@ -1067,9 +1083,11 @@ export const OperationsPage = {
       document.getElementById('op-price').value    = editing.price
       document.getElementById('op-currency').value = editing.currency
       document.getElementById('op-notes').value    = editing.notes || ''
+      document.getElementById('op-usd-rate').value = editing.usd_rate ?? ''
     }
 
     this._bindTotalCalc()
+    this._bindUsdRateField()
     this._bindFormSubmit(overlay)
   },
 
@@ -1394,6 +1412,23 @@ export const OperationsPage = {
     update()
   },
 
+  // El campo MEP solo aplica a operaciones en ARS. Vacío = el servidor completa
+  // el MEP del día; si cambia la fecha y el valor no se editó a mano, se vacía
+  // para que se recalcule con la fecha nueva.
+  _bindUsdRateField() {
+    const rateInput = document.getElementById('op-usd-rate')
+    const group     = document.getElementById('op-usd-rate-group')
+    const currSel   = document.getElementById('op-currency')
+    const dateInput = document.getElementById('op-date')
+    let touched = false
+
+    const toggle = () => { group.style.display = currSel.value === 'ARS' ? '' : 'none' }
+    rateInput.addEventListener('input', () => { touched = true })
+    dateInput.addEventListener('change', () => { if (!touched) rateInput.value = '' })
+    currSel.addEventListener('change', toggle)
+    toggle()
+  },
+
   _bindFormSubmit(overlay) {
     const form    = document.getElementById('form-op')
     const editing = state.editingOperation
@@ -1410,6 +1445,7 @@ export const OperationsPage = {
       const currency     = document.getElementById('op-currency').value
       const operatedAt   = document.getElementById('op-date').value
       const notes        = document.getElementById('op-notes').value.trim()
+      const usdRate      = document.getElementById('op-usd-rate').value
 
       let hasError = false
       if (!type)                           { setFieldError('op-type',       'Seleccioná un tipo de operación'); hasError = true }
@@ -1418,6 +1454,7 @@ export const OperationsPage = {
       if (!alycId)                         { setFieldError('op-alyc',       'Seleccioná una ALyC');           hasError = true }
       if (!qty   || parseFloat(qty)   <= 0){ setFieldError('op-qty',        'Ingresá una cantidad mayor a 0'); hasError = true }
       if (!price || parseFloat(price) <= 0){ setFieldError('op-price',      'Ingresá un precio mayor a 0');   hasError = true }
+      if (currency === 'ARS' && usdRate && !(parseFloat(usdRate) > 0)) { setFieldError('op-usd-rate', 'Ingresá una cotización mayor a 0 o dejalo vacío'); hasError = true }
       if (hasError) return
 
       const btn = document.getElementById('btn-op-submit')
@@ -1432,7 +1469,8 @@ export const OperationsPage = {
         price:         parseFloat(price),
         currency,
         operated_at:   operatedAt,
-        notes:         notes || null
+        notes:         notes || null,
+        usd_rate:      currency === 'ARS' && usdRate ? parseFloat(usdRate) : null
       }
 
       try {

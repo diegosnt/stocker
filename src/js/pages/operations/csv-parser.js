@@ -91,6 +91,10 @@ export function parseCsvRow(row, rowNum, headers) {
   let currency = (raw['moneda'] || raw['currency'] || 'ARS').toUpperCase()
   if (currency === 'ARG') currency = 'ARS'
 
+  // Columna opcional: si viene vacía, el servidor completa el MEP del día
+  const usdRateRaw = raw['dolar mep'] || raw['dólar mep'] || ''
+  const usd_rate = currency === 'ARS' && usdRateRaw ? parseCsvNumber(usdRateRaw) : null
+
   return {
     op: {
       type: rawType,
@@ -99,7 +103,8 @@ export function parseCsvRow(row, rowNum, headers) {
       operated_at,
       price: parseCsvNumber(raw['precio']),
       quantity: parseCsvNumber(raw['cantidad']),
-      currency
+      currency,
+      usd_rate
     }
   }
 }

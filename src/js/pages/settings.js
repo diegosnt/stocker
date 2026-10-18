@@ -93,6 +93,21 @@ export const SettingsPage = {
             <button class="btn btn-sm" id="btn-download-md">Descargar Markdown</button>
           </div>
         </div>
+
+        <div class="card">
+          <h3>Dólar MEP histórico</h3>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Completar MEP en operaciones anteriores</div>
+              <div class="setting-desc">
+                Guarda en cada operación en pesos que todavía no lo tenga el dólar MEP del día en que se hizo,
+                para calcular el rendimiento real en dólares. Las operaciones anteriores a octubre de 2018 no tienen
+                cotización disponible: podés cargarla a mano editando la operación.
+              </div>
+            </div>
+            <button class="btn btn-sm" id="btn-backfill-mep">Completar MEP</button>
+          </div>
+        </div>
       </div>`
 
     document.getElementById('btn-download-backup').addEventListener('click', (e) => {
@@ -102,7 +117,31 @@ export const SettingsPage = {
       downloadOperationsMarkdown(e.currentTarget)
     })
 
+    document.getElementById('btn-backfill-mep').addEventListener('click', (e) => {
+      this._backfillMep(e.currentTarget)
+    })
+
     await Promise.all([this._load(), this._loadMarketBadge(), this._loadAlycsVisibility()])
+  },
+
+  async _backfillMep(btn) {
+    const label = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'Completando...'
+    try {
+      const { updated, missing } = await apiRequest('POST', '/api/operations/backfill-usd-rate')
+      if (!updated && !missing) {
+        showToast('Todas las operaciones en pesos ya tienen dólar MEP.', 'success')
+      } else {
+        const extra = missing ? ` ${missing} quedaron sin cotización (anteriores a la serie histórica).` : ''
+        showToast(`Se completó el dólar MEP en ${updated} operaciones.${extra}`, missing ? 'warning' : 'success')
+      }
+    } catch {
+      showToast('No se pudo completar el dólar MEP. Intentá de nuevo más tarde.', 'error')
+    } finally {
+      btn.disabled = false
+      btn.textContent = label
+    }
   },
 
   // ── Registro ──────────────────────────────────────────────

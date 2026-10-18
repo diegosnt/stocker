@@ -10,6 +10,7 @@ const { ipKeyGenerator } = require('express-rate-limit')
 const sanitizeHtml   = require('sanitize-html')
 const logger         = require('./logger')
 const { renderPage } = require('./views/renderPage')
+const { getMepHistory, rateAt } = require('./mep-history')
 
 const app  = express()
 const PORT = process.env.PORT || 3000
@@ -462,6 +463,17 @@ function validate(body, rules) {
   return Object.keys(errs).length ? errs : null
 }
 
+// usd_rate es opcional: vacío = se completa con el MEP histórico del día
+const isOptionalRate = v => v === undefined || v === null || v === '' || isPositive(v)
+
+// Cotización MEP a guardar en una operación: null en USD, la indicada a mano
+// si viene, o la del día de la operación según la serie histórica.
+function resolveUsdRate(series, currency, operatedAt, manualRate) {
+  if (currency !== 'ARS') return null
+  if (manualRate !== undefined && manualRate !== null && manualRate !== '') return Number(manualRate)
+  return series ? rateAt(series, operatedAt) : null
+}
+
 // ── POST /api/instrument-types ─────────────────────────────
 // Recibe el payload, lo loguea con Pino y lo reenvía a Supabase
 // manteniendo el token del usuario para que RLS siga activo.
@@ -544,7 +556,7 @@ app.post('/api/alycs', mutationLimiter, requireAuth, requireCsrf, async (req, re
 
 // ── POST /api/operations ───────────────────────────────────
 app.post('/api/operations', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
-  const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
+  const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes, usd_rate } = req.body
   const userId = req.userId
 
   const errs = validate(req.body, {
@@ -556,6 +568,7 @@ app.post('/api/operations', mutationLimiter, requireAuth, requireCsrf, async (re
     currency:      [[v => v === 'ARS' || v === 'USD', 'Debe ser "ARS" o "USD"']],
     operated_at:   [[v => v && isDate(v), 'Fecha inválida (YYYY-MM-DD)']],
     notes:         [[v => !v || (typeof v === 'string' && v.length <= 1000), 'Máximo 1000 caracteres']],
+    usd_rate:      [[v => isOptionalRate(v), 'Debe ser un número positivo']],
   })
   if (errs) return res.status(400).json({ error: errs })
 
@@ -565,9 +578,11 @@ app.post('/api/operations', mutationLimiter, requireAuth, requireCsrf, async (re
   )
 
   try {
+    const series = currency === 'ARS' ? await getMepHistory(logger) : null
     const data = await supabaseFetch('operations', 'POST', req.headers.authorization, {
       type, instrument_id, alyc_id, quantity, price, currency,
-      operated_at, notes: notes ? sanitize(notes) : null, user_id: userId
+      operated_at, notes: notes ? sanitize(notes) : null, user_id: userId,
+      usd_rate: resolveUsdRate(series, currency, operated_at, usd_rate)
     })
     logger.info({ id: data[0]?.id, type, instrument_id }, 'Operación creada OK')
     res.status(201).json({ data })
@@ -608,6 +623,9 @@ app.post('/api/operations/bulk', mutationLimiter, requireAuth, requireCsrf, asyn
       'GET', req.headers.authorization
     )
 
+    // Serie MEP histórica, una sola descarga para todo el lote
+    const mepSeries = operations.some(op => op.currency === 'ARS') ? await getMepHistory(logger) : null
+
     const results = { imported: 0, skipped: 0, errors: [], duplicates: [], failed_entities: [] }
     const toInsert = []
     const cleanOps = []
@@ -640,7 +658,7 @@ app.post('/api/operations/bulk', mutationLimiter, requireAuth, requireCsrf, asyn
         continue
       }
 
-      if (!isDate(op.operated_at) || !isPositive(op.quantity) || !isPositive(op.price)) {
+      if (!isDate(op.operated_at) || !isPositive(op.quantity) || !isPositive(op.price) || !isOptionalRate(op.usd_rate)) {
         results.failed_entities.push({
           row: rowNum, operated_at: op.operated_at, _raw: meta,
           error: 'Datos numéricos o de fecha inválidos'
@@ -658,7 +676,8 @@ app.post('/api/operations/bulk', mutationLimiter, requireAuth, requireCsrf, asyn
         price: parseFloat(op.price),
         currency: op.currency,
         operated_at: op.operated_at,
-        user_id: userId
+        user_id: userId,
+        usd_rate: resolveUsdRate(mepSeries, op.currency, op.operated_at, op.usd_rate)
       }
 
       // Objeto con metadata para el frontend (duplicados/limpios)
@@ -716,6 +735,48 @@ app.post('/api/operations/bulk', mutationLimiter, requireAuth, requireCsrf, asyn
 
   } catch (err) {
     logger.error({ err: err.message, stack: err.stack }, 'Error en importación masiva')
+    res.status(err.status ?? 500).json({ error: err.payload || 'Error interno en el servidor' })
+  }
+})
+
+// ── POST /api/operations/backfill-usd-rate ─────────────────
+// Completa usd_rate en las operaciones en ARS del usuario que no lo tienen,
+// con el MEP histórico del día de cada una. Un PATCH por fecha distinta.
+app.post('/api/operations/backfill-usd-rate', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
+  const userId = req.userId
+  logger.info({ user_id: userId }, 'Completado de MEP histórico — inicio')
+
+  try {
+    const pending = await supabaseFetch(
+      `operations?select=operated_at&user_id=eq.${userId}&currency=eq.ARS&usd_rate=is.null`,
+      'GET', req.headers.authorization
+    )
+    if (!pending.length) return res.json({ data: { updated: 0, missing: 0 } })
+
+    const series = await getMepHistory(logger)
+    if (!series) return res.status(502).json({ error: 'No se pudo obtener el MEP histórico' })
+
+    const countByDate = new Map()
+    for (const op of pending) {
+      const date = String(op.operated_at).slice(0, 10)
+      countByDate.set(date, (countByDate.get(date) || 0) + 1)
+    }
+
+    let updated = 0, missing = 0
+    for (const [date, count] of countByDate) {
+      const rate = rateAt(series, date)
+      if (rate === null) { missing += count; continue }
+      await supabaseFetch(
+        `operations?user_id=eq.${userId}&currency=eq.ARS&usd_rate=is.null&operated_at=eq.${date}`,
+        'PATCH', req.headers.authorization, { usd_rate: rate }
+      )
+      updated += count
+    }
+
+    logger.info({ user_id: userId, updated, missing }, 'Completado de MEP histórico — finalizado')
+    res.json({ data: { updated, missing } })
+  } catch (err) {
+    logger.error({ err: err.message, status: err.status, payload: err.payload }, 'Error al completar MEP histórico')
     res.status(err.status ?? 500).json({ error: err.payload || 'Error interno en el servidor' })
   }
 })
@@ -807,7 +868,7 @@ app.patch('/api/alycs/:id', mutationLimiter, requireAuth, requireCsrf, async (re
 // ── PATCH /api/operations/:id ──────────────────────────────
 app.patch('/api/operations/:id', mutationLimiter, requireAuth, requireCsrf, async (req, res) => {
   const { id } = req.params
-  const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes } = req.body
+  const { type, instrument_id, alyc_id, quantity, price, currency, operated_at, notes, usd_rate } = req.body
   const userId = req.userId
 
   if (!isUuid(id)) return res.status(400).json({ error: { id: 'ID inválido' } })
@@ -820,6 +881,7 @@ app.patch('/api/operations/:id', mutationLimiter, requireAuth, requireCsrf, asyn
     currency:      [[v => v === 'ARS' || v === 'USD', 'Debe ser "ARS" o "USD"']],
     operated_at:   [[v => v && isDate(v), 'Fecha inválida (YYYY-MM-DD)']],
     notes:         [[v => !v || (typeof v === 'string' && v.length <= 1000), 'Máximo 1000 caracteres']],
+    usd_rate:      [[v => isOptionalRate(v), 'Debe ser un número positivo']],
   })
   if (errs) return res.status(400).json({ error: errs })
 
@@ -829,9 +891,11 @@ app.patch('/api/operations/:id', mutationLimiter, requireAuth, requireCsrf, asyn
   )
 
   try {
+    const series = currency === 'ARS' ? await getMepHistory(logger) : null
     const data = await supabaseFetch(`operations?id=eq.${id}`, 'PATCH', req.headers.authorization, {
       type, instrument_id, alyc_id, quantity, price, currency,
-      operated_at, notes: notes ? sanitize(notes) : null
+      operated_at, notes: notes ? sanitize(notes) : null,
+      usd_rate: resolveUsdRate(series, currency, operated_at, usd_rate)
     })
     logger.info({ id, type, instrument_id }, 'Operación actualizada OK')
     res.json({ data })

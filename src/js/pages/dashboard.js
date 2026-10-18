@@ -6,7 +6,8 @@ import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion } from '../utils.js'
 import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equity-curve.js'
 import { getHiddenAlycSet, aggregateHoldings, computeRealizedPnl } from '../alyc-visibility.js'
-import { usdEquivSpan, fillUsdEquivalents } from '../dollar-rate.js'
+import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
+import { computeUsdCostBasis } from '../real-return.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 const HISTORY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 horas
@@ -57,6 +58,8 @@ export const DashboardPage = {
   async render() {
     this.cleanup()
     this._resolvedPrices = {} // Reset al entrar
+    this._usdCost = null
+    this._arsTotals = null
 
     const hiddenAlycIds = getHiddenAlycSet()
     this._hiddenAlycIds = hiddenAlycIds
@@ -131,6 +134,7 @@ export const DashboardPage = {
     renderIfChanged(content, skeletonHTML)
     this._bindEquityRangeButtons()
     this._loadEquityCurve(this._equityRange) // no bloqueante: puede tardar varios segundos (historial por ticker)
+    this._loadUsdCost() // no bloqueante: costo en US$ de cada compra (MEP guardado por operación)
 
     try {
       const [data, alycRows, realizedPnl] = await Promise.all([
@@ -411,7 +415,7 @@ export const DashboardPage = {
         <div class="kpi-content">
           <div class="kpi-label">Total Invertido ${cur}</div>
           <div class="kpi-value">${fmt(invested)}</div>
-          ${cur === 'ARS' ? usdEquivSpan(invested) : ''}
+          ${cur === 'ARS' ? `<div id="dash-invested-ars-usd">${usdEquivSpan(invested)}</div>` : ''}
         </div>
       </div>
 
@@ -439,6 +443,7 @@ export const DashboardPage = {
         <div class="kpi-content">
           <div class="kpi-label">Total P&amp;L % ${cur}</div>
           <div class="kpi-value" id="dash-pnlpct-${cur.toLowerCase()}">${skeleton}</div>
+          <div id="dash-pnlpct-${cur.toLowerCase()}-usd"></div>
         </div>
       </div>`
 
@@ -808,10 +813,12 @@ export const DashboardPage = {
       const marketEl = document.getElementById(`dash-market-${c}`)
       if (marketEl) marketEl.innerHTML = fmt(inv + pnl)
       if (cur === 'ARS') {
+        this._arsTotals = { inv, pnl }
         const marketUsdEl = document.getElementById('dash-market-ars-usd')
         if (marketUsdEl) marketUsdEl.innerHTML = usdEquivSpan(inv + pnl)
+        // Con el costo histórico en US$ disponible, el P&L en dólares lo arma _renderRealUsdKpis
         const pnlUsdEl = document.getElementById('dash-pnl-ars-usd')
-        if (pnlUsdEl) pnlUsdEl.innerHTML = usdEquivSpan(pnl, { signed: true })
+        if (pnlUsdEl && !(this._usdCost?.costUsd > 0)) pnlUsdEl.innerHTML = usdEquivSpan(pnl, { signed: true })
       }
       const pctEl = document.getElementById(`dash-pnlpct-${c}`)
       if (pctEl) {
@@ -823,6 +830,57 @@ export const DashboardPage = {
     fillCurrency('ARS', invARS, pnlARS, resARS, totARS)
     fillCurrency('USD', invUSD, pnlUSD, resUSD, totUSD)
     fillUsdEquivalents(document.getElementById('dash-kpis'))
+    this._renderRealUsdKpis()
+  },
+
+  // Costo en dólares de las posiciones en ARS, sumando cada compra al MEP de su
+  // día (usd_rate). Si falla (p. ej. la columna todavía no existe), las tarjetas
+  // siguen mostrando la conversión al MEP de hoy.
+  async _loadUsdCost() {
+    try {
+      const hiddenAlycIds = this._hiddenAlycIds || getHiddenAlycSet()
+      const { data, error } = await supabase
+        .from('operations_search')
+        .select('type, quantity, price, currency, operated_at, instrument_ticker, alyc_id, usd_rate')
+        .eq('currency', 'ARS')
+        .order('operated_at', { ascending: true })
+      if (error) throw error
+      const operations = (data || []).filter(op => !hiddenAlycIds.has(String(op.alyc_id)))
+      this._usdCost = computeUsdCostBasis(operations)
+      this._renderRealUsdKpis()
+    } catch (err) {
+      console.warn('[Dashboard] Costo en US$ no disponible:', err)
+    }
+  },
+
+  // Rendimiento real en dólares de la parte en ARS: valor de mercado al MEP de
+  // hoy contra el costo de cada compra al MEP de su día.
+  async _renderRealUsdKpis() {
+    const cost = this._usdCost
+    if (!cost || !(cost.costUsd > 0)) return
+    const rate = await getMepRate()
+    const t = this._arsTotals
+
+    const fmt  = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const sign = v => v > 0 ? '+' : ''
+    const note = cost.incomplete
+      ? ` (${cost.incomplete} ${cost.incomplete === 1 ? 'posición tiene' : 'posiciones tienen'} compras sin dólar MEP: el costo queda subestimado)`
+      : ''
+
+    const investedEl = document.getElementById('dash-invested-ars-usd')
+    if (investedEl) {
+      investedEl.innerHTML = `<span class="kpi-usd" title="Cada compra convertida al dólar MEP de su día${note}">US$ ${fmt(cost.costUsd)}${cost.incomplete ? ' *' : ''}</span>`
+    }
+
+    if (!rate || !t) return
+    const realPnl = (t.inv + t.pnl) / rate - cost.costUsd
+    const realPct = (realPnl / cost.costUsd) * 100
+    const title = `Valor de mercado al MEP de hoy ($ ${fmt(rate)}) menos el costo en US$ de cada compra${note}`
+
+    const pnlEl = document.getElementById('dash-pnl-ars-usd')
+    if (pnlEl) pnlEl.innerHTML = `<span class="kpi-usd" title="${title}">US$ ${sign(realPnl)}${fmt(realPnl)} real</span>`
+    const pctEl = document.getElementById('dash-pnlpct-ars-usd')
+    if (pctEl) pctEl.innerHTML = `<span class="kpi-usd" title="${title}">${sign(realPct)}${realPct.toFixed(1)}% en US$</span>`
   },
 
   _refreshHeatmap() {
