@@ -25,22 +25,14 @@ const deps = [
     url:  'https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css',
     dest: path.join(__dirname, '../public/css/water.min.css')
   },
-  // Inter font – pesos usados en la app (latin, normal)
+  // Geist y Geist Mono – fuentes variables (licencia SIL OFL 1.1)
   {
-    url:  'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-400-normal.woff2',
-    dest: path.join(__dirname, '../public/fonts/inter-400.woff2')
+    url:  'https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Variable.woff2',
+    dest: path.join(__dirname, '../public/fonts/geist-variable.woff2')
   },
   {
-    url:  'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-500-normal.woff2',
-    dest: path.join(__dirname, '../public/fonts/inter-500.woff2')
-  },
-  {
-    url:  'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-600-normal.woff2',
-    dest: path.join(__dirname, '../public/fonts/inter-600.woff2')
-  },
-  {
-    url:  'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-700-normal.woff2',
-    dest: path.join(__dirname, '../public/fonts/inter-700.woff2')
+    url:  'https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/GeistMono-Variable.woff2',
+    dest: path.join(__dirname, '../public/fonts/geist-mono-variable.woff2')
   },
   {
     url:  'https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js',

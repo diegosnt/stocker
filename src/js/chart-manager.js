@@ -6,6 +6,9 @@ import {
   Tooltip, Legend, Filler
 } from 'chart.js'
 import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
+import { cssVar as getCSSVar, chartColors, withAlpha } from './theme.js'
+
+const FONT_FAMILY = "'Geist', system-ui, sans-serif"
 // Solo lo que usa la app (en vez de `registerables`, que trae todo): permite
 // que el bundler descarte el resto de Chart.js. Si se agrega un tipo de gráfico,
 // escala o plugin nuevo, hay que registrarlo acá o Chart.js tira error al crearlo.
@@ -21,6 +24,7 @@ const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-re
 const defaultAnimation = Chart.defaults.animation
 const applyMotionPreference = () => { Chart.defaults.animation = reducedMotion?.matches ? false : defaultAnimation }
 applyMotionPreference()
+Chart.defaults.font.family = FONT_FAMILY
 reducedMotion?.addEventListener?.('change', applyMotionPreference)
 
 // Re-exportado para que otros módulos (ej. analysis.js) usen la misma instancia
@@ -32,22 +36,10 @@ export { Chart }
  * Proporciona una interfaz única y consistente para todos los gráficos del proyecto.
  */
 
-// Paleta de colores consistente con el proyecto ("Fintech sobrio")
-export const CHART_COLORS = [
-  '#7c3aed', // Violeta (Primary)
-  '#0ea5e9', // Sky
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
-  '#ef4444', // Red
-  '#8b5cf6', // Violet
-  '#ec4899', // Pink
-  '#14b8a6', // Teal
-  '#f97316', // Orange
-  '#64748b'  // Slate
-]
+// Paleta categórica del tema actual (tokens --chart-1..8 de styles.css). Es una
+// función y no una constante porque cambia con el modo claro/oscuro.
+export { chartColors as getChartColors } from './theme.js'
 
-// Función auxiliar para obtener colores de variables CSS reales (para modo dark/light)
-const getCSSVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim()
 
 // Plugin para dibujar etiquetas con contorno (Outline)
 const outlinedTextPlugin = {
@@ -74,7 +66,7 @@ const outlinedTextPlugin = {
       ctx.textBaseline = 'middle'
       
       // Estilo de la etiqueta superior
-      ctx.font = '800 13px Inter, sans-serif'
+      ctx.font = `700 13px ${FONT_FAMILY}`
       ctx.strokeStyle = 'rgba(0,0,0,0.5)'
       ctx.lineWidth = 3
       ctx.lineJoin = 'round'
@@ -83,7 +75,7 @@ const outlinedTextPlugin = {
       ctx.fillText(label, x, y - 6)
       
       // Estilo de la etiqueta inferior
-      ctx.font = '500 12px Inter, sans-serif'
+      ctx.font = `500 12px ${FONT_FAMILY}`
       ctx.strokeStyle = 'rgba(0,0,0,0.45)'
       ctx.lineWidth = 2.5
       ctx.strokeText(pctText, x, y + 10)
@@ -116,10 +108,10 @@ const barPercentageLabelsPlugin = {
       ctx.textAlign = 'center'
       ctx.textBaseline = isVertical ? 'bottom' : 'middle'
       
-      ctx.font = 'bold 11px Inter, sans-serif'
-      ctx.fillStyle = getCSSVar('--text-main') || '#ffffff'
+      ctx.font = `600 11px ${FONT_FAMILY}`
+      ctx.fillStyle = getCSSVar('--text-main')
       
-      ctx.strokeStyle = getCSSVar('--bg-card') || '#1e293b'
+      ctx.strokeStyle = getCSSVar('--bg-card')
       ctx.lineWidth = 3.5
       ctx.lineJoin = 'round'
       
@@ -158,8 +150,8 @@ const getBaseOptions = () => {
 }
 
 const getScaleOptions = () => {
-  const textColor = getCSSVar('--text-muted') || '#64748b'
-  const gridColor = getCSSVar('--border') || 'rgba(120, 120, 130, 0.15)'
+  const textColor = getCSSVar('--text-muted')
+  const gridColor = getCSSVar('--chart-grid')
   return {
     x: {
       ticks: { color: textColor },
@@ -177,7 +169,7 @@ export const ChartManager = {
     if (!canvas) return null
     const labels = items.map(item => item.label || item.ticker)
     const data = items.map(item => item.value || item.currentValue)
-    const backgroundColor = options.colors || CHART_COLORS
+    const backgroundColor = options.colors || chartColors()
 
     // Si ya existe la instancia, la actualizamos
     if (options.instance && options.instance.config.type === (options.type === 'pie' ? 'pie' : 'doughnut')) {
@@ -220,7 +212,7 @@ export const ChartManager = {
     const labels = items.map(item => item.label || item.ticker)
     const data = items.map(item => item.value || item.pnl)
     const isPos = v => v >= 0
-    const backgroundColor = items.map(item => item.color || (isPos(item.value || item.pnl) ? '#10b981' : '#ef4444'))
+    const backgroundColor = items.map(item => item.color || (isPos(item.value || item.pnl) ? getCSSVar('--color-success') : getCSSVar('--color-danger')))
 
     if (options.instance && options.instance.config.type === 'bar') {
       options.instance.data.labels = labels
@@ -283,7 +275,7 @@ export const ChartManager = {
     if (!canvas) return null
     const labels = items.map(item => item.label || item.ticker)
     const data = items.map(item => item.value || item.currentValue)
-    const colors = options.colors || CHART_COLORS
+    const colors = options.colors || chartColors()
     const backgroundColor = items.map((_, i) => colors[i % colors.length])
 
     if (options.instance && options.instance.config.type === 'bar' && options.instance.config.options.indexAxis === 'x') {
@@ -324,7 +316,7 @@ export const ChartManager = {
           },
           y: {
             ...scales.y,
-            grid: { color: getCSSVar('--border') || 'rgba(120, 120, 130, 0.15)' },
+            grid: { color: getCSSVar('--chart-grid') },
             ticks: {
               ...scales.y.ticks,
               callback: v => {
@@ -393,9 +385,9 @@ export const ChartManager = {
           key: options.key || 'value',
           spacing: 1, // Espacio entre rectángulos para que se distingan
           borderWidth: 1, // Un borde sutil
-          borderColor: getCSSVar('--bg-card') || '#ffffff',
+          borderColor: getCSSVar('--bg-card'),
           borderRadius: 4,
-          backgroundColor: (ctx) => ctx.raw?._data?.color || '#64748b',
+          backgroundColor: (ctx) => ctx.raw?._data?.color || getCSSVar('--heat-neutral'),
           labels: {
             display: true,
             formatter: options.formatter || ((ctx) => {
@@ -440,8 +432,8 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
-    const gridColor = getCSSVar('--border') ? getCSSVar('--border') + '44' : 'rgba(255, 255, 255, 0.05)'
+    const textColor = getCSSVar('--text-muted')
+    const gridColor = getCSSVar('--chart-grid')
     
     return new Chart(canvas, {
       type: 'scatter',
@@ -450,7 +442,7 @@ export const ChartManager = {
           {
             label: 'Carteras Aleatorias',
             data: (analysis.portfolios || []).map(p => ({ x: p.std, y: p.return })),
-            backgroundColor: 'rgba(148, 163, 184, 0.25)',
+            backgroundColor: withAlpha(getCSSVar('--chart-6'), 0.28),
             pointRadius: 2,
             pointHoverRadius: 4,
             borderWidth: 0
@@ -458,20 +450,20 @@ export const ChartManager = {
           {
             label: 'Máximo Sharpe (Óptimo)',
             data: [{ x: analysis.optimal.std, y: analysis.optimal.return }],
-            backgroundColor: '#10b981',
+            backgroundColor: getCSSVar('--chart-3'),
             pointRadius: 8,
             pointHoverRadius: 10,
-            borderColor: getCSSVar('--bg-card') || '#ffffff',
+            borderColor: getCSSVar('--bg-card'),
             borderWidth: 3,
             zIndex: 10
           },
           {
             label: 'Cartera Actual',
             data: [{ x: analysis.current.std, y: analysis.current.return }],
-            backgroundColor: '#3b82f6',
+            backgroundColor: getCSSVar('--chart-1'),
             pointRadius: 8,
             pointHoverRadius: 10,
-            borderColor: getCSSVar('--bg-card') || '#ffffff',
+            borderColor: getCSSVar('--bg-card'),
             borderWidth: 3,
             pointStyle: 'rectRot',
             zIndex: 11
@@ -479,8 +471,8 @@ export const ChartManager = {
           {
             label: 'Activos Individuales',
             data: (analysis.assets || []).map(a => ({ x: a.std, y: a.return, ticker: a.ticker, weight: a.weight })),
-            backgroundColor: 'rgba(245, 158, 11, 0.85)',
-            borderColor: getCSSVar('--bg-card') || '#ffffff',
+            backgroundColor: withAlpha(getCSSVar('--chart-4'), 0.85),
+            borderColor: getCSSVar('--bg-card'),
             borderWidth: 1.5,
             pointRadius: (ctx) => 5 + (ctx.raw?.weight || 0) * 35,
             pointHoverRadius: (ctx) => 7 + (ctx.raw?.weight || 0) * 35,
@@ -541,18 +533,18 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
+    const textColor = getCSSVar('--text-muted')
     
     const processedDatasets = datasets.map((ds, i) => {
       const isMedian = ds.label === 'Mediana' || i === 0
       return {
         ...ds,
         label: isMedian ? 'Proyección Mediana' : ds.label,
-        borderColor: isMedian ? '#8b5cf6' : 'rgba(148, 163, 184, 0.12)',
+        borderColor: isMedian ? getCSSVar('--color-primary') : withAlpha(getCSSVar('--chart-6'), 0.14),
         borderWidth: isMedian ? 3 : 1,
         pointRadius: 0,
         fill: isMedian ? 'origin' : false,
-        backgroundColor: isMedian ? 'rgba(139, 92, 246, 0.05)' : 'transparent',
+        backgroundColor: isMedian ? `rgba(${getCSSVar('--color-primary-rgb')}, 0.06)` : 'transparent',
         tension: 0.3,
         zIndex: isMedian ? 10 : 1
       }
@@ -613,10 +605,10 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
-    const cardBg = getCSSVar('--bg-card') || '#ffffff'
-    const primary = getCSSVar('--color-primary') || '#7c3aed'
-    const primaryRgb = getCSSVar('--color-primary-rgb') || '91, 91, 214'
+    const textColor = getCSSVar('--text-muted')
+    const cardBg = getCSSVar('--bg-card')
+    const primary = getCSSVar('--color-primary')
+    const primaryRgb = getCSSVar('--color-primary-rgb')
 
     return new Chart(canvas, {
       type: 'line',
@@ -641,7 +633,7 @@ export const ChartManager = {
             pointStyle: 'triangle',
             pointRadius: 7,
             pointHoverRadius: 9,
-            pointBackgroundColor: '#10b981',
+            pointBackgroundColor: getCSSVar('--color-success'),
             pointBorderColor: cardBg,
             pointBorderWidth: 1.5,
             showLine: false,
@@ -654,7 +646,7 @@ export const ChartManager = {
             pointRotation: 180,
             pointRadius: 7,
             pointHoverRadius: 9,
-            pointBackgroundColor: '#ef4444',
+            pointBackgroundColor: getCSSVar('--color-danger'),
             pointBorderColor: cardBg,
             pointBorderWidth: 1.5,
             showLine: false,
@@ -705,9 +697,9 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
-    const primary = getCSSVar('--color-primary') || '#7c3aed'
-    const primaryRgb = getCSSVar('--color-primary-rgb') || '91, 91, 214'
+    const textColor = getCSSVar('--text-muted')
+    const primary = getCSSVar('--color-primary')
+    const primaryRgb = getCSSVar('--color-primary-rgb')
 
     return new Chart(canvas, {
       type: 'line',
@@ -783,9 +775,9 @@ export const ChartManager = {
     const data = items.map(item => item.value)
     const colors = items.map(item => {
       const val = item.value || 0
-      if (val > 25) return '#ef4444'
-      if (val > 12) return '#f59e0b'
-      return '#3b82f6'
+      if (val > 25) return getCSSVar('--color-danger')
+      if (val > 12) return getCSSVar('--color-warning')
+      return getCSSVar('--chart-1')
     })
 
     if (options.instance && options.instance.config.type === 'bar') {
@@ -798,7 +790,7 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
+    const textColor = getCSSVar('--text-muted')
     
     return new Chart(canvas, {
       type: 'bar',
@@ -849,10 +841,10 @@ export const ChartManager = {
     //  - Segmento superior       = |resultado|; verde si es ganancia, rojo si es pérdida
     // Ganancia  -> la barra llega hasta el valor actual (base = invertido, +verde encima)
     // Pérdida   -> la barra llega hasta el capital invertido (base = actual, +rojo encima)
-    const BASE_COLOR = '#8b30ff' // violeta eléctrico (fijo: rinde igual en claro y oscuro)
-    const GAIN_COLOR = getCSSVar('--color-success') || '#059669'
-    const LOSS_COLOR = getCSSVar('--color-danger')  || '#dc2626'
-    const SURFACE_COLOR = getCSSVar('--bg-card') || '#ffffff'
+    const BASE_COLOR = getCSSVar('--color-primary')
+    const GAIN_COLOR = getCSSVar('--color-success')
+    const LOSS_COLOR = getCSSVar('--color-danger')
+    const SURFACE_COLOR = getCSSVar('--bg-card')
 
     const baseData  = currentData.map((cur, i) => Math.min(investedData[i], cur))
     const deltaData = currentData.map((cur, i) => Math.abs(cur - investedData[i]))
@@ -871,7 +863,7 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
+    const textColor = getCSSVar('--text-muted')
 
     return new Chart(canvas, {
       type: 'bar',
@@ -979,7 +971,7 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
+    const textColor = getCSSVar('--text-muted')
 
     return new Chart(canvas, {
       type: 'bar',
@@ -1037,7 +1029,7 @@ export const ChartManager = {
 
     const baseOptions = getBaseOptions()
     const scales = getScaleOptions()
-    const textColor = getCSSVar('--text-muted') || '#64748b'
+    const textColor = getCSSVar('--text-muted')
 
     const datasets = series.map(s => ({
       label: s.label,

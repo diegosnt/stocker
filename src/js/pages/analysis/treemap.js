@@ -1,4 +1,5 @@
 import { ChartManager } from '../../chart-manager.js'
+import { heatColor } from '../../theme.js'
 
 export function renderTreemapChart(container, items, prevInstance) {
   if (!container || !items || items.length === 0) return prevInstance
@@ -8,13 +9,7 @@ export function renderTreemapChart(container, items, prevInstance) {
   container.innerHTML = '<canvas style="width:100%;height:100%"></canvas>'
   const canvas = container.querySelector('canvas')
 
-  const getColor = (p) => {
-    if (p > 5) return '#065f46'
-    if (p > 0) return '#10b981'
-    if (p < -5) return '#991b1b'
-    if (p < 0) return '#ef4444'
-    return '#64748b'
-  }
+  const getColor = (p) => heatColor(p, 5)
   const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   const totalValue = items.reduce((sum, item) => sum + (item.currentValue || 0), 0)

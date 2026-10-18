@@ -25,7 +25,7 @@ export async function showFailedEntitiesModal(failedEntities) {
           <h3 style="margin:0">Registros no importados</h3>
           <button type="button" class="btn btn-sm btn-ghost" id="btn-failed-close" aria-label="Cerrar">✕</button>
         </div>
-        <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: #fff5f5; color: #c53030; font-size: 0.9rem">
+        <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--color-danger-soft); color: var(--color-danger); font-size: 0.9rem">
           Los siguientes <strong>${failedEntities.length}</strong> registros no pudieron cargarse porque los datos son incompletos o las entidades no existen. 
           Por favor, verificá que los instrumentos y ALyCs estén creados en el sistema.
         </div>

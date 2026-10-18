@@ -1,124 +1,149 @@
-/* ---- Inter font (auto-hospedada) ---- */
+/* ---- Geist y Geist Mono (auto-hospedadas, variables: un archivo con todos los pesos) ----
+   Licencia SIL OFL 1.1: public/fonts/GEIST-LICENSE.txt */
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Geist';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/inter-400.woff2') format('woff2');
+  src: url('/fonts/geist-variable.woff2') format('woff2-variations'), url('/fonts/geist-variable.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Geist Mono';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/inter-500.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/inter-600.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/inter-700.woff2') format('woff2');
+  src: url('/fonts/geist-mono-variable.woff2') format('woff2-variations'), url('/fonts/geist-mono-variable.woff2') format('woff2');
 }
 
 /* =====================================================
-   STOCKER – Slate & Indigo Dashboard Blueprint
-   Basado en SKILL.md y style_example.css
-   ===================================================== */
-
-/* =====================================================
-   Design tokens — "Fintech sobrio" (base zinc + acento índigo-violeta)
+   STOCKER — "Nocturno denso"
+   Herramienta profesional: neutros casi negros apenas azulados, bordes de
+   una línea, radios chicos, un solo acento índigo para lo interactivo.
+   Verde y rojo se reservan para ganancia/pérdida; nunca como categoría.
    ===================================================== */
 :root {
-  /* Acento — violeta */
-  --color-primary: #7c3aed;      /* violet-600 */
-  --color-primary-dk: #6d28d9;   /* hover / pressed */
-  --color-primary-rgb: 124, 58, 237;
-  --color-primary-soft: rgba(124, 58, 237, 0.10);
-  --color-primary-tint: rgba(124, 58, 237, 0.16); /* estado activo / seleccionado */
+  /* Tipografía */
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Acento — índigo */
+  --color-primary: #4f55e8;
+  --color-primary-dk: #3f45d0;   /* hover / pressed */
+  --color-primary-rgb: 79, 85, 232;
+  --color-primary-soft: rgba(79, 85, 232, 0.09);
+  --color-primary-tint: rgba(79, 85, 232, 0.14); /* estado activo / seleccionado */
   --color-primary-light: var(--color-primary-soft); /* alias legacy */
-  --ring: 0 0 0 3px rgba(124, 58, 237, 0.30);
+  --color-on-primary: #ffffff;
+  --color-primary-fill: #4f55e8; /* rellenos con texto blanco (botones, chips activos) */
+  --ring: 0 0 0 3px rgba(79, 85, 232, 0.28);
 
   /* Estado semántico (texto) + tinte de fondo */
-  --color-success: #059669;
-  --color-success-soft: rgba(16, 185, 129, 0.12);
+  --color-success: #15803d;
+  --color-success-soft: rgba(21, 128, 61, 0.09);
   --color-danger: #dc2626;
-  --color-danger-soft: rgba(239, 68, 68, 0.12);
-  --color-warning: #d97706;
-  --color-warning-soft: rgba(245, 158, 11, 0.12);
+  --color-danger-soft: rgba(220, 38, 38, 0.09);
+  --color-warning: #b45309;
+  --color-warning-soft: rgba(180, 83, 9, 0.10);
+  --color-info: #0369a1;
+  --color-info-soft: rgba(3, 105, 161, 0.09);
 
-  /* Superficies (zinc) */
-  --bg-app: #fafafa;    /* fondo global */
-  --bg-main: #f4f4f5;   /* superficies hundidas: th, insets */
+  /* Rellenos de mapas de calor (texto blanco encima, iguales en ambos temas) */
+  --heat-gain: #15803d;
+  --heat-gain-strong: #14532d;
+  --heat-loss: #dc2626;
+  --heat-loss-strong: #991b1b;
+  --heat-neutral: #52525b;
+
+  /* Paleta categórica de gráficos: sin verde ni rojo */
+  --chart-1: #4f55e8;
+  --chart-2: #0284c7;
+  --chart-3: #0d9488;
+  --chart-4: #b45309;
+  --chart-5: #9333ea;
+  --chart-6: #64748b;
+  --chart-7: #0e7490;
+  --chart-8: #c026d3;
+  --chart-grid: rgba(15, 17, 21, 0.06);
+
+  /* Superficies */
+  --bg-app: #fbfbfc;    /* fondo global */
+  --bg-main: #f0f1f4;   /* superficies hundidas: th, insets */
   --bg-card: #ffffff;
 
   /* Texto */
-  --text-main: #18181b;
-  --text-muted: #52525b;  /* AA: ~7:1 sobre --bg-app / --bg-main */
-  --text-faint: #71717a;  /* hints, ejes — usar sobre #fff */
+  --text-main: #0f1115;
+  --text-muted: #5d6270;  /* AA: ~6:1 sobre --bg-card */
+  --text-faint: #6b7080;  /* hints, ejes */
 
-  /* Bordes */
-  --border: #e4e4e7;
-  --border-strong: #d4d4d8;
+  /* Bordes (de una línea) */
+  --border: #e7e8ec;
+  --border-strong: #d5d7dd;
 
-  /* Sombras en capas */
-  --shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.06);
-  --shadow: 0 1px 3px rgba(9, 9, 11, 0.06), 0 1px 2px rgba(9, 9, 11, 0.04);
-  --shadow-md: 0 4px 12px -2px rgba(9, 9, 11, 0.08), 0 2px 6px -2px rgba(9, 9, 11, 0.05);
-  --shadow-lg: 0 20px 40px -12px rgba(9, 9, 11, 0.18);
+  /* Sombras mínimas: la separación la dan los bordes */
+  --shadow-sm: 0 1px 1px rgba(15, 17, 21, 0.03);
+  --shadow: 0 1px 2px rgba(15, 17, 21, 0.04);
+  --shadow-md: 0 4px 12px -4px rgba(15, 17, 21, 0.10);
+  --shadow-lg: 0 16px 32px -12px rgba(15, 17, 21, 0.18);
 
-  --gradient: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-  --transition: transform 0.3s, opacity 0.3s, background-color 0.3s, box-shadow 0.3s;
+  --gradient: linear-gradient(135deg, #5c62f0 0%, #4f55e8 100%);
+  --transition: transform 0.2s, opacity 0.2s, background-color 0.2s, box-shadow 0.2s;
   --sidebar-width: 210px;
-  --navbar-height: 52px;
+  --navbar-height: 48px;
 
-  /* Radios */
-  --radius: 14px;
-  --radius-sm: 9px;
-  --radius-lg: 20px;
+  /* Radios chicos */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 10px;
   --radius-pill: 9999px;
 }
 
-/* ---- Dark Mode (negro real, base zinc) ---- */
+/* ---- Dark Mode (casi negro con tinte azul) ---- */
 .dark-mode {
-  --color-primary: #a78bfa;      /* violet-400 */
-  --color-primary-dk: #8b5cf6;
-  --color-primary-rgb: 167, 139, 250;
-  --color-primary-soft: rgba(167, 139, 250, 0.14);
-  --color-primary-tint: rgba(167, 139, 250, 0.20);
-  --ring: 0 0 0 3px rgba(167, 139, 250, 0.38);
+  --color-primary: #6e7bff;
+  --color-primary-dk: #4c56e0;   /* hover de rellenos: blanco ~5.6:1 */
+  --color-primary-rgb: 110, 123, 255;
+  --color-primary-soft: rgba(110, 123, 255, 0.13);
+  --color-primary-tint: rgba(110, 123, 255, 0.20);
+  --color-on-primary: #ffffff;
+  --color-primary-fill: #5560f0; /* blanco encima ~4.9:1 (el acento #6e7bff no llega a 4.5) */
+  --ring: 0 0 0 3px rgba(110, 123, 255, 0.36);
 
-  --color-success: #34d399;
-  --color-success-soft: rgba(52, 211, 153, 0.15);
+  --color-success: #4ade80;
+  --color-success-soft: rgba(74, 222, 128, 0.11);
   --color-danger: #f87171;
-  --color-danger-soft: rgba(248, 113, 113, 0.15);
+  --color-danger-soft: rgba(248, 113, 113, 0.11);
   --color-warning: #fbbf24;
-  --color-warning-soft: rgba(251, 191, 36, 0.15);
+  --color-warning-soft: rgba(251, 191, 36, 0.11);
+  --color-info: #38bdf8;
+  --color-info-soft: rgba(56, 189, 248, 0.11);
 
-  --bg-app: #09090b;
-  --bg-main: #131316;
-  --bg-card: #18181b;
+  --chart-1: #6e7bff;
+  --chart-2: #38bdf8;
+  --chart-3: #2dd4bf;
+  --chart-4: #fbbf24;
+  --chart-5: #c084fc;
+  --chart-6: #a1a1aa;
+  --chart-7: #22d3ee;
+  --chart-8: #e879f9;
+  --chart-grid: rgba(232, 234, 239, 0.06);
 
-  --text-main: #fafafa;
-  --text-muted: #a1a1aa;
-  --text-faint: #8b8b93;
+  --bg-app: #08090c;
+  --bg-main: #14161c;
+  --bg-card: #101217;
 
-  --border: #27272a;
-  --border-strong: #3f3f46;
+  --text-main: #e8eaef;
+  --text-muted: #8b91a0;
+  --text-faint: #7a8090;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 6px 16px -4px rgba(0, 0, 0, 0.55), 0 2px 8px -2px rgba(0, 0, 0, 0.40);
-  --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.65);
+  --border: #1d2028;
+  --border-strong: #2a2e38;
 
-  --gradient: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+  --shadow-sm: 0 0 #0000;
+  --shadow: 0 0 #0000;
+  --shadow-md: 0 8px 20px -8px rgba(0, 0, 0, 0.60);
+  --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.70);
+
+  --gradient: linear-gradient(135deg, #7d88ff 0%, #6e7bff 100%);
 }
 
 /* ---- Reset & Base ---- */
@@ -129,7 +154,7 @@ body {
   padding: 0;
   background-color: var(--bg-app);
   color: var(--text-main);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -140,7 +165,7 @@ body {
 
 h1, h2, h3, h4, h5 {
   margin-top: 0;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -296,7 +321,7 @@ h1, h2, h3, h4, h5 {
 }
 .quicknav-alyc:hover { color: var(--color-primary); border-color: var(--color-primary); }
 .quicknav-alyc.active {
-  background: var(--color-primary);
+  background: var(--color-primary-fill);
   color: #fff;
   border-color: var(--color-primary);
 }
@@ -426,7 +451,7 @@ h1, h2, h3, h4, h5 {
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
   font-weight: 700;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   min-width: 54px;
   text-align: center;
@@ -713,9 +738,9 @@ tr.selected-row td {
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 .btn-alyc.btn-primary {
-  background: var(--color-primary);
-  color: white;
-  border-color: var(--color-primary);
+  background: var(--color-primary-fill);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary-fill);
 }
 
 /* ---- Analysis header actions ---- */
@@ -1101,8 +1126,8 @@ tr.selected-row td {
 }
 
 .page-header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
@@ -1135,27 +1160,27 @@ tr.selected-row td {
 }
 
 .page-header h2 {
-  font-size: 1.7rem;
+  font-size: 1.45rem;
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.03em;
 }
 
 /* ---- Cards & KPI ---- */
 .card {
   background: var(--bg-card);
-  padding: 1.5rem;
+  padding: 1.1rem 1.15rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 1.75rem;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
   animation: fadeIn 0.6s ease-out;
 }
 
@@ -1184,8 +1209,9 @@ tr.selected-row td {
 }
 
 .kpi-value {
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
@@ -1228,6 +1254,7 @@ tr.selected-row td {
 }
 .price-freshness-btn {
   padding: 0.25rem;
+  min-width: 28px;
   line-height: 0;
 }
 .price-freshness-btn.is-loading svg {
@@ -1265,7 +1292,7 @@ table {
 
 th {
   background: var(--bg-main);
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: 0.65rem;
   font-weight: 700;
@@ -1288,7 +1315,7 @@ th.sort-desc::after        { content: ' \a0▼'; opacity: 1;   color: var(--colo
 th.sortable:hover::after   { opacity: 0.6; }
 
 td {
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.75rem;
   border-bottom: 1px solid var(--border);
   background: var(--bg-card);
   transition: background-color 0.2s;
@@ -1358,9 +1385,9 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.55rem 1.1rem;
+  padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-weight: 550;
   font-size: 0.8rem;
   font-family: inherit;
   cursor: pointer;
@@ -1415,14 +1442,14 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-primary {
-  background: var(--color-primary);
-  color: #ffffff !important;
+  background: var(--color-primary-fill);
+  color: var(--color-on-primary) !important;
   border-color: transparent;
-  box-shadow: 0 1px 2px rgba(var(--color-primary-rgb), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: none;
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 12px -2px rgba(var(--color-primary-rgb), 0.45);
+  box-shadow: none;
   background: var(--color-primary-dk);
   border-color: var(--color-primary-dk);
 }
@@ -1434,9 +1461,9 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-danger:hover {
-  background: var(--color-danger);
+  background: var(--heat-loss);
   color: #ffffff !important;
-  border-color: var(--color-danger);
+  border-color: var(--heat-loss);
 }
 
 .btn-ghost {
@@ -1558,14 +1585,15 @@ input:focus, select:focus, textarea:focus {
   padding: 0.25rem 0.5rem;
   border-radius: var(--radius-sm);
   font-weight: 700;
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .badge {
-  padding: 0.25rem 0.625rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
@@ -1574,7 +1602,8 @@ input:focus, select:focus, textarea:focus {
 .badge-compra { background: var(--color-success-soft); color: var(--color-success); }
 .badge-venta { background: var(--color-danger-soft); color: var(--color-danger); }
 
-.amount { font-variant-numeric: tabular-nums; text-align: right; }
+/* Importes en Geist Mono: los dígitos alinean en columna */
+.amount { font-family: var(--font-mono); font-size: 0.92em; font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ---- Charts side-by-side row ---- */
 .charts-row {
@@ -2196,8 +2225,8 @@ input:focus, select:focus, textarea:focus {
 .kpi-card--modern {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  padding: 1.15rem 1.25rem;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
   background: var(--bg-card);
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -2218,9 +2247,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .kpi-icon-circle {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
+  /* Neutros: el color queda para el valor (ganancia/pérdida), no para el ícono */
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;

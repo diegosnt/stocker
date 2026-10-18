@@ -287,7 +287,7 @@ export const SettingsPage = {
     container.innerHTML = alycs.map(a => {
       const isVisible = !hiddenSet.has(String(a.id))
       return `
-        <div class="setting-row alyc-vis-item" data-alyc-id="${a.id}" style="padding-bottom:0.6rem; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.06))">
+        <div class="setting-row alyc-vis-item" data-alyc-id="${a.id}" style="padding-bottom:0.6rem; border-bottom:1px solid var(--border)">
           <div class="setting-info">
             <div class="setting-label">
               <strong>${esc(a.name)}</strong>

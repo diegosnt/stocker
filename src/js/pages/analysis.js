@@ -13,6 +13,7 @@ import { usdEquivSpan, fillUsdEquivalents, getMepRate } from '../dollar-rate.js'
 import { computeUsdCostBasis } from '../real-return.js'
 import { getCachedQuote, setCachedQuote, clearCachedQuotes, createFreshnessIndicator } from '../quote-freshness.js'
 import { fetchHistories } from '../history-client.js'
+import { cssVar, pnlColorVar } from '../theme.js'
 
 const HISTORY_RANGE = '6mo'
 const HISTORY_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 horas
@@ -121,7 +122,7 @@ export const AnalysisPage = {
 
           <div class="kpi-grid" id="analysis-totals-cards" style="margin-bottom: 0">
             <div class="kpi-card kpi-card--modern">
-              <div class="kpi-icon-circle" style="background: rgba(79, 70, 230, 0.1); color: #4f46e6">
+              <div class="kpi-icon-circle">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               </div>
               <div class="kpi-content">
@@ -131,7 +132,7 @@ export const AnalysisPage = {
             </div>
 
             <div class="kpi-card kpi-card--modern">
-              <div class="kpi-icon-circle" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">
+              <div class="kpi-icon-circle">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
               </div>
               <div class="kpi-content">
@@ -141,7 +142,7 @@ export const AnalysisPage = {
             </div>
 
             <div class="kpi-card kpi-card--modern">
-              <div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: #10b981">
+              <div class="kpi-icon-circle">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
               </div>
               <div class="kpi-content">
@@ -151,7 +152,7 @@ export const AnalysisPage = {
             </div>
 
             <div class="kpi-card kpi-card--modern">
-              <div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">
+              <div class="kpi-icon-circle">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               </div>
               <div class="kpi-content">
@@ -257,17 +258,17 @@ export const AnalysisPage = {
               </div>
               <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
                 <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">VaR (95%)</h4>
-                <div id="analysis-var" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">--</div>
+                <div id="analysis-var" style="font-size: 1.1rem; font-weight: 700; color: var(--color-danger); line-height: 1">--</div>
                 <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Pérdida diaria prob.</p>
               </div>
               <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
                 <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Max Drawdown</h4>
-                <div id="analysis-mdd" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">--</div>
+                <div id="analysis-mdd" style="font-size: 1.1rem; font-weight: 700; color: var(--color-danger); line-height: 1">--</div>
                 <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Mayor caída hist.</p>
               </div>
               <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
                 <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Alpha</h4>
-                <div id="capm-alpha" style="font-size: 1.1rem; font-weight: 700; color: #10b981; line-height: 1">--</div>
+                <div id="capm-alpha" style="font-size: 1.1rem; font-weight: 700; color: var(--color-success); line-height: 1">--</div>
                 <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Excedente anual</p>
               </div>
               <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
@@ -283,7 +284,7 @@ export const AnalysisPage = {
             <div id="stress-test-container" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 0.4rem">
               <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
                 <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">Expected Shortfall (95%)</h4>
-                <div id="analysis-es" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">--</div>
+                <div id="analysis-es" style="font-size: 1.1rem; font-weight: 700; color: var(--color-danger); line-height: 1">--</div>
                 <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Pérdida promedio en días de pánico</p>
               </div>
               <div id="stress-test-results" style="display: contents">
@@ -678,7 +679,7 @@ export const AnalysisPage = {
 
     let html = ''; let totalMarketValueAll = 0
     const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const pnlColor = pnlColorVar
     const sign = v => v > 0 ? '+' : ''
 
     const typeGroups = {}
@@ -867,7 +868,7 @@ export const AnalysisPage = {
     if (!investedEl || !marketEl || !pnlEl || !pnlPctEl) return
 
     const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const pnlColor = pnlColorVar
     const sign = v => v > 0 ? '+' : ''
 
     const currencies = Object.keys(totalsByCurrency)
@@ -1008,8 +1009,8 @@ export const AnalysisPage = {
         data: {
           labels,
           datasets: [
-            { label: 'Compras', data: compras, backgroundColor: '#10b981', borderRadius: 3 },
-            { label: 'Ventas',  data: ventas,  backgroundColor: '#f59e0b', borderRadius: 3 }
+            { label: 'Compras', data: compras, backgroundColor: cssVar('--chart-1'), borderRadius: 3 },
+            { label: 'Ventas',  data: ventas,  backgroundColor: cssVar('--chart-4'), borderRadius: 3 }
           ]
         },
         options: {
@@ -1021,7 +1022,7 @@ export const AnalysisPage = {
           },
           scales: {
             x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-            y: { grid: { color: 'rgba(100,116,139,0.12)' }, ticks: { precision: 0, font: { size: 10 } }, beginAtZero: true }
+            y: { grid: { color: cssVar('--chart-grid') }, ticks: { precision: 0, font: { size: 10 } }, beginAtZero: true }
           }
         }
       })
@@ -1192,7 +1193,7 @@ export const AnalysisPage = {
             scale: 2, 
             useCORS: true, 
             logging: false, 
-            backgroundColor: '#f1f5f9',
+            backgroundColor: cssVar('--bg-app'),
             allowTaint: true,
             onclone: (clonedDoc) => {
               // Hide elements that shouldn't be in the PDF
@@ -1200,7 +1201,7 @@ export const AnalysisPage = {
             }
           }).then(resolve).catch(err => {
             // Retry once on error
-            setTimeout(() => html2canvas(resultsEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#f1f5f9' }).then(resolve).catch(reject), 100)
+            setTimeout(() => html2canvas(resultsEl, { scale: 2, useCORS: true, logging: false, backgroundColor: cssVar('--bg-app') }).then(resolve).catch(reject), 100)
           })
         }
         
@@ -1301,12 +1302,12 @@ export const AnalysisPage = {
         <td>${(currentW * 100).toFixed(1)}%</td>
         <td style="color: var(--text-muted)">${(sharpeW * 100).toFixed(1)}%</td>
         <td style="color: var(--text-muted); font-size: 0.65rem">${sharpeDiff > 0 ? '+' : ''}${sharpeDiff.toFixed(1)}%</td>
-        <td style="color: #10b981; font-weight: 600">${(michW * 100).toFixed(1)}%</td>
-        <td style="color: #10b981; font-weight: 800">${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%</td>
-        <td style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}%</td>
-        <td style="color: #4f46e6; font-weight: 800">${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%</td>
+        <td style="color: var(--chart-3); font-weight: 600">${(michW * 100).toFixed(1)}%</td>
+        <td style="color: var(--chart-3); font-weight: 800">${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%</td>
+        <td style="color: var(--chart-1); font-weight: 700">${(hrpW * 100).toFixed(1)}%</td>
+        <td style="color: var(--chart-1); font-weight: 800">${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%</td>
         <td style="background: var(--bg-main); font-weight: 700">${(avgW * 100).toFixed(1)}%</td>
-        <td style="background: var(--bg-main); color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900">${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%</td>
+        <td style="background: var(--bg-main); color: ${avgDiff >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}; font-weight: 900">${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%</td>
       </tr>`
 
       // Mobile card
@@ -1316,7 +1317,7 @@ export const AnalysisPage = {
             <span class="ticker-chip" style="font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.3rem">${ticker}</span>
             <div style="display: flex; gap: 0.2rem; margin-left: auto; flex-wrap: wrap; justify-content: flex-end">
               <span style="background: var(--bg-main); color: var(--text-main); padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 700; font-size: 0.6rem; white-space: nowrap">P: ${(avgW * 100).toFixed(1)}%</span>
-              <span style="background: ${avgDiff >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color: ${avgDiff >= 0 ? '#10b981' : '#ef4444'}; font-weight: 900; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 3px; white-space: nowrap">
+              <span style="background: ${avgDiff >= 0 ? 'var(--color-success-soft)' : 'var(--color-danger-soft)'}; color: ${avgDiff >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}; font-weight: 900; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 3px; white-space: nowrap">
                 ${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}%
               </span>
             </div>
@@ -1333,13 +1334,13 @@ export const AnalysisPage = {
             </div>
 
             <div class="dash-instrument-row" style="font-size: 0.65rem">
-              <span class="dash-instrument-label" style="color: #10b981">Michaud</span>
-              <span class="dash-instrument-value" style="color: #10b981; font-weight: 600">${(michW * 100).toFixed(1)}% <small style="font-weight: 800; font-size: 0.55rem">(${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%)</small></span>
+              <span class="dash-instrument-label" style="color: var(--chart-3)">Michaud</span>
+              <span class="dash-instrument-value" style="color: var(--chart-3); font-weight: 600">${(michW * 100).toFixed(1)}% <small style="font-weight: 800; font-size: 0.55rem">(${michaudDiff > 0 ? '+' : ''}${michaudDiff.toFixed(1)}%)</small></span>
             </div>
 
             <div class="dash-instrument-row" style="font-size: 0.65rem">
-              <span class="dash-instrument-label" style="color: #4f46e6">HRP</span>
-              <span class="dash-instrument-value" style="color: #4f46e6; font-weight: 700">${(hrpW * 100).toFixed(1)}% <small style="font-weight: 800; font-size: 0.55rem">(${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%)</small></span>
+              <span class="dash-instrument-label" style="color: var(--chart-1)">HRP</span>
+              <span class="dash-instrument-value" style="color: var(--chart-1); font-weight: 700">${(hrpW * 100).toFixed(1)}% <small style="font-weight: 800; font-size: 0.55rem">(${hrpDiff > 0 ? '+' : ''}${hrpDiff.toFixed(1)}%)</small></span>
             </div>
           </div>
         </div>`
@@ -1356,9 +1357,9 @@ export const AnalysisPage = {
               <th>Sharpe</th>
               <th style="color: var(--text-muted)">Dif S</th>
               <th>Michaud</th>
-              <th style="color: #10b981">Dif M</th>
+              <th style="color: var(--chart-3)">Dif M</th>
               <th>HRP</th>
-              <th style="color: #4f46e6">Dif HRP</th>
+              <th style="color: var(--chart-1)">Dif HRP</th>
               <th style="background: var(--bg-main)">Promedio</th>
               <th style="background: var(--bg-main)">Diff</th>
             </tr>
@@ -1389,14 +1390,14 @@ export const AnalysisPage = {
     document.getElementById('capm-beta').textContent = beta.toFixed(2)
     document.getElementById('capm-r2').textContent = (r2 * 100).toFixed(1) + '%'
     document.getElementById('capm-alpha').textContent = (alpha > 0 ? '+' : '') + (alpha * 100).toFixed(1) + '%'
-    document.getElementById('capm-alpha').style.color = alpha >= 0 ? '#10b981' : '#ef4444'
+    document.getElementById('capm-alpha').style.color = alpha >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
     document.getElementById('analysis-var').textContent = (vR * 100).toFixed(1) + '%'
     document.getElementById('analysis-es').textContent = (es * 100).toFixed(1) + '%'
     document.getElementById('analysis-mdd').textContent = (maxDrawdown * 100).toFixed(1) + '%'
     const bD = document.getElementById('capm-beta-desc')
     if (bD) {
       bD.textContent = beta > 1.2 ? 'Agresivo' : (beta < 0.8 ? 'Defensivo' : 'Neutral')
-      bD.style.color = beta > 1.2 ? '#ef4444' : (beta < 0.8 ? '#3b82f6' : 'var(--text-muted)')
+      bD.style.color = beta > 1.2 ? 'var(--color-danger)' : (beta < 0.8 ? 'var(--color-info)' : 'var(--text-muted)')
     }
   },
 
@@ -1423,9 +1424,9 @@ export const AnalysisPage = {
     const resEl = document.getElementById('backtesting-result')
     if (resEl) {
       resEl.innerHTML = `
-        <span style="color:#4f46e6">Mío: ${((pE-1)*100).toFixed(1)}%</span> | 
+        <span style="color: var(--chart-1)">Mío: ${((pE-1)*100).toFixed(1)}%</span> | 
         <span style="color:var(--text-muted)">${sanitize(benchmarkTicker)}: ${((bE-1)*100).toFixed(1)}%</span> 
-        <div style="font-size:0.75rem; color:${diff >= 0 ? '#10b981' : '#ef4444'}; font-weight:800">
+        <div style="font-size:0.75rem; color:${diff >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}; font-weight:800">
           ${diff >= 0 ? '+' : ''}${diff}%
         </div>`
     }
@@ -1445,7 +1446,7 @@ export const AnalysisPage = {
     document.getElementById('stress-test-results').innerHTML = scenarios.map(s => `
       <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg-main); text-align: center; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem">
         <h4 style="color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; margin: 0">${s.name}</h4>
-        <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444; line-height: 1">${(beta * s.drop).toFixed(1)}%</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: var(--color-danger); line-height: 1">${(beta * s.drop).toFixed(1)}%</div>
         <p style="font-size: 0.65rem; margin: 0; color: var(--text-muted)">Mkt: ${s.drop}%</p>
       </div>`).join('')
   },

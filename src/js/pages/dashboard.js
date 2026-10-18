@@ -1,7 +1,8 @@
 import { supabase } from '../supabase-client.js'
 import { apiRequest } from '../api-client.js'
 import { renderIfChanged, clearRenderCache } from '../smart-render.js'
-import { ChartManager, CHART_COLORS } from '../chart-manager.js'
+import { ChartManager, getChartColors } from '../chart-manager.js'
+import { cssVar, heatColor, pnlColorVar } from '../theme.js'
 import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion, emptyState, bindEmptyStateActions } from '../utils.js'
 import { requestPageAction } from '../nav-state.js'
@@ -355,7 +356,7 @@ export const DashboardPage = {
 
         this._equityCharts[curr] = ChartManager.destroy(this._equityCharts[curr])
         this._equityCharts[curr] = ChartManager.renderEquityCurveChart(canvas, dates, [
-          { label: `Valor de Cartera (${curr})`, data: portfolioValue, color: '#10b981', fill: true }
+          { label: `Valor de Cartera (${curr})`, data: portfolioValue, color: cssVar('--color-primary'), fill: true }
         ])
       })
     })
@@ -451,7 +452,7 @@ export const DashboardPage = {
 
     const kpiBlock = (cur, invested) => `
       <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: #10b981">${icoInvested}</div>
+        <div class="kpi-icon-circle">${icoInvested}</div>
         <div class="kpi-content">
           <div class="kpi-label">Total Invertido ${cur}</div>
           <div class="kpi-value">${fmt(invested)}</div>
@@ -460,7 +461,7 @@ export const DashboardPage = {
       </div>
 
       <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6">${icoMarket}</div>
+        <div class="kpi-icon-circle">${icoMarket}</div>
         <div class="kpi-content">
           <div class="kpi-label">Total Valor Mercado ${cur}</div>
           <div class="kpi-value" id="dash-market-${cur.toLowerCase()}">${skeleton}</div>
@@ -469,7 +470,7 @@ export const DashboardPage = {
       </div>
 
       <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">${icoPnl}</div>
+        <div class="kpi-icon-circle">${icoPnl}</div>
         <div class="kpi-content">
           <div class="kpi-label">P&amp;L Total ${cur}</div>
           <div class="kpi-value" id="dash-pnl-${cur.toLowerCase()}">${skeleton}</div>
@@ -479,7 +480,7 @@ export const DashboardPage = {
       </div>
 
       <div class="kpi-card kpi-card--modern">
-        <div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">${icoPct}</div>
+        <div class="kpi-icon-circle">${icoPct}</div>
         <div class="kpi-content">
           <div class="kpi-label">Total P&amp;L % ${cur}</div>
           <div class="kpi-value" id="dash-pnlpct-${cur.toLowerCase()}">${skeleton}</div>
@@ -788,7 +789,7 @@ export const DashboardPage = {
   _updatePriceCells(ticker, price) {
     const fmt      = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const dash     = '<span style="color:var(--text-muted)">—</span>'
-    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const pnlColor = pnlColorVar
     const sign     = v => v > 0 ? '+' : ''
 
     document.querySelectorAll(`.market-price-cell[data-ticker="${ticker}"]`).forEach(el => {
@@ -853,7 +854,7 @@ export const DashboardPage = {
 
     const fmt   = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const sign  = v => v > 0 ? '+' : ''
-    const color = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-main)'
+    const color = v => v > 0 ? 'var(--color-success)' : v < 0 ? 'var(--color-danger)' : 'var(--text-main)'
     const pending = resARS + resUSD < total
 
     // Si los KPIs aún no están en el DOM, no hay nada que actualizar
@@ -938,11 +939,7 @@ export const DashboardPage = {
 
     const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-    const getColor = (p) => {
-      if (p > 0) return p > 10 ? '#065f46' : '#10b981'
-      if (p < 0) return p < -10 ? '#991b1b' : '#ef4444'
-      return '#64748b'
-    }
+    const getColor = (p) => heatColor(p, 10)
 
     const rawData = Object.entries(this._summary).map(([ticker, h]) => {
       const price = this._resolvedPrices?.[ticker] ?? null
@@ -1073,10 +1070,11 @@ export const DashboardPage = {
     const { alycNames, tickers, tickerMap } = this._buildAlycData(rows)
     const fmtQty = v => v.toLocaleString('es-AR', { maximumFractionDigits: 4 })
 
+    const palette = getChartColors()
     const datasets = alycNames.map((alyc, i) => ({
       label: alyc,
       data: tickers.map(t => tickerMap[t].byAlyc[alyc]?.invested || 0),
-      backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      backgroundColor: palette[i % palette.length],
       borderRadius: 4,
       barThickness: 26
     }))
@@ -1179,7 +1177,7 @@ export const DashboardPage = {
     const perf   = this._computeAlycPerformance(this._alycRows)
     const fmt    = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const sign   = v => v > 0 ? '+' : ''
-    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const pnlColor = pnlColorVar
 
     const items = perf.map(p => ({
       label: `${p.alyc} (${p.currency})`,
@@ -1210,7 +1208,7 @@ export const DashboardPage = {
     }
 
     const fmt = v => v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    const pnlColor = v => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : 'var(--text-muted)'
+    const pnlColor = pnlColorVar
     const sign = v => v > 0 ? '+' : ''
 
     const items = rows.map(r => ({

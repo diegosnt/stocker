@@ -15,7 +15,10 @@ export function renderCorrelationHeatmap(tickers, returnsMatrix) {
     for (let j = 0; j < n; j++) {
       let cov = 0; for (let d = 0; d < numDays; d++) cov += (returnsMatrix[i][d] - stats[i].avg) * (returnsMatrix[j][d] - stats[j].avg)
       const corr = (stats[i].std * stats[j].std === 0) ? 0 : (cov / numDays) / (stats[i].std * stats[j].std)
-      const bg = corr > 0.5 ? `rgba(16, 185, 129, ${corr})` : (corr < -0.2 ? `rgba(239, 68, 68, ${Math.abs(corr)})` : 'transparent')
+      // Escala neutra: la correlación alta no es "buena" (resta diversificación)
+      const bg = corr > 0.5
+        ? `color-mix(in srgb, var(--chart-1) ${Math.round(corr * 55)}%, transparent)`
+        : (corr < -0.2 ? `color-mix(in srgb, var(--chart-2) ${Math.round(Math.abs(corr) * 55)}%, transparent)` : 'transparent')
       html += `<td style="background:${bg}; text-align:center; padding:${cellPad}">${corr.toFixed(2)}</td>`
     }
     html += `</tr>`
