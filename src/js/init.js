@@ -1,6 +1,6 @@
 import { signOut } from './auth.js'
 import { register, start, navigate, currentHash } from './router.js'
-import { initDarkMode, toggleDarkMode, setDOMPurify } from './utils.js'
+import { initDarkMode, toggleDarkMode, setDOMPurify, setupModal } from './utils.js'
 import { prunePersistentCache, get as cacheGet, set as cacheSet } from './cache.js'
 import { supabase } from './supabase-client.js'
 import { requestAlycAnalysis } from './nav-state.js'
@@ -13,20 +13,60 @@ const app = document.getElementById('app')
 let toastContainer = null
 let domPurifyLoading = false
 
-export function showToast(msg, type = 'info') {
+// Los errores quedan más tiempo en pantalla; el temporizador se pausa mientras
+// el mouse o el foco están sobre el toast, y siempre se puede cerrar con ✕.
+const TOAST_DURATION = { error: 8000, warning: 6000, success: 4000, info: 4000 }
+
+function getToastContainer() {
   if (!toastContainer) {
     toastContainer = document.createElement('div')
     toastContainer.className = 'toast-container'
+    // Región viva: los lectores de pantalla anuncian cada toast nuevo
+    toastContainer.setAttribute('role', 'region')
+    toastContainer.setAttribute('aria-label', 'Notificaciones')
+    toastContainer.setAttribute('aria-live', 'polite')
     document.body.appendChild(toastContainer)
   }
+  return toastContainer
+}
+
+export function showToast(msg, type = 'info') {
+  const container = getToastContainer()
   const toast = document.createElement('div')
   toast.className = `toast toast-${type}`
-  toast.textContent = msg
-  toastContainer.appendChild(toast)
-  setTimeout(() => {
-    toast.style.opacity = '0'
+  // El contenedor ya anuncia los toasts de forma cortés; los errores además
+  // interrumpen la lectura (role="alert")
+  if (type === 'error') toast.setAttribute('role', 'alert')
+  toast.innerHTML = `
+    <span class="toast-text"></span>
+    <button type="button" class="toast-close" aria-label="Cerrar notificación">✕</button>`
+  toast.querySelector('.toast-text').textContent = msg
+  container.appendChild(toast)
+
+  let remaining = TOAST_DURATION[type] ?? TOAST_DURATION.info
+  let startedAt = 0
+  let timer = null
+
+  const dismiss = () => {
+    clearTimeout(timer)
+    toast.classList.add('toast-leaving')
     setTimeout(() => toast.remove(), 300)
-  }, 3000)
+  }
+  const resume = () => {
+    startedAt = Date.now()
+    timer = setTimeout(dismiss, remaining)
+  }
+  const pause = () => {
+    clearTimeout(timer)
+    remaining -= Date.now() - startedAt
+  }
+
+  toast.querySelector('.toast-close').addEventListener('click', dismiss)
+  toast.addEventListener('mouseenter', pause)
+  toast.addEventListener('mouseleave', resume)
+  toast.addEventListener('focusin', pause)
+  toast.addEventListener('focusout', resume)
+  resume()
 }
 
 // Puebla la barra de accesos rápidos con una entrada por ALyC con tenencias.
@@ -268,6 +308,8 @@ window.addEventListener('session-expired', () => {
   `
   document.body.appendChild(overlay)
   
+  // Sin onClose: la sesión vencida no se puede descartar, solo volver a ingresar
+  setupModal(overlay, { initialFocus: overlay.querySelector('#btn-reload-session') })
   overlay.querySelector('#btn-reload-session').onclick = () => {
     window.location.href = '/' // Forzar redirección al home/login
   }
@@ -321,12 +363,8 @@ initAuth()
 
 // ── Service Worker ─────────────────────────────────────────
 function showUpdatePrompt(sw) {
-  if (!toastContainer) {
-    toastContainer = document.createElement('div')
-    toastContainer.className = 'toast-container'
-    document.body.appendChild(toastContainer)
-  }
-  
+  const container = getToastContainer()
+
   const toast = document.createElement('div')
   toast.className = 'toast toast-update'
   toast.innerHTML = `
@@ -336,8 +374,7 @@ function showUpdatePrompt(sw) {
     </div>
     <button class="btn btn-primary btn-sm" id="btn-sw-update">Actualizar</button>
   `
-  toast.style.pointerEvents = 'auto'
-  toastContainer.appendChild(toast)
+  container.appendChild(toast)
 
   toast.querySelector('#btn-sw-update').addEventListener('click', () => {
     sw.postMessage('SKIP_WAITING')

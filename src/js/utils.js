@@ -110,7 +110,7 @@ export function confirmModal({ title, message, confirmLabel = 'Eliminar' }) {
     const overlay = document.createElement('div')
     overlay.className = 'modal-overlay'
     overlay.innerHTML = `
-      <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal">
         <h3 class="modal-title">${sanitizeAttr(title)}</h3>
         <p class="modal-message">${sanitizeAttr(message)}</p>
         <div class="modal-actions">
@@ -121,21 +121,79 @@ export function confirmModal({ title, message, confirmLabel = 'Eliminar' }) {
     document.body.appendChild(overlay)
 
     const close = result => {
-      document.removeEventListener('keydown', onKey)
       overlay.remove()
       resolve(result)
     }
-
-    const onKey = e => { if (e.key === 'Escape') close(false) }
-    document.addEventListener('keydown', onKey)
 
     overlay.querySelector('#modal-cancel').addEventListener('click', () => close(false))
     overlay.querySelector('#modal-confirm').addEventListener('click', () => close(true))
     overlay.addEventListener('click', e => { if (e.target === overlay) close(false) })
 
     // foco en el botón cancelar por seguridad
-    overlay.querySelector('#modal-cancel').focus()
+    setupModal(overlay, { onClose: () => close(false), initialFocus: overlay.querySelector('#modal-cancel') })
   })
+}
+
+// ── Modales accesibles ───────────────────────────────────────
+// Pila de modales abiertos: Esc y Tab solo actúan sobre el de arriba (por
+// ejemplo, "Nuevo instrumento" abierto encima del formulario de operación).
+const _modalStack = []
+let _modalSeq = 0
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Hace accesible un modal ya agregado al DOM: role="dialog", aria-modal y
+ * aria-labelledby (con su primer título), foco inicial adentro, Tab que no se
+ * escapa del modal, Esc para cerrar (si se pasa onClose) y, al sacar el overlay
+ * del DOM, el foco vuelve al elemento que lo abrió. No hace falta llamar nada
+ * al cerrar: alcanza con overlay.remove().
+ */
+export function setupModal(overlay, { onClose = null, initialFocus = null } = {}) {
+  const dialog = overlay.querySelector('.modal-card, .modal') || overlay
+  dialog.setAttribute('role', 'dialog')
+  dialog.setAttribute('aria-modal', 'true')
+  const heading = dialog.querySelector('h1, h2, h3, .modal-title')
+  if (heading && !dialog.hasAttribute('aria-labelledby')) {
+    if (!heading.id) heading.id = `modal-title-${++_modalSeq}`
+    dialog.setAttribute('aria-labelledby', heading.id)
+  }
+  if (!dialog.hasAttribute('tabindex')) dialog.tabIndex = -1
+
+  const previousFocus = document.activeElement
+  _modalStack.push(overlay)
+
+  const focusables = () => [...dialog.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null)
+
+  const onKey = e => {
+    if (_modalStack[_modalStack.length - 1] !== overlay) return
+    if (e.key === 'Escape' && onClose) {
+      e.preventDefault()
+      onClose()
+    } else if (e.key === 'Tab') {
+      const items = focusables()
+      if (!items.length) { e.preventDefault(); dialog.focus(); return }
+      const first = items[0], last = items[items.length - 1]
+      if (e.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        e.preventDefault(); first.focus()
+      }
+    }
+  }
+  document.addEventListener('keydown', onKey)
+
+  const release = () => {
+    document.removeEventListener('keydown', onKey)
+    observer.disconnect()
+    const idx = _modalStack.indexOf(overlay)
+    if (idx !== -1) _modalStack.splice(idx, 1)
+    if (previousFocus?.isConnected) previousFocus.focus()
+  }
+  const observer = new MutationObserver(() => { if (!overlay.isConnected) release() })
+  observer.observe(overlay.parentNode || document.body, { childList: true })
+
+  ;(initialFocus || focusables()[0] || dialog).focus()
+  return release
 }
 
 // Bindea el click de columnas ordenables (th[data-col]) de UNA tabla, identificada por
@@ -163,11 +221,20 @@ export function bindSortableHeaders(tbodyId, { getCol, getAsc, onChange }) {
 
 // Compara los valores actuales de un form contra los que tenía al empezar a editar
 // (guardados en form.dataset). Si hay cambios sin guardar, confirma con el usuario
-// antes de descartarlos. Devuelve true si está OK seguir (no dirty, o confirmado).
-export function confirmDiscardIfDirty(fields) {
+// antes de descartarlos. Resuelve true si está OK seguir (no dirty, o confirmado).
+export async function confirmDiscardIfDirty(fields) {
   const isDirty = fields.some(({ inputId, form, datasetKey }) =>
     document.getElementById(inputId).value.trim() !== (form.dataset[datasetKey] || ''))
-  return !isDirty || confirm('Tenés cambios sin guardar. ¿Descartarlos?')
+  return !isDirty || confirmDiscardChanges()
+}
+
+// Confirmación estándar para descartar cambios sin guardar (en lugar del confirm() nativo)
+export function confirmDiscardChanges() {
+  return confirmModal({
+    title: 'Cambios sin guardar',
+    message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+    confirmLabel: 'Descartar'
+  })
 }
 
 // Vuelve un formulario de alta/edición a su estado "Nuevo" — mismo patrón repetido
@@ -234,4 +301,10 @@ export function bindCardAccordion(scope = document) {
       toggle()
     })
   })
+}
+
+// Desplazamiento suave, salvo que el usuario haya pedido movimiento reducido
+export function scrollIntoViewSmooth(el) {
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' })
 }

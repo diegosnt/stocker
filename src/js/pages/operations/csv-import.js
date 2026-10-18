@@ -1,7 +1,7 @@
 import { showToast } from '../../init.js'
 import { apiRequest } from '../../api-client.js'
 import { invalidate as cacheInvalidate } from '../../cache.js'
-import { esc, fmtDateShort } from '../../utils.js'
+import { esc, fmtDateShort, setupModal } from '../../utils.js'
 import { parseCsvRow } from './csv-parser.js'
 
 export async function showFailedEntitiesModal(failedEntities) {
@@ -59,6 +59,7 @@ export async function showFailedEntitiesModal(failedEntities) {
 
     overlay.querySelector('#btn-failed-close').addEventListener('click', close)
     overlay.querySelector('#btn-failed-ok').addEventListener('click', close)
+    setupModal(overlay, { onClose: close, initialFocus: overlay.querySelector('#btn-failed-ok') })
   })
 }
 
@@ -125,6 +126,7 @@ export async function showDuplicateSelectionModal(duplicates, cleanCount = 0) {
 
     overlay.querySelector('#btn-dup-close').addEventListener('click', () => close('CANCEL_ALL'))
     overlay.querySelector('#btn-dup-cancel').addEventListener('click', () => close('CANCEL_ALL'))
+    setupModal(overlay, { onClose: () => close('CANCEL_ALL') })
 
     const checkAll = overlay.querySelector('#dup-check-all')
     const checks = overlay.querySelectorAll('.dup-check')

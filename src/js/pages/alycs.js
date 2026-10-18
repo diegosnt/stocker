@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
+import { esc, setFieldError, fmtDate, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 import { isAlycVisible, setAlycHidden } from '../alyc-visibility.js'
 
@@ -268,16 +268,16 @@ export const AlycsPage = {
     form.dataset.originalCuit    = record.cuit || ''
     form.dataset.originalWebsite = record.website || ''
     document.getElementById('alyc-name').focus()
-    form.scrollIntoView({ behavior: 'smooth' })
+    scrollIntoViewSmooth(form)
   },
 
-  _cancelEdit(confirmed = false) {
+  async _cancelEdit(confirmed = false) {
     const form = document.getElementById('form-alyc')
-    if (!confirmed && !confirmDiscardIfDirty([
+    if (!confirmed && !(await confirmDiscardIfDirty([
       { inputId: 'alyc-name', form, datasetKey: 'originalName' },
       { inputId: 'alyc-cuit', form, datasetKey: 'originalCuit' },
       { inputId: 'alyc-website', form, datasetKey: 'originalWebsite' }
-    ])) return
+    ]))) return
 
     resetEditForm({
       formId: 'form-alyc', titleId: 'alyc-form-title', submitId: 'btn-alyc-submit', cancelId: 'btn-alyc-cancel-edit',

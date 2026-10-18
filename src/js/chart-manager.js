@@ -2,6 +2,13 @@ import { Chart, registerables } from 'chart.js'
 import { TreemapController, TreemapElement } from 'chartjs-chart-treemap'
 Chart.register(...registerables, TreemapController, TreemapElement)
 
+// Sin animaciones si el usuario pidió movimiento reducido en el sistema operativo
+const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+const defaultAnimation = Chart.defaults.animation
+const applyMotionPreference = () => { Chart.defaults.animation = reducedMotion?.matches ? false : defaultAnimation }
+applyMotionPreference()
+reducedMotion?.addEventListener?.('change', applyMotionPreference)
+
 // Re-exportado para que otros módulos (ej. analysis.js) usen la misma instancia
 // ya registrada con todos los controllers, sin depender de `window`.
 export { Chart }
@@ -119,7 +126,7 @@ const getBaseOptions = () => {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: {
+    animation: reducedMotion?.matches ? false : {
       duration: 750,
       easing: 'easeInOutQuart'
     },

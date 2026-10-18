@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, setFieldError, fmtDate, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
+import { esc, setFieldError, fmtDate, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 
 export const InstrumentTypesPage = {
@@ -211,15 +211,15 @@ export const InstrumentTypesPage = {
     form.dataset.originalName = record.name
     form.dataset.originalDesc = record.description || ''
     document.getElementById('tipo-name').focus()
-    form.scrollIntoView({ behavior: 'smooth' })
+    scrollIntoViewSmooth(form)
   },
 
-  _cancelEdit(confirmed = false) {
+  async _cancelEdit(confirmed = false) {
     const form = document.getElementById('form-tipo')
-    if (!confirmed && !confirmDiscardIfDirty([
+    if (!confirmed && !(await confirmDiscardIfDirty([
       { inputId: 'tipo-name', form, datasetKey: 'originalName' },
       { inputId: 'tipo-desc', form, datasetKey: 'originalDesc' }
-    ])) return
+    ]))) return
 
     resetEditForm({
       formId: 'form-tipo', titleId: 'tipo-form-title', submitId: 'btn-tipo-submit', cancelId: 'btn-tipo-cancel-edit',

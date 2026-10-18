@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { invalidate as cacheInvalidate } from '../cache.js'
-import { esc, setFieldError, fmtDate, buildPageRange, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm } from '../utils.js'
+import { esc, setFieldError, fmtDate, buildPageRange, bindSortableHeaders, confirmDiscardIfDirty, resetEditForm, scrollIntoViewSmooth } from '../utils.js'
 import { deleteWithConfirm } from '../crud-helpers.js'
 
 const PAGE_SIZE   = 10
@@ -353,16 +353,16 @@ export const InstrumentsPage = {
     form.dataset.originalName   = record.name
     form.dataset.originalTypeId = record.instrument_type_id
     document.getElementById('inst-ticker').focus()
-    form.scrollIntoView({ behavior: 'smooth' })
+    scrollIntoViewSmooth(form)
   },
 
-  _cancelEdit(confirmed = false) {
+  async _cancelEdit(confirmed = false) {
     const form = document.getElementById('form-instrumento')
-    if (!confirmed && !confirmDiscardIfDirty([
+    if (!confirmed && !(await confirmDiscardIfDirty([
       { inputId: 'inst-ticker', form, datasetKey: 'originalTicker' },
       { inputId: 'inst-name', form, datasetKey: 'originalName' },
       { inputId: 'inst-type', form, datasetKey: 'originalTypeId' }
-    ])) return
+    ]))) return
 
     resetEditForm({
       formId: 'form-instrumento', titleId: 'inst-form-title', submitId: 'btn-inst-submit', cancelId: 'btn-inst-cancel-edit',

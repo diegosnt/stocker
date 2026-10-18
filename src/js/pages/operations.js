@@ -2,7 +2,7 @@ import { supabase } from '../supabase-client.js'
 import { showToast } from '../init.js'
 import { apiRequest } from '../api-client.js'
 import { get as cacheGet, set as cacheSet, invalidate as cacheInvalidate } from '../cache.js'
-import { esc, confirmModal, setFieldError, fmtDateShort, buildPageRange } from '../utils.js'
+import { esc, confirmModal, confirmDiscardChanges, setupModal, setFieldError, fmtDateShort, buildPageRange } from '../utils.js'
 import { handleCsvImport } from './operations/csv-import.js'
 import { isAlycVisible } from '../alyc-visibility.js'
 
@@ -1042,7 +1042,7 @@ export const OperationsPage = {
       ? editing.operated_at
       : new Date().toISOString().split('T')[0]
 
-    const close = () => {
+    const close = async () => {
       const type    = document.getElementById('op-type').value
       const instrId = document.getElementById('op-instrument').value
       const alycId  = document.getElementById('op-alyc').value
@@ -1058,11 +1058,12 @@ export const OperationsPage = {
           notes !== (editing.notes || '')
         : type !== '' || instrId !== '' || alycId !== '' || qty !== '' || price !== '' || notes !== ''
 
-      if (isDirty && !confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return
+      if (isDirty && !(await confirmDiscardChanges())) return
       state.editingOperation = null
       overlay.remove()
     }
 
+    setupModal(overlay, { onClose: close, initialFocus: document.getElementById('op-type') })
     document.getElementById('btn-op-close').addEventListener('click', close)
     document.getElementById('btn-op-cancel').addEventListener('click', close)
     document.getElementById('btn-new-instrument').addEventListener('click', () => this._showInstrumentModal())
@@ -1202,6 +1203,8 @@ export const OperationsPage = {
         searchEl.value = active.dataset.label
         listEl.hidden  = true
       } else if (e.key === 'Escape') {
+        // Con la lista abierta, Esc solo la cierra (no cierra el modal)
+        if (!listEl.hidden) e.stopPropagation()
         listEl.hidden = true
         if (!hiddenEl.value) searchEl.value = ''
       }
@@ -1290,7 +1293,7 @@ export const OperationsPage = {
 
     const tickerInput = document.getElementById('modal-ticker')
     tickerInput.addEventListener('input', () => { tickerInput.value = tickerInput.value.toUpperCase() })
-    tickerInput.focus()
+    setupModal(overlay, { onClose: close, initialFocus: tickerInput })
 
     document.getElementById('modal-inst-form').addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -1360,7 +1363,7 @@ export const OperationsPage = {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close() })
 
     const nameInput = document.getElementById('modal-alyc-name')
-    nameInput.focus()
+    setupModal(overlay, { onClose: close, initialFocus: nameInput })
 
     document.getElementById('modal-alyc-form').addEventListener('submit', async (e) => {
       e.preventDefault()
