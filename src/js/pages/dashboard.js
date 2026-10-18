@@ -6,6 +6,7 @@ import { get as cacheGet, set as cacheSet } from '../cache.js'
 import { getConcentrationAlert, renderRiskAlerts, esc, bindCollapsibleSection, bindCardAccordion } from '../utils.js'
 import { computeEquitySeries, groupOperationsByCurrency } from './dashboard/equity-curve.js'
 import { getHiddenAlycSet, aggregateHoldings, computeRealizedPnl } from '../alyc-visibility.js'
+import { usdEquivSpan, fillUsdEquivalents } from '../dollar-rate.js'
 
 const QUOTE_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 horas
 const HISTORY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 horas
@@ -410,6 +411,7 @@ export const DashboardPage = {
         <div class="kpi-content">
           <div class="kpi-label">Total Invertido ${cur}</div>
           <div class="kpi-value">${fmt(invested)}</div>
+          ${cur === 'ARS' ? usdEquivSpan(invested) : ''}
         </div>
       </div>
 
@@ -418,6 +420,7 @@ export const DashboardPage = {
         <div class="kpi-content">
           <div class="kpi-label">Total Valor Mercado ${cur}</div>
           <div class="kpi-value" id="dash-market-${cur.toLowerCase()}">${skeleton}</div>
+          <div id="dash-market-${cur.toLowerCase()}-usd"></div>
         </div>
       </div>
 
@@ -426,6 +429,7 @@ export const DashboardPage = {
         <div class="kpi-content">
           <div class="kpi-label">P&amp;L Total ${cur}</div>
           <div class="kpi-value" id="dash-pnl-${cur.toLowerCase()}">${skeleton}</div>
+          <div id="dash-pnl-${cur.toLowerCase()}-usd"></div>
           <div class="kpi-sub"  id="dash-pnl-${cur.toLowerCase()}-sub"></div>
         </div>
       </div>
@@ -441,6 +445,7 @@ export const DashboardPage = {
     kpiEl.innerHTML = data.items.length
       ? (hasARS ? kpiBlock('ARS', data.totalARS) : '') + (hasUSD ? kpiBlock('USD', data.totalUSD) : '')
       : ''
+    fillUsdEquivalents(kpiEl)
 
     if (!data.items.length) {
       document.getElementById('dash-risk-alerts').innerHTML = ''
@@ -802,6 +807,12 @@ export const DashboardPage = {
       if (sub) sub.innerHTML = pending ? `<span style="font-size:0.7rem;color:var(--text-muted)">${res}/${tot} tickers</span>` : ''
       const marketEl = document.getElementById(`dash-market-${c}`)
       if (marketEl) marketEl.innerHTML = fmt(inv + pnl)
+      if (cur === 'ARS') {
+        const marketUsdEl = document.getElementById('dash-market-ars-usd')
+        if (marketUsdEl) marketUsdEl.innerHTML = usdEquivSpan(inv + pnl)
+        const pnlUsdEl = document.getElementById('dash-pnl-ars-usd')
+        if (pnlUsdEl) pnlUsdEl.innerHTML = usdEquivSpan(pnl, { signed: true })
+      }
       const pctEl = document.getElementById(`dash-pnlpct-${c}`)
       if (pctEl) {
         const pct = inv > 0 ? (pnl / inv) * 100 : 0
@@ -811,6 +822,7 @@ export const DashboardPage = {
 
     fillCurrency('ARS', invARS, pnlARS, resARS, totARS)
     fillCurrency('USD', invUSD, pnlUSD, resUSD, totUSD)
+    fillUsdEquivalents(document.getElementById('dash-kpis'))
   },
 
   _refreshHeatmap() {

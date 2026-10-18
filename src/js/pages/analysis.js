@@ -9,6 +9,7 @@ import { renderCorrelationHeatmap } from './analysis/correlation.js'
 import { renderTreemapChart } from './analysis/treemap.js'
 import { consumeAlycRequest } from '../nav-state.js'
 import { isAlycVisible } from '../alyc-visibility.js'
+import { usdEquivSpan, fillUsdEquivalents } from '../dollar-rate.js'
 
 export const AnalysisPage = {
   _chart: null,
@@ -814,15 +815,24 @@ export const AnalysisPage = {
       <div style="${multi ? 'font-size: 0.95rem;' : ''} ${color ? `color: ${color};` : ''}">
         ${multi ? `<span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; margin-right: 0.35rem">${curr}</span>` : ''}${text}
       </div>`
+    // Equivalente en dólares MEP, solo para los importes en pesos
+    const usd = (curr, ars, opts) => curr === 'ARS' ? usdEquivSpan(ars, opts) : ''
 
-    investedEl.innerHTML = currencies.map(curr => line(curr, fmt(totalsByCurrency[curr].totalInv))).join('')
-    marketEl.innerHTML = currencies.map(curr => line(curr, fmt(totalsByCurrency[curr].totalMarket))).join('')
+    investedEl.innerHTML = currencies.map(curr => {
+      const { totalInv } = totalsByCurrency[curr]
+      return line(curr, fmt(totalInv)) + usd(curr, totalInv)
+    }).join('')
+    marketEl.innerHTML = currencies.map(curr => {
+      const { totalMarket } = totalsByCurrency[curr]
+      return line(curr, fmt(totalMarket)) + usd(curr, totalMarket)
+    }).join('')
 
     pnlEl.innerHTML = currencies.map(curr => {
       const { totalInv, totalMarket } = totalsByCurrency[curr]
       const pnl = totalMarket - totalInv
-      return line(curr, `${sign(pnl)}${fmt(pnl)}`, pnlColor(pnl))
+      return line(curr, `${sign(pnl)}${fmt(pnl)}`, pnlColor(pnl)) + usd(curr, pnl, { signed: true })
     }).join('')
+    fillUsdEquivalents(document.getElementById('analysis-totals-cards'))
 
     pnlPctEl.innerHTML = currencies.map(curr => {
       const { totalInv, totalMarket } = totalsByCurrency[curr]

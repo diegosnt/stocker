@@ -1123,6 +1123,42 @@ app.get('/api/quote/:ticker', financeLimiter, requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/dollar-rate ──────────────────────────────────
+// Cotización del dólar MEP (venta) desde dolarapi.com, cacheada en memoria.
+const DOLLAR_RATE_URL = 'https://dolarapi.com/v1/dolares/bolsa'
+const DOLLAR_RATE_TTL = 10 * 60 * 1000  // 10 minutos en ms
+let dollarRateCache = null              // { rate, updatedAt, expiresAt }
+
+app.get('/api/dollar-rate', requireAuth, async (req, res) => {
+  if (dollarRateCache && Date.now() < dollarRateCache.expiresAt) {
+    const { rate, updatedAt } = dollarRateCache
+    return res.json({ rate, updatedAt })
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+  try {
+    const upstream = await fetch(DOLLAR_RATE_URL, { signal: controller.signal })
+    if (!upstream.ok) throw new Error(`HTTP ${upstream.status}`)
+    const data = await upstream.json()
+    const rate = Number(data?.venta)
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error('Cotización inválida')
+
+    dollarRateCache = { rate, updatedAt: data.fechaActualizacion ?? null, expiresAt: Date.now() + DOLLAR_RATE_TTL }
+    res.json({ rate, updatedAt: dollarRateCache.updatedAt })
+  } catch (err) {
+    logger.warn({ err: err.name === 'AbortError' ? 'Timeout' : err.message }, 'Error al consultar dólar MEP')
+    // Si falla, devolvemos la última cotización conocida aunque esté vencida
+    if (dollarRateCache) {
+      const { rate, updatedAt } = dollarRateCache
+      return res.json({ rate, updatedAt })
+    }
+    res.status(502).json({ error: 'No se pudo obtener la cotización del dólar' })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+})
+
 app.get('/api/history/:ticker', requireAuth, async (req, res) => {
   const { ticker } = req.params
   const range = req.query.range || '6mo'

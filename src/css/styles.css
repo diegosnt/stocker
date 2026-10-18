@@ -1200,6 +1200,20 @@ tr.selected-row td {
   min-height: 1rem;
 }
 
+/* Equivalente en dólares MEP de un importe en pesos */
+.kpi-usd {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kpi-usd:empty {
+  display: none;
+}
+
 .kpi-card--compact {
   padding: 0.5rem 0.75rem;
 }
